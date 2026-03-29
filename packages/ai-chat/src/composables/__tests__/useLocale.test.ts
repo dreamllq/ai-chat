@@ -1,6 +1,5 @@
 import { describe, it, expect } from 'vitest'
 import { ref, computed } from 'vue'
-import { en } from '../../locales/en'
 import { zhCn } from '../../locales/zh-cn'
 import { locales, type AiChatLocale, type LocaleName } from '../../locales'
 
@@ -18,9 +17,19 @@ function getNestedValue(obj: Record<string, unknown>, path: string): string {
   return typeof current === 'string' ? current : path
 }
 
-function createLocaleHelpers(initialLocale: AiChatLocale = en) {
+function createLocaleHelpers(initialLocale: AiChatLocale = locales.en) {
   const localeRef = ref<AiChatLocale>(initialLocale)
   const locale = computed(() => localeRef.value)
+
+  function findLocaleName(loc: AiChatLocale): LocaleName {
+    for (const [name, obj] of Object.entries(locales)) {
+      // Use JSON comparison to avoid reference identity issues in test environments
+      if (JSON.stringify(obj) === JSON.stringify(loc)) return name as LocaleName
+    }
+    return 'en'
+  }
+
+  const currentLocaleName = computed(() => findLocaleName(localeRef.value))
 
   function t(path: string, params?: Record<string, string>): string {
     let result = getNestedValue(locale.value as unknown as Record<string, unknown>, path)
@@ -36,13 +45,13 @@ function createLocaleHelpers(initialLocale: AiChatLocale = en) {
     localeRef.value = locales[name]
   }
 
-  return { locale, t, setLocale }
+  return { locale, currentLocaleName, t, setLocale }
 }
 
 describe('useLocale', () => {
   it('returns English locale by default', () => {
     const { locale } = createLocaleHelpers()
-    expect(locale.value).toEqual(en)
+    expect(locale.value).toEqual(locales.en)
   })
 
   it('resolves nested paths via t()', () => {
@@ -60,10 +69,16 @@ describe('useLocale', () => {
   })
 
   it('switches locale via setLocale()', () => {
-    const { locale, setLocale, t } = createLocaleHelpers()
+    const { locale, currentLocaleName, setLocale, t } = createLocaleHelpers()
     setLocale('zh-cn')
     expect(locale.value).toEqual(zhCn)
+    expect(currentLocaleName.value).toBe('zh-cn')
     expect(t('conversation.newChat')).toBe(zhCn.conversation.newChat)
+  })
+
+  it('currentLocaleName tracks the active locale', () => {
+    const { currentLocaleName } = createLocaleHelpers()
+    expect(currentLocaleName.value).toBe('en')
   })
 
   it('t() handles params without placeholders gracefully', () => {
@@ -73,7 +88,7 @@ describe('useLocale', () => {
   })
 
   it('t() replaces {param} placeholders', () => {
-    const { t } = createLocaleHelpers(en)
+    const { t } = createLocaleHelpers(locales.en)
     // Verify interpolation logic via getNestedValue directly
     const obj = { greeting: 'Hello {name}, welcome to {place}!' } as unknown as Record<string, unknown>
     let result = getNestedValue(obj, 'greeting')

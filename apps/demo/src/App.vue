@@ -3,9 +3,6 @@ import { ref, onMounted } from 'vue'
 import {
   AiChat,
   registerAgent,
-  zhCn,
-  en,
-  ja,
 } from '@ai-chat/vue'
 import type {
   AgentDefinition,
@@ -14,7 +11,6 @@ import type {
   ModelConfig,
   ChatOptions,
   ChatChunk,
-  AiChatLocale,
   LocaleName,
 } from '@ai-chat/vue'
 
@@ -70,11 +66,7 @@ const mockAgentRunner: AgentRunner = {
 // Locale state
 // ---------------------------------------------------------------------------
 
-const localeMap: Record<string, AiChatLocale> = {
-  'zh-cn': zhCn,
-  en,
-  ja,
-}
+const STORAGE_KEY = 'ai-chat-locale'
 
 const localeLabels: { key: LocaleName; label: string }[] = [
   { key: 'zh-cn', label: '中文' },
@@ -82,12 +74,23 @@ const localeLabels: { key: LocaleName; label: string }[] = [
   { key: 'ja', label: '日本語' },
 ]
 
-const currentLocale = ref<LocaleName>('en')
-const currentLocaleObj = ref<AiChatLocale>(en)
+function getPersistedLocale(): LocaleName {
+  try {
+    const saved = localStorage.getItem(STORAGE_KEY)
+    if (saved && ['zh-cn', 'en', 'ja'].includes(saved)) {
+      return saved as LocaleName
+    }
+  } catch { /* localStorage unavailable */ }
+  return 'en'
+}
+
+const currentLocale = ref<LocaleName>(getPersistedLocale())
 
 function switchLocale(name: LocaleName) {
   currentLocale.value = name
-  currentLocaleObj.value = localeMap[name]
+  try {
+    localStorage.setItem(STORAGE_KEY, name)
+  } catch { /* localStorage unavailable */ }
 }
 
 // ---------------------------------------------------------------------------
@@ -138,7 +141,7 @@ onMounted(() => {
 
     <!-- ── Chat area ───────────────────────────────────────────────── -->
     <main class="demo-main">
-      <AiChat :locale="currentLocaleObj" />
+      <AiChat :locale="currentLocale" />
     </main>
   </div>
 </template>
