@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, nextTick, onMounted, onUpdated, ref } from 'vue'
 import MarkdownIt from 'markdown-it'
 import hljs from 'highlight.js'
+import 'highlight.js/styles/github-dark.css'
 import type { ChatMessage } from '../types'
 import { useLocale } from '../composables/useLocale'
 
@@ -16,14 +17,18 @@ const md = new MarkdownIt({
   linkify: true,
   typographer: true,
   highlight: (str: string, lang: string): string => {
+    let highlighted: string
     if (lang && hljs.getLanguage(lang)) {
       try {
-        return hljs.highlight(str, { language: lang }).value
+        highlighted = hljs.highlight(str, { language: lang }).value
       } catch {
-        // fall through
+        highlighted = md.utils.escapeHtml(str)
       }
+    } else {
+      highlighted = md.utils.escapeHtml(str)
     }
-    return ''
+    const langLabel = lang ? `<span class="code-block-header__lang">${md.utils.escapeHtml(lang)}</span>` : ''
+    return `<span class="code-block-header">${langLabel}</span><span class="code-block-body">${highlighted}</span>`
   },
 })
 
@@ -36,37 +41,66 @@ const showStreamingCursor = computed(
   () => props.message.role === 'assistant' && props.message.isStreaming === true,
 )
 
-// Code block copy state: keyed by code index
-const copiedIndex = ref<number | null>(null)
-
-interface CodeBlock {
-  index: number
-  raw: string
-}
-
-const codeBlocks = computed<CodeBlock[]>(() => {
-  const blocks: CodeBlock[] = []
+// Store raw code indexed by block position for copy
+const codeBlockRawMap = computed<Map<number, string>>(() => {
+  const map = new Map<number, string>()
   const regex = /```[\w]*\n([\s\S]*?)```/g
-  let match: RegExpExecArray | null
+  let match: RegExpExecArray | null = regex.exec(props.message.content)
   let idx = 0
-  while ((match = regex.exec(props.message.content)) !== null) {
-    blocks.push({ index: idx, raw: match[1].replace(/\n$/, '') })
+  while (match !== null) {
+    map.set(idx, match[1].replace(/\n$/, ''))
     idx++
+    match = regex.exec(props.message.content)
   }
-  return blocks
+  return map
 })
 
-async function copyCode(block: CodeBlock): Promise<void> {
+const contentRef = ref<HTMLElement | null>(null)
+const copiedIndex = ref<number | null>(null)
+
+function addCopyButtons(): void {
+  const el = contentRef.value
+  if (!el) return
+
+  // Find all <pre> blocks — each one corresponds to a code block
+  const preBlocks = el.querySelectorAll('pre')
+  preBlocks.forEach((pre, index) => {
+    // Skip if already has a copy button
+    if (pre.querySelector('.code-block-copy')) return
+
+    pre.style.position = 'relative'
+
+    const btn = document.createElement('button')
+    btn.className = 'code-block-copy'
+    btn.textContent = t('chat.copyCode')
+    btn.addEventListener('click', () => copyCode(index, btn))
+    pre.appendChild(btn)
+  })
+}
+
+async function copyCode(index: number, btn: HTMLButtonElement): Promise<void> {
+  const raw = codeBlockRawMap.value.get(index)
+  if (raw === undefined) return
   try {
-    await navigator.clipboard.writeText(block.raw)
-    copiedIndex.value = block.index
+    await navigator.clipboard.writeText(raw)
+    copiedIndex.value = index
+    btn.textContent = t('chat.copySuccess')
     setTimeout(() => {
       copiedIndex.value = null
+      btn.textContent = t('chat.copyCode')
     }, 2000)
   } catch {
     // Clipboard not available
   }
 }
+
+onMounted(() => {
+  nextTick(() => addCopyButtons())
+})
+
+onUpdated(() => {
+  nextTick(() => addCopyButtons())
+})
 </script>
 
 <template>
@@ -84,22 +118,8 @@ async function copyCode(block: CodeBlock): Promise<void> {
 
     <div class="chat-message__bubble">
       <!-- eslint-disable-next-line vue/no-v-html -->
-      <div class="chat-message__content" v-html="renderedContent" />
+      <div ref="contentRef" class="chat-message__content" v-html="renderedContent" />
       <span v-if="showStreamingCursor" class="chat-message__cursor" />
-
-      <!-- Copy buttons for code blocks -->
-      <div
-        v-for="block in codeBlocks"
-        :key="block.index"
-        class="chat-message__code-actions"
-      >
-        <button
-          class="chat-message__code-copy"
-          @click="copyCode(block)"
-        >
-          {{ copiedIndex === block.index ? t('chat.copySuccess') : t('chat.copyCode') }}
-        </button>
-      </div>
     </div>
   </div>
 </template>
@@ -176,14 +196,45 @@ async function copyCode(block: CodeBlock): Promise<void> {
 }
 
 .chat-message__content :deep(pre) {
-  background: var(--el-fill-color-darker, #1e1e1e);
-  color: #d4d4d4;
-  border-radius: 6px;
-  padding: 12px;
-  overflow-x: auto;
-  margin: 8px 0;
+  background: #0d1117;
+  border-radius: 8px;
+  overflow: hidden;
+  margin: 12px 0;
   font-size: 13px;
   line-height: 1.6;
+  position: relative;
+}
+
+.chat-message__content :deep(pre code) {
+  display: block;
+  color: #c9d1d9;
+  background: #0d1117;
+  font-family: 'Menlo', 'Monaco', 'Courier New', monospace;
+  font-size: 13px;
+  overflow-x: auto;
+}
+
+.chat-message__content :deep(pre .code-block-header) {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 16px;
+  background: rgba(110, 118, 129, 0.15);
+  border-bottom: 1px solid rgba(110, 118, 129, 0.2);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+  font-size: 12px;
+  color: #8b949e;
+  user-select: none;
+}
+
+.chat-message__content :deep(pre .code-block-header__lang) {
+  text-transform: lowercase;
+}
+
+.chat-message__content :deep(pre .code-block-body) {
+  display: block;
+  padding: 12px 16px;
+  overflow-x: auto;
 }
 
 .chat-message__content :deep(code) {
@@ -213,25 +264,25 @@ async function copyCode(block: CodeBlock): Promise<void> {
   50% { opacity: 0; }
 }
 
-.chat-message__code-actions {
-  display: flex;
-  justify-content: flex-end;
-  margin-top: 4px;
-}
-
-.chat-message__code-copy {
-  background: transparent;
-  border: none;
-  color: var(--el-text-color-secondary, #909399);
+.chat-message__content :deep(.code-block-copy) {
+  position: absolute;
+  top: 6px;
+  right: 8px;
+  background: rgba(110, 118, 129, 0.25);
+  border: 1px solid rgba(110, 118, 129, 0.3);
+  color: #c9d1d9;
   font-size: 12px;
   cursor: pointer;
-  padding: 2px 8px;
+  padding: 4px 10px;
   border-radius: 4px;
-  transition: color 0.2s, background-color 0.2s;
+  transition: background-color 0.2s, color 0.2s;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+  z-index: 1;
+  line-height: 1;
 }
 
-.chat-message__code-copy:hover {
-  color: var(--el-color-primary, #409eff);
-  background: var(--el-fill-color-light, #f5f7fa);
+.chat-message__content :deep(.code-block-copy:hover) {
+  background: rgba(110, 118, 129, 0.45);
+  color: #f0f6fc;
 }
 </style>

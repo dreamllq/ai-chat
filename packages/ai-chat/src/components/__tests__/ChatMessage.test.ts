@@ -121,7 +121,7 @@ describe('ChatMessage', () => {
 
   // --- Code blocks ---
 
-  it('renders code block with copy button', () => {
+  it('renders code block with copy button', async () => {
     const wrapper = mountChatMessage({
       message: createMessage({
         role: 'assistant',
@@ -129,7 +129,10 @@ describe('ChatMessage', () => {
       }),
     })
 
-    const copyBtn = wrapper.find('.chat-message__code-copy')
+    // Copy buttons are injected via onMounted → nextTick
+    await wrapper.vm.$nextTick()
+
+    const copyBtn = wrapper.find('.code-block-copy')
     expect(copyBtn.exists()).toBe(true)
     expect(copyBtn.text()).toBe('Copy Code')
   })
@@ -142,8 +145,12 @@ describe('ChatMessage', () => {
       }),
     })
 
-    const copyBtn = wrapper.find('.chat-message__code-copy')
-    await copyBtn.trigger('click')
+    await wrapper.vm.$nextTick()
+
+    const copyBtn = wrapper.find('.code-block-copy')
+    // Dispatch click event because the listener is added via addEventListener on a DOM element
+    copyBtn.element.dispatchEvent(new Event('click', { bubbles: true }))
+    await wrapper.vm.$nextTick()
 
     expect(navigator.clipboard.writeText).toHaveBeenCalledWith('console.log("hello")')
   })
@@ -156,8 +163,10 @@ describe('ChatMessage', () => {
       }),
     })
 
-    const copyBtn = wrapper.find('.chat-message__code-copy')
-    await copyBtn.trigger('click')
+    await wrapper.vm.$nextTick()
+
+    const copyBtn = wrapper.find('.code-block-copy')
+    copyBtn.element.dispatchEvent(new Event('click', { bubbles: true }))
     await wrapper.vm.$nextTick()
 
     expect(copyBtn.text()).toBe('Copied!')
@@ -207,13 +216,16 @@ describe('ChatMessage', () => {
 
   // --- useLocale integration ---
 
-  it('uses useLocale for copy code text', () => {
+  it('uses useLocale for copy code text', async () => {
     mountChatMessage({
       message: createMessage({
         role: 'assistant',
         content: '```js\ntest\n```',
       }),
     })
+
+    // Copy button text is set during onMounted → nextTick
+    await new Promise((r) => setTimeout(r, 0))
 
     expect(mockT).toHaveBeenCalledWith('chat.copyCode')
   })
