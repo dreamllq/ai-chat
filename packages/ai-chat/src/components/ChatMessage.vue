@@ -3,11 +3,13 @@ import { computed, nextTick, onMounted, onUpdated, ref } from 'vue'
 import MarkdownIt from 'markdown-it'
 import hljs from 'highlight.js'
 import 'highlight.js/styles/github-dark.css'
-import type { ChatMessage } from '../types'
+import type { ChatMessage as ChatMessageType } from '../types'
+import { isMessageAttachment, isLegacyFileMetadata } from '../types'
+import type { MessageAttachment } from '../types'
 import { useLocale } from '../composables/useLocale'
 
 const props = defineProps<{
-  message: ChatMessage
+  message: ChatMessageType
 }>()
 
 const { t } = useLocale()
@@ -40,6 +42,25 @@ const isSystem = computed(() => props.message.role === 'system')
 const showStreamingCursor = computed(
   () => props.message.role === 'assistant' && props.message.isStreaming === true,
 )
+
+// Attachments
+const attachments = computed<MessageAttachment[]>(() => {
+  const files = props.message.metadata?.files
+  if (!Array.isArray(files)) return []
+  return files.filter(isMessageAttachment)
+})
+
+const legacyFiles = computed<{ name: string; size: number; type: string }[]>(() => {
+  const files = props.message.metadata?.files
+  if (!Array.isArray(files)) return []
+  return files.filter((f: unknown) => !isMessageAttachment(f) && isLegacyFileMetadata(f)) as { name: string; size: number; type: string }[]
+})
+
+function formatSize(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
+}
 
 // Store raw code indexed by block position for copy
 const codeBlockRawMap = computed<Map<number, string>>(() => {
@@ -119,6 +140,54 @@ onUpdated(() => {
     <div class="chat-message__bubble">
       <!-- eslint-disable-next-line vue/no-v-html -->
       <div ref="contentRef" class="chat-message__content" v-html="renderedContent" />
+      <!-- Attachments -->
+      <div v-if="attachments.length > 0 || legacyFiles.length > 0" class="chat-message__attachments">
+        <!-- Valid MessageAttachment items -->
+        <div
+          v-for="attachment in attachments"
+          :key="attachment.id"
+          class="chat-message__attachment"
+          :class="`chat-message__attachment--${attachment.type}`"
+        >
+          <!-- Image -->
+          <img
+            v-if="attachment.type === 'image' && (attachment.url || attachment.data)"
+            :src="attachment.url || attachment.data"
+            :alt="attachment.name"
+            class="chat-message__attachment-image"
+          />
+          <!-- Audio -->
+          <audio
+            v-else-if="attachment.type === 'audio' && (attachment.url || attachment.data)"
+            controls
+            :src="attachment.url || attachment.data"
+          />
+          <!-- Video -->
+          <video
+            v-else-if="attachment.type === 'video' && (attachment.url || attachment.data)"
+            controls
+            :src="attachment.url || attachment.data"
+            class="chat-message__attachment-video"
+          />
+          <!-- Document / fallback -->
+          <div v-else class="chat-message__attachment-doc">
+            <span class="chat-message__attachment-icon">📎</span>
+            <span class="chat-message__attachment-name">{{ attachment.name }}</span>
+            <span class="chat-message__attachment-size">{{ formatSize(attachment.size) }}</span>
+          </div>
+        </div>
+        <!-- Legacy file metadata -->
+        <div
+          v-for="(file, index) in legacyFiles"
+          :key="`legacy-${index}`"
+          class="chat-message__attachment chat-message__attachment--document"
+        >
+          <div class="chat-message__attachment-doc">
+            <span class="chat-message__attachment-icon">📎</span>
+            <span class="chat-message__attachment-name">{{ file.name }}</span>
+          </div>
+        </div>
+      </div>
       <span v-if="showStreamingCursor" class="chat-message__cursor" />
     </div>
   </div>
@@ -284,5 +353,71 @@ onUpdated(() => {
 .chat-message__content :deep(.code-block-copy:hover) {
   background: rgba(110, 118, 129, 0.45);
   color: #f0f6fc;
+}
+
+.chat-message__attachments {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.chat-message__attachment {
+  border-radius: 8px;
+  overflow: hidden;
+  max-width: 100%;
+}
+
+.chat-message__attachment--image {
+  max-width: 300px;
+}
+
+.chat-message__attachment-image {
+  display: block;
+  max-width: 100%;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.chat-message__attachment--audio,
+.chat-message__attachment--video {
+  max-width: 320px;
+}
+
+.chat-message__attachment-video {
+  display: block;
+  max-width: 100%;
+  border-radius: 8px;
+}
+
+.chat-message__attachment--document {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  background: rgba(0, 0, 0, 0.05);
+  border-radius: 6px;
+  font-size: 12px;
+}
+
+.chat-message--user .chat-message__attachment--document {
+  background: rgba(255, 255, 255, 0.15);
+}
+
+.chat-message__attachment-icon {
+  font-size: 14px;
+}
+
+.chat-message__attachment-name {
+  color: inherit;
+  max-width: 180px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.chat-message__attachment-size {
+  opacity: 0.6;
+  font-size: 11px;
 }
 </style>
