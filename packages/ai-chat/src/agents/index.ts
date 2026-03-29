@@ -1,15 +1,4 @@
-import { agentRegistry } from '../services/agent'
-import { LangChainChatAgent } from './langchain-chat-agent'
-import type { AgentDefinition } from '../types'
-
-const builtinChatAgent: AgentDefinition = {
-  id: 'langchain-chat',
-  name: 'LangChain Chat',
-  description: 'Built-in chat agent powered by LangChain.js',
-  isBuiltin: true,
-}
-
-const langchainRunner = new LangChainChatAgent()
-agentRegistry.register(builtinChatAgent, langchainRunner)
-
-export { LangChainChatAgent }
+export { LangChainRunner } from './langchain-runner'
+export { convertMessages } from './message-converter'
+export { createLLM } from './llm-init'
+export { LangChainChatAgent } from './langchain-chat-agent'

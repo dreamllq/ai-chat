@@ -44,21 +44,17 @@ export { useAgent } from './composables/useAgent'
 export { useObservable } from './composables/useObservable'
 
 // === Agents ===
-// Import the class (prevents tree-shaking) and manually register the built-in agent.
-// The agents/index.ts side-effect registration gets tree-shaken in production builds,
-// so we register here to guarantee it runs.
-import { LangChainChatAgent } from './agents/langchain-chat-agent'
+// Built-in agent — config-based registration (LangChainRunner created internally by registry)
 import { agentRegistry, registerAgent } from './services/agent'
 
-const _builtinDef = {
+agentRegistry.register({
   id: 'langchain-chat',
   name: 'LangChain Chat',
   description: 'Built-in chat agent powered by LangChain.js',
   isBuiltin: true,
-}
-agentRegistry.register(_builtinDef, new LangChainChatAgent())
+})
 
-export { LangChainChatAgent }
+export type { ToolDefinition, MCPServerConfig, MCPTransportType } from './types'
 export { TitleGenerator } from './agents/title-generator'
 export { agentRegistry, registerAgent }
 

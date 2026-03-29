@@ -8,14 +8,10 @@ import type { S3StorageConfig } from '@ai-chat/storage-s3'
 // ---------------------------------------------------------------------------
 // Custom Agents — 从独立文件导入，调用 registerAgent() 注册
 // ---------------------------------------------------------------------------
-import { echoAgentDef, echoAgentRunner } from './agents/echo-agent'
-import { reverseAgentDef, reverseAgentRunner } from './agents/reverse-agent'
-import { llmToolAgentDef, llmToolAgentRunner } from './agents/llm-tool-agent'
+import { llmToolAgentDef } from './agents/llm-tool-agent'
 
 // 在模块顶层同步注册（先于组件渲染），确保下拉框能立即列出
-registerAgent(echoAgentDef, echoAgentRunner)
-registerAgent(reverseAgentDef, reverseAgentRunner)
-registerAgent(llmToolAgentDef, llmToolAgentRunner)
+registerAgent(llmToolAgentDef)
 
 // ---------------------------------------------------------------------------
 // Locale state

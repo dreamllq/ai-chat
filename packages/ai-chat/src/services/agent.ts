@@ -1,5 +1,6 @@
 import { ref } from 'vue'
 import type { AgentDefinition, AgentRunner } from '../types'
+import { LangChainRunner } from '../agents/langchain-runner'
 
 class AgentRegistry {
   private definitions: Map<string, AgentDefinition> = new Map()
@@ -11,9 +12,20 @@ class AgentRegistry {
    */
   readonly version = ref(0)
 
-  register(agentDef: AgentDefinition, runner: AgentRunner): void {
+  /**
+   * Register an agent. Accepts either:
+   * 1. Config-based: register(agentDef) — creates LangChainRunner internally
+   * 2. Legacy: register(agentDef, runner) — explicit runner (backward compat)
+   */
+  register(agentDef: AgentDefinition, runner?: AgentRunner): void {
     this.definitions.set(agentDef.id, agentDef)
-    this.runners.set(agentDef.id, runner)
+
+    if (runner) {
+      this.runners.set(agentDef.id, runner)
+    } else {
+      this.runners.set(agentDef.id, new LangChainRunner(agentDef))
+    }
+
     this.version.value++
   }
 
@@ -38,7 +50,7 @@ class AgentRegistry {
 
 export const agentRegistry = new AgentRegistry()
 
-/** Convenience function for registering custom agents */
-export function registerAgent(agentDef: AgentDefinition, runner: AgentRunner): void {
+/** Convenience function for registering agents (runner is optional) */
+export function registerAgent(agentDef: AgentDefinition, runner?: AgentRunner): void {
   agentRegistry.register(agentDef, runner)
 }
