@@ -59,6 +59,7 @@ function handleSend() {
   }
   emit('send', payload)
   inputText.value = ''
+  selectedFiles.value = []
   nextTick(autoResize)
 }
 
@@ -179,27 +180,26 @@ function handleModelChange(id: string) {
             </ElOption>
           </ElSelect>
 
-          <!-- File upload -->
-          <template v-if="fileUploadService">
-            <input
-              ref="fileInputRef"
-              type="file"
-              multiple
-              class="chat-input__hidden-input"
-              @change="handleFileChange"
-            />
-            <ElButton
-              size="small"
-              text
-              class="chat-input__icon-btn"
-              @click="triggerFileUpload"
-            >
-              <ElIcon :size="14"><UploadFilled /></ElIcon>
-            </ElButton>
-          </template>
         </div>
 
         <div class="chat-input__toolbar-right">
+          <!-- File upload (hidden input + icon button) -->
+          <input
+            ref="fileInputRef"
+            type="file"
+            multiple
+            class="chat-input__hidden-input"
+            aria-label="Upload file"
+            @change="handleFileChange"
+          />
+          <ElButton
+            size="small"
+            text
+            class="chat-input__icon-btn"
+            @click="triggerFileUpload"
+          >
+            <ElIcon :size="14"><UploadFilled /></ElIcon>
+          </ElButton>
           <!-- Stop button -->
           <ElButton
             v-if="isStreaming"

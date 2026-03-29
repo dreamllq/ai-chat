@@ -203,11 +203,11 @@ describe('ChatInput', () => {
     expect(fileInput.exists()).toBe(true)
   })
 
-  it('file upload button hidden when fileUploadService is not provided', () => {
+  it('file upload button visible even without fileUploadService (base64 mode)', () => {
     const wrapper = mountChatInput()
 
     const fileInput = wrapper.find('input[type="file"]')
-    expect(fileInput.exists()).toBe(false)
+    expect(fileInput.exists()).toBe(true)
   })
 
   it('send clears input after sending', async () => {
