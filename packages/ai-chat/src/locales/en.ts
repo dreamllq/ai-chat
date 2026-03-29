@@ -18,6 +18,7 @@ export interface AiChatLocale {
     title: string
     create: string
     delete: string
+    deleteConfirm: string
     endpoint: string
     apiKey: string
     modelName: string
@@ -26,6 +27,8 @@ export interface AiChatLocale {
     provider: string
     temperature: string
     maxTokens: string
+    addNew: string
+    emptyList: string
   }
   agent: {
     title: string
@@ -64,9 +67,10 @@ export const en: AiChatLocale = {
     copySuccess: 'Copied!',
   },
   model: {
-    title: 'Model',
+    title: 'Model Management',
     create: 'Create Model',
     delete: 'Delete',
+    deleteConfirm: 'Are you sure you want to delete this model?',
     endpoint: 'API Endpoint',
     apiKey: 'API Key',
     modelName: 'Model Name',
@@ -75,6 +79,8 @@ export const en: AiChatLocale = {
     provider: 'Provider',
     temperature: 'Temperature',
     maxTokens: 'Max Tokens',
+    addNew: 'Add Model',
+    emptyList: 'No models configured',
   },
   agent: {
     title: 'Agent',

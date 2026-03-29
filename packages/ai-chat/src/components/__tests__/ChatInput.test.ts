@@ -9,6 +9,9 @@ const mockT = vi.fn((path: string) => {
     'chat.send': 'Send',
     'chat.stop': 'Stop',
     'upload.button': 'Upload File',
+    'agent.select': 'Select Agent',
+    'agent.builtin': 'Built-in',
+    'model.selectModel': 'Select Model',
   }
   return map[path] ?? path
 })
@@ -21,26 +24,60 @@ vi.mock('../../composables/useLocale', () => ({
   }),
 }))
 
-// Element Plus stubs
-const ElInputStub = {
-  name: 'ElInput',
-  template: `
-    <textarea
-      :value="modelValue"
-      :placeholder="placeholder"
-      @input="$emit('update:modelValue', $event.target.value)"
-      @keydown="$emit('keydown', $event)"
-    ></textarea>
-  `,
-  props: ['modelValue', 'placeholder', 'type', 'autosize', 'resize'],
-  emits: ['update:modelValue', 'keydown'],
-}
+// Mock useModel
+vi.mock('../../composables/useModel', () => ({
+  useModel: () => ({
+    models: { value: [] },
+    currentModelId: { value: null },
+    selectModel: vi.fn(),
+  }),
+}))
 
+// Mock agentRegistry
+vi.mock('../../services/agent', () => ({
+  agentRegistry: {
+    getAllDefinitions: () => [{ id: 'langchain-chat', name: 'Chat', isBuiltin: true }],
+  },
+}))
+
+// Element Plus stubs
 const ElButtonStub = {
   name: 'ElButton',
-  template: `<button :disabled="disabled" :type="nativeType" @click="$emit('click')"><slot /></button>`,
-  props: ['type', 'disabled', 'nativeType', 'icon', 'circle'],
+  template: `<button :disabled="disabled" :data-type="type" @click="$emit('click')"><slot /></button>`,
+  props: ['type', 'disabled', 'nativeType', 'icon', 'circle', 'size', 'text'],
   emits: ['click'],
+}
+
+const ElSelectStub = {
+  name: 'ElSelect',
+  template: `<div class="el-select-stub"><slot /></div>`,
+  props: ['modelValue', 'placeholder', 'size', 'class'],
+  emits: ['update:modelValue'],
+}
+
+const ElOptionStub = {
+  name: 'ElOption',
+  template: `<div class="el-option-stub"><slot /></div>`,
+  props: ['value', 'label'],
+}
+
+const ElTagStub = {
+  name: 'ElTag',
+  template: `<span class="el-tag-stub"><slot /></span>`,
+  props: ['size', 'type'],
+}
+
+const ElIconStub = {
+  name: 'ElIcon',
+  template: `<span class="el-icon-stub"><slot /></span>`,
+  props: ['size'],
+}
+
+const ModelManagerStub = {
+  name: 'ModelManager',
+  template: `<div class="model-manager-stub"></div>`,
+  props: ['visible'],
+  emits: ['update:visible'],
 }
 
 function mountChatInput(props: Record<string, unknown> = {}) {
@@ -48,8 +85,12 @@ function mountChatInput(props: Record<string, unknown> = {}) {
     props,
     global: {
       stubs: {
-        ElInput: ElInputStub,
         ElButton: ElButtonStub,
+        ElSelect: ElSelectStub,
+        ElOption: ElOptionStub,
+        ElTag: ElTagStub,
+        ElIcon: ElIconStub,
+        ModelManager: ModelManagerStub,
       },
     },
   })
@@ -62,41 +103,37 @@ describe('ChatInput', () => {
 
   it('renders textarea with correct placeholder', () => {
     const wrapper = mountChatInput()
-    const textarea = wrapper.findComponent({ name: 'ElInput' })
+    const textarea = wrapper.find('textarea.chat-input__textarea')
 
-    expect(textarea.props('type')).toBe('textarea')
-    expect(textarea.props('placeholder')).toBe('Type a message...')
-    expect(textarea.props('autosize')).toEqual({ minRows: 1, maxRows: 6 })
+    expect(textarea.exists()).toBe(true)
+    expect(textarea.attributes('placeholder')).toBe('Type a message...')
   })
 
   it('Enter triggers send with content', async () => {
     const wrapper = mountChatInput()
-    const textarea = wrapper.findComponent({ name: 'ElInput' })
+    const textarea = wrapper.find('textarea.chat-input__textarea')
 
-    // Set input value
-    await textarea.vm.$emit('update:modelValue', 'Hello')
+    // Set input value via DOM
+    await textarea.setValue('Hello')
     await wrapper.vm.$nextTick()
 
     // Simulate Enter key
-    const enterEvent = new KeyboardEvent('keydown', { key: 'Enter', shiftKey: false })
-    Object.defineProperty(enterEvent, 'preventDefault', { value: vi.fn() })
-    await textarea.vm.$emit('keydown', enterEvent)
+    await textarea.trigger('keydown', { key: 'Enter' })
     await wrapper.vm.$nextTick()
 
-    const emitted = wrapper.emitted('send')
-    expect(emitted).toBeTruthy()
-    expect(emitted![0]).toEqual([{ content: 'Hello' }])
+    expect(wrapper.emitted('send')).toBeTruthy()
+    expect(wrapper.emitted('send')![0]).toEqual([{ content: 'Hello' }])
   })
 
   it('Shift+Enter does NOT trigger send (adds newline)', async () => {
     const wrapper = mountChatInput()
-    const textarea = wrapper.findComponent({ name: 'ElInput' })
+    const textarea = wrapper.find('textarea.chat-input__textarea')
 
-    await textarea.vm.$emit('update:modelValue', 'Hello')
+    await textarea.setValue('Hello')
     await wrapper.vm.$nextTick()
 
-    const shiftEnterEvent = new KeyboardEvent('keydown', { key: 'Enter', shiftKey: true })
-    await textarea.vm.$emit('keydown', shiftEnterEvent)
+    // Shift+Enter should NOT send
+    await textarea.trigger('keydown', { key: 'Enter', shiftKey: true })
     await wrapper.vm.$nextTick()
 
     expect(wrapper.emitted('send')).toBeFalsy()
@@ -104,20 +141,19 @@ describe('ChatInput', () => {
 
   it('empty input does NOT trigger send', async () => {
     const wrapper = mountChatInput()
-    const textarea = wrapper.findComponent({ name: 'ElInput' })
+    const textarea = wrapper.find('textarea.chat-input__textarea')
 
     // Input is empty by default, try sending
-    const enterEvent = new KeyboardEvent('keydown', { key: 'Enter' })
-    await textarea.vm.$emit('keydown', enterEvent)
+    await textarea.trigger('keydown', { key: 'Enter' })
     await wrapper.vm.$nextTick()
 
     expect(wrapper.emitted('send')).toBeFalsy()
 
     // Also test whitespace-only
-    await textarea.vm.$emit('update:modelValue', '   ')
+    await textarea.setValue('   ')
     await wrapper.vm.$nextTick()
 
-    await textarea.vm.$emit('keydown', enterEvent)
+    await textarea.trigger('keydown', { key: 'Enter' })
     await wrapper.vm.$nextTick()
 
     expect(wrapper.emitted('send')).toBeFalsy()
@@ -127,10 +163,8 @@ describe('ChatInput', () => {
     const wrapper = mountChatInput({ isStreaming: true })
     const buttons = wrapper.findAllComponents({ name: 'ElButton' })
 
-    // Should have a stop button with danger type
     const stopButton = buttons.find(b => b.props('type') === 'danger')
     expect(stopButton).toBeTruthy()
-    expect(stopButton!.text()).toBe('Stop')
 
     // Send button should not be present
     const sendButton = buttons.find(b => b.props('type') === 'primary')
@@ -177,24 +211,22 @@ describe('ChatInput', () => {
 
   it('send clears input after sending', async () => {
     const wrapper = mountChatInput()
-    const textarea = wrapper.findComponent({ name: 'ElInput' })
+    const textarea = wrapper.find('textarea.chat-input__textarea')
 
     // Set input value
-    await textarea.vm.$emit('update:modelValue', 'Hello')
+    await textarea.setValue('Hello')
     await wrapper.vm.$nextTick()
 
     // Send via Enter key
-    const enterEvent = new KeyboardEvent('keydown', { key: 'Enter' })
-    await textarea.vm.$emit('keydown', enterEvent)
+    await textarea.trigger('keydown', { key: 'Enter' })
     await wrapper.vm.$nextTick()
 
     // Verify send was emitted with correct content
     expect(wrapper.emitted('send')).toBeTruthy()
     expect(wrapper.emitted('send')![0]).toEqual([{ content: 'Hello' }])
 
-    // After sending, the send button should be disabled again (input cleared internally)
-    const sendButton = wrapper.findAllComponents({ name: 'ElButton' }).find(b => b.props('type') === 'primary')
-    expect(sendButton!.props('disabled')).toBe(true)
+    // After sending, the textarea should be cleared
+    expect((textarea.element as HTMLTextAreaElement).value).toBe('')
   })
 
   it('send button is disabled when input is empty', () => {
@@ -206,9 +238,9 @@ describe('ChatInput', () => {
 
   it('send button is enabled when input has content', async () => {
     const wrapper = mountChatInput()
-    const textarea = wrapper.findComponent({ name: 'ElInput' })
+    const textarea = wrapper.find('textarea.chat-input__textarea')
 
-    await textarea.vm.$emit('update:modelValue', 'Hello')
+    await textarea.setValue('Hello')
     await wrapper.vm.$nextTick()
 
     const sendButton = wrapper.findAllComponents({ name: 'ElButton' }).find(b => b.props('type') === 'primary')
@@ -217,9 +249,9 @@ describe('ChatInput', () => {
 
   it('clicking send button emits send with content', async () => {
     const wrapper = mountChatInput()
-    const textarea = wrapper.findComponent({ name: 'ElInput' })
+    const textarea = wrapper.find('textarea.chat-input__textarea')
 
-    await textarea.vm.$emit('update:modelValue', 'Test message')
+    await textarea.setValue('Test')
     await wrapper.vm.$nextTick()
 
     const sendButton = wrapper.findAllComponents({ name: 'ElButton' }).find(b => b.props('type') === 'primary')
@@ -227,7 +259,7 @@ describe('ChatInput', () => {
     await wrapper.vm.$nextTick()
 
     expect(wrapper.emitted('send')).toBeTruthy()
-    expect(wrapper.emitted('send')![0]).toEqual([{ content: 'Test message' }])
+    expect(wrapper.emitted('send')![0]).toEqual([{ content: 'Test' }])
   })
 
   it('sends with files when files are selected', async () => {
@@ -237,11 +269,11 @@ describe('ChatInput', () => {
     }
 
     const wrapper = mountChatInput({ fileUploadService: mockService })
-    const textarea = wrapper.findComponent({ name: 'ElInput' })
     const fileInput = wrapper.find('input[type="file"]')
 
     // Set text
-    await textarea.vm.$emit('update:modelValue', 'Check this file')
+    const textarea = wrapper.find('textarea.chat-input__textarea')
+    await textarea.setValue('Check this file')
     await wrapper.vm.$nextTick()
 
     // Simulate file selection
@@ -258,11 +290,11 @@ describe('ChatInput', () => {
     await sendButton!.vm.$emit('click')
     await wrapper.vm.$nextTick()
 
-    const emitted = wrapper.emitted('send')
+    const emitted = wrapper.emitted<{ content: string; files?: File[] }[]>('send')
     expect(emitted).toBeTruthy()
     expect(emitted![0][0].content).toBe('Check this file')
     expect(emitted![0][0].files).toHaveLength(1)
-    expect(emitted![0][0].files[0].name).toBe('test.txt')
+    expect(emitted![0][0].files![0].name).toBe('test.txt')
   })
 
   it('shows file preview with remove button for selected files', async () => {

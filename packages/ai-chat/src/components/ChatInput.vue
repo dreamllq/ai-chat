@@ -1,42 +1,58 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue'
-import { ElInput, ElButton } from 'element-plus'
+import { ref, computed, nextTick, watch } from 'vue'
+import { ElSelect, ElOption, ElTag, ElButton, ElIcon } from 'element-plus'
+import { Promotion, CircleClose, UploadFilled, Setting } from '@element-plus/icons-vue'
 import { useLocale } from '../composables/useLocale'
+import { useModel } from '../composables/useModel'
+import { agentRegistry } from '../services/agent'
+import ModelManager from './ModelManager.vue'
 import type { FileUploadService } from '../types'
 
 const props = defineProps<{
   isStreaming?: boolean
   fileUploadService?: FileUploadService | null
+  currentAgentId?: string
 }>()
 
 const emit = defineEmits<{
   send: [payload: { content: string; files?: File[] }]
   stop: []
+  'update:currentAgentId': [value: string]
 }>()
 
 const { t } = useLocale()
+const { models, currentModelId, selectModel } = useModel()
 
 const inputText = ref('')
 const selectedFiles = ref<File[]>([])
 const fileInputRef = ref<HTMLInputElement | null>(null)
+const textareaRef = ref<HTMLTextAreaElement | null>(null)
+const managerVisible = ref(false)
 
 const trimmedText = computed(() => inputText.value.trim())
 const canSend = computed(() => trimmedText.value.length > 0 || selectedFiles.value.length > 0)
+const agents = computed(() => agentRegistry.getAllDefinitions())
+
+function autoResize() {
+  const el = textareaRef.value
+  if (!el) return
+  el.style.height = 'auto'
+  const lineHeight = parseInt(getComputedStyle(el).lineHeight) || 22
+  const maxHeight = lineHeight * 8
+  el.style.height = Math.min(el.scrollHeight, maxHeight) + 'px'
+}
+
+watch(inputText, () => nextTick(autoResize))
 
 function handleSend() {
   if (!canSend.value || props.isStreaming) return
-
-  const payload: { content: string; files?: File[] } = {
-    content: trimmedText.value,
-  }
-
+  const payload: { content: string; files?: File[] } = { content: trimmedText.value }
   if (selectedFiles.value.length > 0) {
     payload.files = [...selectedFiles.value]
   }
-
   emit('send', payload)
   inputText.value = ''
-  selectedFiles.value = []
+  nextTick(autoResize)
 }
 
 function handleKeydown(event: KeyboardEvent) {
@@ -60,94 +76,175 @@ function handleFileChange(event: Event) {
     const newFiles = Array.from(target.files)
     selectedFiles.value = [...selectedFiles.value, ...newFiles]
   }
-  // Reset the input so the same file can be selected again
   target.value = ''
 }
 
 function removeFile(index: number) {
   selectedFiles.value.splice(index, 1)
 }
+
+function handleAgentChange(value: string) {
+  emit('update:currentAgentId', value)
+}
+
+function handleModelChange(id: string) {
+  selectModel(id)
+}
 </script>
 
 <template>
   <div class="chat-input">
-    <!-- File preview area -->
-    <div v-if="selectedFiles.length > 0" class="chat-input__files">
-      <div v-for="(file, index) in selectedFiles" :key="index" class="chat-input__file-item">
-        <span class="chat-input__file-name">{{ file.name }}</span>
-        <button class="chat-input__file-remove" @click="removeFile(index)">×</button>
+    <div class="chat-input__container">
+      <!-- File preview area -->
+      <div v-if="selectedFiles.length > 0" class="chat-input__files">
+        <div v-for="(file, index) in selectedFiles" :key="index" class="chat-input__file-item">
+          <span class="chat-input__file-name">{{ file.name }}</span>
+          <button class="chat-input__file-remove" @click="removeFile(index)">×</button>
+        </div>
       </div>
-    </div>
 
-    <div class="chat-input__row">
-      <ElInput
+      <!-- Textarea -->
+      <textarea
+        ref="textareaRef"
         v-model="inputText"
-        type="textarea"
+        class="chat-input__textarea"
         :placeholder="t('chat.placeholder')"
-        :autosize="{ minRows: 1, maxRows: 6 }"
-        resize="none"
+        rows="1"
         @keydown="handleKeydown"
       />
 
-      <!-- File upload button -->
-      <template v-if="fileUploadService">
-        <input
-          ref="fileInputRef"
-          type="file"
-          multiple
-          class="chat-input__hidden-input"
-          @change="handleFileChange"
-        />
-        <ElButton @click="triggerFileUpload">
-          {{ t('upload.button') }}
-        </ElButton>
-      </template>
+      <!-- Toolbar strip -->
+      <div class="chat-input__toolbar">
+        <div class="chat-input__toolbar-left">
+          <!-- Agent selector -->
+          <ElSelect
+            :model-value="currentAgentId"
+            :placeholder="t('agent.select')"
+            size="small"
+            class="chat-input__selector"
+            @update:model-value="handleAgentChange"
+          >
+            <ElOption
+              v-for="agent in agents"
+              :key="agent.id"
+              :value="agent.id"
+              :label="agent.name"
+            >
+              <div class="chat-input__agent-option">
+                <span>{{ agent.name }}</span>
+                <ElTag v-if="agent.isBuiltin" size="small" type="info">
+                  {{ t('agent.builtin') }}
+                </ElTag>
+              </div>
+            </ElOption>
+          </ElSelect>
 
-      <!-- Send / Stop button -->
-      <ElButton
-        v-if="isStreaming"
-        type="danger"
-        @click="handleStop"
-      >
-        {{ t('chat.stop') }}
-      </ElButton>
-      <ElButton
-        v-else
-        type="primary"
-        :disabled="!canSend"
-        @click="handleSend"
-      >
-        {{ t('chat.send') }}
-      </ElButton>
+          <!-- Model selector -->
+          <ElSelect
+            :model-value="currentModelId"
+            :placeholder="t('model.selectModel')"
+            size="small"
+            class="chat-input__selector"
+            @update:model-value="handleModelChange"
+          >
+            <ElOption
+              v-for="model in (models ?? [])"
+              :key="model.id"
+              :value="model.id"
+              :label="model.name"
+            />
+          </ElSelect>
+          <ElButton
+            size="small"
+            text
+            class="chat-input__icon-btn"
+            @click="managerVisible = true"
+          >
+            <ElIcon :size="14"><Setting /></ElIcon>
+          </ElButton>
+
+          <!-- File upload -->
+          <template v-if="fileUploadService">
+            <input
+              ref="fileInputRef"
+              type="file"
+              multiple
+              class="chat-input__hidden-input"
+              @change="handleFileChange"
+            />
+            <ElButton
+              size="small"
+              text
+              class="chat-input__icon-btn"
+              @click="triggerFileUpload"
+            >
+              <ElIcon :size="14"><UploadFilled /></ElIcon>
+            </ElButton>
+          </template>
+        </div>
+
+        <div class="chat-input__toolbar-right">
+          <!-- Stop button -->
+          <ElButton
+            v-if="isStreaming"
+            type="danger"
+            circle
+            size="small"
+            @click="handleStop"
+          >
+            <ElIcon :size="14"><CircleClose /></ElIcon>
+          </ElButton>
+          <!-- Send button -->
+          <ElButton
+            v-else
+            type="primary"
+            circle
+            size="small"
+            :disabled="!canSend"
+            @click="handleSend"
+          >
+            <ElIcon :size="14"><Promotion /></ElIcon>
+          </ElButton>
+        </div>
+      </div>
     </div>
+
+    <ModelManager v-model:visible="managerVisible" />
   </div>
 </template>
 
 <style scoped>
 .chat-input {
+  --chat-input-radius: var(--ai-chat-input-radius, 14px);
+  --chat-input-border: var(--ai-chat-input-border, var(--el-border-color-light, #dcdfe6));
+  --chat-input-bg: var(--ai-chat-input-bg, var(--el-bg-color, #ffffff));
+  --chat-input-shadow: var(--ai-chat-input-shadow, 0 2px 8px rgba(0, 0, 0, 0.06));
+  --chat-input-toolbar-height: var(--ai-chat-input-toolbar-height, 38px);
+}
+
+.chat-input__container {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  border-radius: var(--chat-input-radius);
+  border: 1px solid var(--chat-input-border);
+  background-color: var(--chat-input-bg);
+  box-shadow: var(--chat-input-shadow);
+  overflow: hidden;
+  transition: box-shadow 0.2s ease, border-color 0.2s ease;
 }
 
-.chat-input__row {
-  display: flex;
-  align-items: flex-end;
-  gap: 8px;
+.chat-input__container:focus-within {
+  border-color: var(--el-color-primary-light-3, #b3d8ff);
+  box-shadow: 0 0 0 2px var(--el-color-primary-light-7, rgba(64, 158, 255, 0.12)),
+    var(--chat-input-shadow);
 }
 
-.chat-input__row :deep(.el-textarea) {
-  flex: 1;
-}
-
-.chat-input__hidden-input {
-  display: none;
-}
-
+/* === File previews === */
 .chat-input__files {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
+  padding: 10px 14px 0;
 }
 
 .chat-input__file-item {
@@ -162,6 +259,10 @@ function removeFile(index: number) {
 
 .chat-input__file-name {
   color: var(--el-text-color-regular);
+  max-width: 140px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .chat-input__file-remove {
@@ -183,5 +284,95 @@ function removeFile(index: number) {
 .chat-input__file-remove:hover {
   color: var(--el-color-danger);
   background-color: var(--el-fill-color);
+}
+
+/* === Textarea === */
+.chat-input__textarea {
+  display: block;
+  width: 100%;
+  padding: 12px 14px 4px;
+  border: none;
+  outline: none;
+  resize: none;
+  background: transparent;
+  color: var(--el-text-color-primary);
+  font-size: 14px;
+  line-height: 22px;
+  font-family: inherit;
+  min-height: 44px;
+  max-height: 176px;
+  overflow-y: auto;
+}
+
+.chat-input__textarea::placeholder {
+  color: var(--el-text-color-placeholder);
+}
+
+/* === Toolbar === */
+.chat-input__toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: var(--chat-input-toolbar-height);
+  padding: 0 8px 6px;
+  gap: 4px;
+}
+
+.chat-input__toolbar-left {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  min-width: 0;
+  flex: 1;
+  overflow: hidden;
+}
+
+.chat-input__toolbar-right {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+/* Compact selects in toolbar — strip borders */
+.chat-input__selector :deep(.el-input__wrapper) {
+  box-shadow: none !important;
+  background: transparent;
+  padding: 0 4px;
+}
+
+.chat-input__selector :deep(.el-input__wrapper:hover) {
+  box-shadow: none !important;
+}
+
+.chat-input__selector :deep(.el-input__inner) {
+  font-size: 12px;
+}
+
+.chat-input__selector :deep(.el-select__caret) {
+  font-size: 12px;
+}
+
+/* Agent option layout */
+.chat-input__agent-option {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+}
+
+/* Icon buttons in toolbar */
+.chat-input__icon-btn {
+  flex-shrink: 0;
+  color: var(--el-text-color-secondary);
+}
+
+.chat-input__icon-btn:hover {
+  color: var(--el-text-color-primary);
+}
+
+/* Hidden file input */
+.chat-input__hidden-input {
+  display: none;
 }
 </style>

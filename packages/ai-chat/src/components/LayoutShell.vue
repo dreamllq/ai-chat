@@ -72,7 +72,7 @@ function toggleSidebar() {
   --ai-chat-bg: var(--ai-chat-bg, #ffffff);
   --ai-chat-sidebar-bg: var(--ai-chat-sidebar-bg, #f7f7f8);
   --ai-chat-border-color: var(--ai-chat-border-color, #e5e5e5);
-  --ai-chat-header-height: var(--ai-chat-header-height, 52px);
+  --ai-chat-header-height: var(--ai-chat-header-height, 44px);
   --ai-chat-input-padding: var(--ai-chat-input-padding, 16px);
   --ai-chat-transition: 0.3s ease;
 
@@ -135,6 +135,5 @@ function toggleSidebar() {
 .ai-chat-input {
   flex-shrink: 0;
   padding: var(--ai-chat-input-padding);
-  border-top: 1px solid var(--ai-chat-border-color);
 }
 </style>

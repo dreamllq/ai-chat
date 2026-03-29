@@ -49,7 +49,7 @@ describe('useLocale', () => {
     const { t } = createLocaleHelpers()
     expect(t('conversation.newChat')).toBe('New Chat')
     expect(t('chat.placeholder')).toBe('Type a message...')
-    expect(t('model.title')).toBe('Model')
+    expect(t('model.title')).toBe('Model Management')
     expect(t('error.network')).toBe('Network error. Please check your connection.')
   })
 

@@ -17,9 +17,10 @@ export const zhCn: AiChatLocale = {
     copySuccess: '已复制！',
   },
   model: {
-    title: '模型',
+    title: '模型管理',
     create: '创建模型',
     delete: '删除',
+    deleteConfirm: '确定要删除此模型吗？',
     endpoint: 'API 地址',
     apiKey: 'API 密钥',
     modelName: '模型名称',
@@ -28,6 +29,8 @@ export const zhCn: AiChatLocale = {
     provider: '提供商',
     temperature: '温度',
     maxTokens: '最大令牌数',
+    addNew: '添加模型',
+    emptyList: '暂无模型配置',
   },
   agent: {
     title: '智能体',

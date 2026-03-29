@@ -3,8 +3,6 @@ import { ref, computed, onMounted } from 'vue'
 import AiChatProvider from './AiChatProvider.vue'
 import LayoutShell from './LayoutShell.vue'
 import Sidebar from './Sidebar.vue'
-import AgentSelector from './AgentSelector.vue'
-import ModelSelector from './ModelSelector.vue'
 import ChatMessageList from './ChatMessageList.vue'
 import ChatInput from './ChatInput.vue'
 import { useChat } from '../composables/useChat'
@@ -66,15 +64,12 @@ async function handleSend(payload: { content: string; files?: File[] }) {
         <template #sidebar>
           <Sidebar :agent-id="currentAgentId" :model-id="modelIdForSidebar" />
         </template>
-        <template #header>
-          <AgentSelector v-model="currentAgentId" />
-          <ModelSelector />
-        </template>
         <template #messages>
           <ChatMessageList />
         </template>
         <template #input>
           <ChatInput
+            v-model:current-agent-id="currentAgentId"
             :is-streaming="isStreaming"
             :file-upload-service="props.fileUploadService"
             @send="handleSend"

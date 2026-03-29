@@ -17,9 +17,10 @@ export const ja: AiChatLocale = {
     copySuccess: 'コピーしました！',
   },
   model: {
-    title: 'モデル',
+    title: 'モデル管理',
     create: 'モデルを作成',
     delete: '削除',
+    deleteConfirm: 'このモデルを削除してもよろしいですか？',
     endpoint: 'APIエンドポイント',
     apiKey: 'APIキー',
     modelName: 'モデル名',
@@ -28,6 +29,8 @@ export const ja: AiChatLocale = {
     provider: 'プロバイダー',
     temperature: '温度',
     maxTokens: '最大トークン数',
+    addNew: 'モデルを追加',
+    emptyList: 'モデルが設定されていません',
   },
   agent: {
     title: 'エージェント',
