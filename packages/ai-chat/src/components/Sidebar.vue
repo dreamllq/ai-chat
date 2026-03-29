@@ -120,7 +120,10 @@ function formatTime(timestamp: number): string {
 
 .ai-chat-sidebar__header {
   flex-shrink: 0;
-  padding: 12px;
+  display: flex;
+  align-items: center;
+  height: var(--ai-chat-header-height, 44px);
+  padding: 0 12px;
   border-bottom: 1px solid var(--ai-chat-border-color, #e5e5e5);
 }
 
@@ -144,6 +147,7 @@ function formatTime(timestamp: number): string {
   flex: 1;
   overflow-y: auto;
   padding: 4px 0;
+  background-color: var(--ai-chat-sidebar-bg, #f7f7f8);
 }
 
 .ai-chat-sidebar__item {

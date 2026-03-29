@@ -42,13 +42,14 @@ function toggleSidebar() {
           @click="toggleSidebar"
         >
           <ElIcon :size="20">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <line v-if="!sidebarCollapsed" x1="3" y1="12" x2="21" y2="12" />
-              <line v-if="!sidebarCollapsed" x1="3" y1="6" x2="21" y2="6" />
-              <line v-if="!sidebarCollapsed" x1="3" y1="18" x2="21" y2="18" />
-              <line v-if="sidebarCollapsed" x1="3" y1="12" x2="21" y2="12" />
-              <line v-if="sidebarCollapsed" x1="3" y1="6" x2="21" y2="6" />
-              <polyline v-if="sidebarCollapsed" points="9 6 15 12 9 18" />
+            <svg v-if="!sidebarCollapsed" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="3" y="3" width="18" height="18" rx="2" />
+              <line x1="9" y1="3" x2="9" y2="21" />
+            </svg>
+            <svg v-else viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="3" y="3" width="18" height="18" rx="2" />
+              <line x1="9" y1="3" x2="9" y2="21" />
+              <polyline points="14 9 17 12 14 15" />
             </svg>
           </ElIcon>
         </ElButton>
@@ -71,9 +72,9 @@ function toggleSidebar() {
   --ai-chat-sidebar-width: 260px;
   --ai-chat-bg: var(--ai-chat-bg, #ffffff);
   --ai-chat-sidebar-bg: var(--ai-chat-sidebar-bg, #f7f7f8);
-  --ai-chat-border-color: var(--ai-chat-border-color, #e5e5e5);
-  --ai-chat-header-height: var(--ai-chat-header-height, 44px);
-  --ai-chat-input-padding: var(--ai-chat-input-padding, 16px);
+  --ai-chat-border-color: #e5e5e5;
+  --ai-chat-header-height: 44px;
+  --ai-chat-input-padding: 16px;
   --ai-chat-transition: 0.3s ease;
 
   display: flex;
@@ -117,8 +118,9 @@ function toggleSidebar() {
   gap: 8px;
   height: var(--ai-chat-header-height);
   min-height: var(--ai-chat-header-height);
-  padding: 0 12px;
+  padding: 0 16px;
   border-bottom: 1px solid var(--ai-chat-border-color);
+  background-color: var(--ai-chat-bg);
 }
 
 .ai-chat-sidebar-toggle {
@@ -132,10 +134,13 @@ function toggleSidebar() {
   flex-direction: column;
   min-height: 0;
   overflow: hidden;
+  padding: 0 16px;
+  background-color: var(--ai-chat-bg);
 }
 
 .ai-chat-input {
   flex-shrink: 0;
-  padding: var(--ai-chat-input-padding);
+  padding: var(--ai-chat-input-padding) 16px;
+  background-color: var(--ai-chat-bg);
 }
 </style>
