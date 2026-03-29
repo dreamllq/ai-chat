@@ -128,8 +128,10 @@ function toggleSidebar() {
 
 .ai-chat-messages {
   flex: 1;
-  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
   min-height: 0;
+  overflow: hidden;
 }
 
 .ai-chat-input {
