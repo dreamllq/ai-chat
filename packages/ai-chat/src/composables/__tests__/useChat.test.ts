@@ -64,7 +64,7 @@ describe('useChat', () => {
   let currentConversationId: ReturnType<typeof ref<string | null>>
   let currentConversation: ReturnType<typeof ref<Conversation | undefined>>
   let currentMessages: ReturnType<typeof ref<ChatMessage[]>>
-  let currentModel: ReturnType<typeof ref<ModelConfig | undefined>>
+  let models: ReturnType<typeof ref<ModelConfig[] | undefined>>
 
   beforeEach(async () => {
     await db.messages.clear()
@@ -83,22 +83,24 @@ describe('useChat', () => {
       updatedAt: Date.now(),
     })
     currentMessages = ref<ChatMessage[]>([])
-    currentModel = ref<ModelConfig | undefined>({
-      id: 'model-1',
-      name: 'Test Model',
-      provider: 'openai',
-      endpoint: 'https://api.openai.com/v1',
-      apiKey: 'sk-test',
-      modelName: 'gpt-4',
-      createdAt: Date.now(),
-    })
+    models = ref<ModelConfig[] | undefined>([
+      {
+        id: 'model-1',
+        name: 'Test Model',
+        provider: 'openai',
+        endpoint: 'https://api.openai.com/v1',
+        apiKey: 'sk-test',
+        modelName: 'gpt-4',
+        createdAt: Date.now(),
+      },
+    ])
 
     mocks.useSession.mockReturnValue({
       currentConversationId,
       currentConversation,
       currentMessages,
     })
-    mocks.useModel.mockReturnValue({ currentModel })
+    mocks.useModel.mockReturnValue({ models })
 
     // Default: no agent runner registered
     mocks.getRunner.mockReturnValue(undefined)
@@ -120,7 +122,7 @@ describe('useChat', () => {
   })
 
   it('returns early when no model is selected', async () => {
-    currentModel.value = undefined
+    models.value = []
     await chat.sendMessage('Hello')
     const msgs = await messageService.getByConversationId('conv-1')
     expect(msgs).toHaveLength(0)

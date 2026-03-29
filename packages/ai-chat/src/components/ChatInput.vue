@@ -20,10 +20,11 @@ const emit = defineEmits<{
   send: [payload: { content: string; files?: File[] }]
   stop: []
   'update:currentAgentId': [value: string]
+  'update:currentModelId': [value: string]
 }>()
 
 const { t } = useLocale()
-const { models, currentModelId, selectModel } = useModel()
+const { models, currentModelId } = useModel()
 
 const inputText = ref('')
 const selectedFiles = ref<File[]>([])
@@ -98,7 +99,7 @@ function handleModelChange(id: string) {
     managerVisible.value = true
     return
   }
-  selectModel(id)
+  emit('update:currentModelId', id)
 }
 </script>
 

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, watch, onMounted } from 'vue'
 import AiChatProvider from './AiChatProvider.vue'
 import LayoutShell from './LayoutShell.vue'
 import Sidebar from './Sidebar.vue'
@@ -10,8 +10,9 @@ import { useSession } from '../composables/useSession'
 import { useModel } from '../composables/useModel'
 import { useAgent } from '../composables/useAgent'
 import { ConversationService } from '../services/database'
+import { agentRegistry } from '../services/agent'
 import type { AiChatLocale, LocaleName } from '../locales'
-import type { FileUploadService } from '../types'
+import type { FileUploadService, Conversation } from '../types'
 
 const props = withDefaults(defineProps<{
   locale?: AiChatLocale | LocaleName
@@ -24,9 +25,9 @@ const props = withDefaults(defineProps<{
 const sidebarCollapsed = ref(false)
 
 const { isStreaming, sendMessage, stopStreaming } = useChat()
-const { currentConversationId, createConversation } = useSession()
-const { currentModelId, initDefault, initBuiltins } = useModel()
-const { currentAgentId, selectAgent, initDefault: initDefaultAgent } = useAgent()
+const { currentConversation, currentConversationId, createConversation } = useSession()
+const { models, currentModelId, selectModel, initDefault, initBuiltins } = useModel()
+const { agents, currentAgentId, selectAgent, initDefault: initDefaultAgent } = useAgent()
 
 const conversationService = new ConversationService()
 
@@ -39,6 +40,49 @@ async function handleAgentChange(agentId: string) {
     await conversationService.update(currentConversationId.value, { agentId })
   }
 }
+
+/** Switch model — persist the current conversation's modelId to DB */
+async function handleModelChange(modelId: string) {
+  selectModel(modelId)
+  if (currentConversationId.value) {
+    await conversationService.update(currentConversationId.value, { modelId })
+  }
+}
+
+/**
+ * When the active conversation changes, sync global agent/model selection
+ * from the conversation's stored values. If the bound agent/model no longer
+ * exists, fall back to the first available and update the conversation.
+ */
+watch(currentConversation, async (conv: Conversation | undefined) => {
+  if (!conv) return
+
+  const loadedAgents = agents.value ?? []
+  const loadedModels = models.value ?? []
+
+  // Wait for data to be loaded
+  if (loadedAgents.length === 0 || loadedModels.length === 0) return
+
+  // Resolve agent — fallback to first available (builtin)
+  const agentExists = loadedAgents.some(a => a.id === conv.agentId)
+  const validAgentId = agentExists ? conv.agentId : loadedAgents[0].id
+
+  // Resolve model — fallback to first available (builtin)
+  const modelExists = loadedModels.some(m => m.id === conv.modelId)
+  const validModelId = modelExists ? conv.modelId : loadedModels[0].id
+
+  // Persist fallback values to conversation if needed
+  const updates: Partial<Conversation> = {}
+  if (!agentExists) updates.agentId = validAgentId
+  if (!modelExists) updates.modelId = validModelId
+  if (Object.keys(updates).length > 0) {
+    await conversationService.update(conv.id, updates)
+  }
+
+  // Sync global state from conversation
+  selectAgent(validAgentId)
+  if (validModelId) selectModel(validModelId)
+})
 
 onMounted(() => {
   initBuiltins().then(() => {
@@ -88,6 +132,7 @@ async function handleSend(payload: { content: string; files?: File[] }) {
             :is-streaming="isStreaming"
             :file-upload-service="props.fileUploadService"
             @update:current-agent-id="handleAgentChange"
+            @update:current-model-id="handleModelChange"
             @send="handleSend"
             @stop="stopStreaming"
           />

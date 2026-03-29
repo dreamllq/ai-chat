@@ -14,16 +14,20 @@ const INITIAL_TITLE_MAX_LENGTH = 30
 export function useChat() {
   const { currentConversation, currentConversationId, currentMessages } =
     useSession()
-  const { currentModel } = useModel()
+  const { models } = useModel()
   const messageService = new MessageService()
   const conversationService = new ConversationService()
 
   async function sendMessage(content: string, files?: File[]): Promise<void> {
     console.log('[useChat] sendMessage called', { content })
 
-    const model = currentModel.value
     const conversation = currentConversation.value
     const conversationId = currentConversationId.value
+
+    // Resolve model from conversation's modelId (per-conversation binding)
+    const model = conversation
+      ? models.value?.find(m => m.id === conversation.modelId)
+      : undefined
 
     console.log('[useChat] state:', {
       hasModel: !!model,
