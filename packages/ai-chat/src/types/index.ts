@@ -65,6 +65,43 @@ export interface ModelConfig {
   createdAt: number
 }
 
+// === 工具 ===
+
+/** 框架无关的工具定义 */
+export interface ToolDefinition {
+  /** 工具名称 */
+  name: string
+  /** 工具描述 */
+  description: string
+  /** 工具参数 JSON Schema */
+  parameters?: Record<string, unknown>
+  /** 工具执行函数 */
+  execute: (input: string) => Promise<string>
+}
+
+// === MCP 服务器 ===
+
+/** MCP 服务器传输类型 */
+export type MCPTransportType = 'stdio' | 'http' | 'sse'
+
+/** MCP 服务器配置 */
+export interface MCPServerConfig {
+  /** 服务器名称 */
+  name: string
+  /** 传输类型 */
+  transport: MCPTransportType
+  /** 可执行文件命令 (stdio transport) */
+  command?: string
+  /** 命令参数 (stdio transport) */
+  args?: string[]
+  /** 服务器 URL (http/sse transport) */
+  url?: string
+  /** 请求头 (http/sse transport) */
+  headers?: Record<string, string>
+  /** 环境变量 (stdio transport) */
+  env?: Record<string, string>
+}
+
 // === Agent ===
 
 /** 智能体定义 */
@@ -81,9 +118,13 @@ export interface AgentDefinition {
   systemPrompt?: string
   /** 是否为内置智能体 */
   isBuiltin?: boolean
+  /** 工具列表 */
+  tools?: ToolDefinition[]
+  /** MCP 服务器列表 */
+  mcpServers?: MCPServerConfig[]
 }
 
-/** 智能体运行器接口 */
+/** @internal 智能体运行器接口 — 内部使用，用户不再需要实现此接口 */
 export interface AgentRunner {
   /** 执行聊天，返回流式响应 */
   chat(
