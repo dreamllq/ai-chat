@@ -37,6 +37,7 @@ vi.mock('../../composables/useModel', () => ({
 vi.mock('../../services/agent', () => ({
   agentRegistry: {
     getAllDefinitions: () => [{ id: 'langchain-chat', name: 'Chat', isBuiltin: true }],
+    version: { value: 0 },
   },
 }))
 

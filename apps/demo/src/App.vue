@@ -1,66 +1,17 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
-import {
-  AiChat,
-  registerAgent,
-} from '@ai-chat/vue'
-import type {
-  AgentDefinition,
-  AgentRunner,
-  ChatMessage,
-  ModelConfig,
-  ChatOptions,
-  ChatChunk,
-  LocaleName,
-} from '@ai-chat/vue'
+import { ref } from 'vue'
+import { AiChat, registerAgent } from '@ai-chat/vue'
+import type { LocaleName } from '@ai-chat/vue'
 
 // ---------------------------------------------------------------------------
-// Mock Agent — streams back an echo of whatever the user sends
+// Custom Agents — 从独立文件导入，调用 registerAgent() 注册
 // ---------------------------------------------------------------------------
+import { echoAgentDef, echoAgentRunner } from './agents/echo-agent'
+import { reverseAgentDef, reverseAgentRunner } from './agents/reverse-agent'
 
-const mockAgentDef: AgentDefinition = {
-  id: 'demo-mock',
-  name: 'Demo Agent',
-  description: 'A mock agent for demonstration — echoes your message back',
-}
-
-const mockAgentRunner: AgentRunner = {
-  async *chat(
-    messages: ChatMessage[],
-    _model: ModelConfig,
-    options?: ChatOptions,
-  ): AsyncGenerator<ChatChunk, void, unknown> {
-    const lastMessage = messages[messages.length - 1]
-    const text =
-      lastMessage?.content ?? ''
-
-    const response = [
-      `You said: _"${text}"_`,
-      '',
-      'This is a **mock response** from the demo agent.',
-      'In production you would register a real LangChain or OpenAI agent instead.',
-      '',
-      '---',
-      '',
-      'Try switching locales with the buttons in the header, or creating a new conversation in the sidebar.',
-    ].join('\n')
-
-    // Simulate token-by-token streaming
-    const chars = [...response]
-    let buffer = ''
-    for (let i = 0; i < chars.length; i++) {
-      if (options?.signal?.aborted) return
-      buffer += chars[i]
-      // Yield in small bursts for a realistic feel
-      if (buffer.length >= 3 || i === chars.length - 1) {
-        yield { type: 'token', content: buffer }
-        buffer = ''
-        await new Promise<void>((r) => setTimeout(r, 18))
-      }
-    }
-    yield { type: 'done' }
-  },
-}
+// 在模块顶层同步注册（先于组件渲染），确保下拉框能立即列出
+registerAgent(echoAgentDef, echoAgentRunner)
+registerAgent(reverseAgentDef, reverseAgentRunner)
 
 // ---------------------------------------------------------------------------
 // Locale state
@@ -94,12 +45,8 @@ function switchLocale(name: LocaleName) {
 }
 
 // ---------------------------------------------------------------------------
-// Register mock agent on mount
+// Locale state
 // ---------------------------------------------------------------------------
-
-onMounted(() => {
-  registerAgent(mockAgentDef, mockAgentRunner)
-})
 </script>
 
 <template>

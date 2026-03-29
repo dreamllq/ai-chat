@@ -9,6 +9,7 @@ const mockGetAllDefinitions = vi.fn()
 vi.mock('../../services/agent', () => ({
   agentRegistry: {
     getAllDefinitions: () => mockGetAllDefinitions(),
+    version: { value: 0 },
   },
 }))
 

@@ -9,6 +9,7 @@ import { useChat } from '../composables/useChat'
 import { useSession } from '../composables/useSession'
 import { useModel } from '../composables/useModel'
 import { useAgent } from '../composables/useAgent'
+import { ConversationService } from '../services/database'
 import type { AiChatLocale, LocaleName } from '../locales'
 import type { FileUploadService } from '../types'
 
@@ -27,7 +28,17 @@ const { currentConversationId, createConversation } = useSession()
 const { currentModelId, initDefault, initBuiltins } = useModel()
 const { currentAgentId, selectAgent, initDefault: initDefaultAgent } = useAgent()
 
+const conversationService = new ConversationService()
+
 const modelIdForSidebar = computed(() => currentModelId.value ?? undefined)
+
+/** Switch agent — persist the current conversation's agentId to DB */
+async function handleAgentChange(agentId: string) {
+  selectAgent(agentId)
+  if (currentConversationId.value) {
+    await conversationService.update(currentConversationId.value, { agentId })
+  }
+}
 
 onMounted(() => {
   initBuiltins().then(() => {
@@ -76,7 +87,7 @@ async function handleSend(payload: { content: string; files?: File[] }) {
             :current-agent-id="currentAgentId"
             :is-streaming="isStreaming"
             :file-upload-service="props.fileUploadService"
-            @update:current-agent-id="selectAgent"
+            @update:current-agent-id="handleAgentChange"
             @send="handleSend"
             @stop="stopStreaming"
           />

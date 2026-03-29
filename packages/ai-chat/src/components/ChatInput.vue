@@ -33,7 +33,11 @@ const managerVisible = ref(false)
 
 const trimmedText = computed(() => inputText.value.trim())
 const canSend = computed(() => trimmedText.value.length > 0 || selectedFiles.value.length > 0)
-const agents = computed(() => agentRegistry.getAllDefinitions())
+const agents = computed(() => {
+  // Depend on version so registry changes trigger re-computation
+  void agentRegistry.version.value
+  return agentRegistry.getAllDefinitions()
+})
 
 function autoResize() {
   const el = textareaRef.value

@@ -29,6 +29,8 @@ export function useAgent() {
 
   // Merge registry definitions (includes runtime-registered agents not in DB)
   const allAgents = computed(() => {
+    // Depend on version so runtime register/unregister triggers re-computation
+    void agentRegistry.version.value
     const registryDefs = agentRegistry.getAllDefinitions()
     const dbAgents = agents.value ?? []
     const dbIds = new Set(dbAgents.map((a) => a.id))
