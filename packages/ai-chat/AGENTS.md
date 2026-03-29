@@ -1,7 +1,7 @@
 # @ai-chat/vue — Package Knowledge Base
 
 **Generated:** 2026-03-29
-**Commit:** e1a90c2
+**Commit:** db5a565
 
 ## OVERVIEW
 
@@ -14,7 +14,7 @@ src/
 ├── components/     # 10 Vue SFCs — AiChat (main), AiChatProvider, LayoutShell,
 │                  #   Sidebar, ChatMessageList, ChatMessage, ChatInput,
 │                  #   ModelSelector, ModelManager, AgentSelector
-├── composables/    # 5 composables — useChat, useSession, useModel, useLocale, useObservable
+├── composables/    # 6 composables — useChat, useSession, useModel, useLocale, useAgent, useObservable
 ├── agents/         # AgentRunner interface + LangChainChatAgent (built-in)
 ├── services/       # AgentRegistry singleton + database CRUD services (4 classes)
 ├── database/       # Dexie schema (4 tables, compound index on messages)
@@ -54,7 +54,7 @@ FileUploadService: { upload(file), getFileUrl(id) }  — interface only, never i
 
 ## CONVENTIONS
 
-- **Singleton composables** — `useChat`, `useSession`, `useModel` use module-level `ref()`s (not provide/inject). Each exports `_reset*State()` for test isolation
+- **Singleton composables** — `useChat`, `useSession`, `useModel`, `useAgent` use module-level `ref()`s (not provide/inject). Most export `_reset*State()` for test isolation
 - **Service classes** — `ConversationService`, `MessageService`, `ModelService`, `AgentService` are plain classes wrapping Dexie ops. Instantiated inside composables, not singletons
 - **Streaming flow** — `useChat.sendMessage()` creates placeholder msg (isStreaming=true), loops `for await (const chunk of generator)`, updates msg per token, marks done
 - **Side-effect registration** — built-in LangChain agent registered in `src/index.ts` to survive tree-shaking (not in `agents/index.ts`)

@@ -1,7 +1,7 @@
 # PROJECT KNOWLEDGE BASE
 
 **Generated:** 2026-03-29
-**Commit:** e1a90c2
+**Commit:** db5a565
 **Branch:** main
 
 ## OVERVIEW
@@ -15,7 +15,7 @@ Vue 3 AI chat component library (monorepo). Uses Element Plus for UI, Dexie/Inde
 ├── packages/ai-chat/   # Main library (@ai-chat/vue)
 │   ├── src/
 │   │   ├── components/ # 10 Vue SFCs (AiChat, Sidebar, ChatInput, ChatMessage, etc.)
-│   │   ├── composables/# 5 composables (useChat, useSession, useModel, useLocale, useObservable)
+│   │   ├── composables/# 6 composables (useChat, useSession, useModel, useLocale, useAgent, useObservable)
 │   │   ├── agents/     # LangChain agent implementation + extensible agent registry
 │   │   ├── services/   # AgentRegistry singleton + CRUD services for IndexedDB
 │   │   ├── database/   # Dexie schema (4 tables: conversations, messages, models, agents)
@@ -44,7 +44,7 @@ Vue 3 AI chat component library (monorepo). Uses Element Plus for UI, Dexie/Inde
 - **No ESLint/Prettier configured** — follow existing code style from surrounding files
 - **TypeScript strict mode** across all tsconfig files — no `as any` or `@ts-ignore`
 - **No hardcoded text** — all user-facing strings go through i18n locale system
-- **Module-level singletons** — composables (`useChat`, `useSession`, `useModel`) share state via module-level `ref()`s, not Vue provide/inject. Each exports a `_reset*State()` for testing
+- **Module-level singletons** — composables (`useChat`, `useSession`, `useModel`, `useAgent`) share state via module-level `ref()`s, not Vue provide/inject. Most export `_reset*State()` for test isolation
 - **Side-effect agent registration** — built-in LangChain agent is registered in `src/index.ts` (not `agents/index.ts`) to prevent tree-shaking from removing it
 - **Element Plus is peerDependency** — never bundle it; externalized in vite build
 - **Tests collocated** — `__tests__/` subdirectory next to source files, `*.test.ts` naming
