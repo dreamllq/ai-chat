@@ -47,6 +47,17 @@ export const ja: AiChatLocale = {
     button: 'ファイルをアップロード',
     dragHere: 'ファイルをここにドラッグ',
   },
+  attachment: {
+    uploading: 'アップロード中...',
+    uploadFailed: 'アップロードに失敗しました',
+    image: '画像',
+    document: 'ドキュメント',
+    audio: '音声',
+    video: '動画',
+    download: 'ダウンロード',
+    fileTooLarge: 'ファイルが大きすぎます',
+    unsupportedPreview: 'プレビューできません',
+  },
   error: {
     network: 'ネットワークエラー。接続を確認してください。',
     apiKey: 'APIキーが無効です。モデル設定を確認してください。',

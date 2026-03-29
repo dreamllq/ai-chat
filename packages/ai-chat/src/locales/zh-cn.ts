@@ -47,6 +47,17 @@ export const zhCn: AiChatLocale = {
     button: '上传文件',
     dragHere: '拖拽文件到此处',
   },
+  attachment: {
+    uploading: '上传中...',
+    uploadFailed: '上传失败',
+    image: '图片',
+    document: '文档',
+    audio: '音频',
+    video: '视频',
+    download: '下载',
+    fileTooLarge: '文件过大',
+    unsupportedPreview: '无法预览',
+  },
   error: {
     network: '网络错误，请检查网络连接。',
     apiKey: 'API 密钥无效，请检查模型配置。',

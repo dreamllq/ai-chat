@@ -45,6 +45,17 @@ export interface AiChatLocale {
     button: string
     dragHere: string
   }
+  attachment: {
+    uploading: string
+    uploadFailed: string
+    image: string
+    document: string
+    audio: string
+    video: string
+    download: string
+    fileTooLarge: string
+    unsupportedPreview: string
+  }
   error: {
     network: string
     apiKey: string
@@ -101,6 +112,17 @@ export const en: AiChatLocale = {
   upload: {
     button: 'Upload File',
     dragHere: 'Drag files here',
+  },
+  attachment: {
+    uploading: 'Uploading...',
+    uploadFailed: 'Upload failed',
+    image: 'Image',
+    document: 'Document',
+    audio: 'Audio',
+    video: 'Video',
+    download: 'Download',
+    fileTooLarge: 'File too large',
+    unsupportedPreview: 'Preview not available',
   },
   error: {
     network: 'Network error. Please check your connection.',
