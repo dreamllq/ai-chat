@@ -112,7 +112,7 @@ async function handleSend(payload: { content: string; files?: File[] }) {
     }
   }
 
-  sendMessage(payload.content, payload.files)
+  sendMessage(payload.content, payload.files, props.fileUploadService)
 }
 </script>
 
