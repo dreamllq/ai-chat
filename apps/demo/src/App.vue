@@ -2,6 +2,8 @@
 import { ref } from 'vue'
 import { AiChat, registerAgent } from '@ai-chat/vue'
 import type { LocaleName } from '@ai-chat/vue'
+import { S3StorageService } from '@ai-chat/storage-s3'
+import type { S3StorageConfig } from '@ai-chat/storage-s3'
 
 // ---------------------------------------------------------------------------
 // Custom Agents — 从独立文件导入，调用 registerAgent() 注册
@@ -49,6 +51,21 @@ function switchLocale(name: LocaleName) {
 // ---------------------------------------------------------------------------
 // Locale state
 // ---------------------------------------------------------------------------
+
+// ---------------------------------------------------------------------------
+// S3 File Upload Service
+// ---------------------------------------------------------------------------
+
+const s3Config: S3StorageConfig = {
+  endpoint: import.meta.env.VITE_S3_ENDPOINT ?? '',
+  region: import.meta.env.VITE_S3_REGION ?? '',
+  bucket: import.meta.env.VITE_S3_BUCKET ?? '',
+  accessKeyId: import.meta.env.VITE_S3_ACCESS_KEY_ID ?? '',
+  secretAccessKey: import.meta.env.VITE_S3_SECRET_ACCESS_KEY ?? '',
+  forcePathStyle: import.meta.env.VITE_S3_FORCE_PATH_STYLE === 'true',
+}
+
+const fileUploadService = new S3StorageService(s3Config)
 </script>
 
 <template>
@@ -90,7 +107,7 @@ function switchLocale(name: LocaleName) {
 
     <!-- ── Chat area ───────────────────────────────────────────────── -->
     <main class="demo-main">
-      <AiChat :locale="currentLocale" />
+      <AiChat :locale="currentLocale" :file-upload-service="fileUploadService" />
     </main>
   </div>
 </template>
