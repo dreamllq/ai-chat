@@ -141,6 +141,64 @@ export interface UploadedFile {
   mimeType: string
 }
 
+// === 消息附件 ===
+
+/** 附件类型 */
+export type AttachmentType = 'image' | 'document' | 'audio' | 'video'
+
+/** 消息附件 */
+export interface MessageAttachment {
+  /** 附件唯一标识 */
+  id: string
+  /** 文件名 */
+  name: string
+  /** 文件访问 URL */
+  url?: string
+  /** Base64 数据 */
+  data?: string
+  /** 文件大小 (字节) */
+  size: number
+  /** MIME 类型 */
+  mimeType: string
+  /** 附件类型 */
+  type: AttachmentType
+}
+
+/** 根据 MIME 类型推断附件类型 */
+export function getAttachmentType(mimeType: string): AttachmentType {
+  if (!mimeType) return 'document'
+  if (mimeType.startsWith('image/')) return 'image'
+  if (mimeType.startsWith('audio/')) return 'audio'
+  if (mimeType.startsWith('video/')) return 'video'
+  return 'document'
+}
+
+/** 判断对象是否为 MessageAttachment 类型 */
+export function isMessageAttachment(obj: unknown): obj is MessageAttachment {
+  if (typeof obj !== 'object' || obj === null) return false
+  const record = obj as Record<string, unknown>
+  return (
+    typeof record.id === 'string' &&
+    typeof record.name === 'string' &&
+    typeof record.size === 'number' &&
+    typeof record.mimeType === 'string' &&
+    typeof record.type === 'string' &&
+    (typeof record.url === 'string' || typeof record.data === 'string')
+  )
+}
+
+/** 判断对象是否为旧版文件元数据格式 */
+export function isLegacyFileMetadata(obj: unknown): boolean {
+  if (typeof obj !== 'object' || obj === null) return false
+  const keys = Object.keys(obj)
+  return (
+    keys.length === 3 &&
+    typeof (obj as Record<string, unknown>).name === 'string' &&
+    typeof (obj as Record<string, unknown>).size === 'number' &&
+    typeof (obj as Record<string, unknown>).type === 'string'
+  )
+}
+
 // === 事件 ===
 
 /** 聊天事件类型 */

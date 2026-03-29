@@ -22,7 +22,15 @@ export type {
   ChatChunk,
   FileUploadService,
   UploadedFile,
+  AttachmentType,
+  MessageAttachment,
   ChatEventType,
+} from './types'
+
+export {
+  getAttachmentType,
+  isMessageAttachment,
+  isLegacyFileMetadata,
 } from './types'
 
 // === Composables ===
