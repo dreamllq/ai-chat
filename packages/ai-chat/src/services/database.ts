@@ -14,7 +14,7 @@ export class ConversationService {
   }
 
   async getAll(): Promise<Conversation[]> {
-    return db.conversations.toArray()
+    return db.conversations.reverse().sortBy('createdAt')
   }
 
   async getById(id: string): Promise<Conversation | undefined> {
@@ -73,7 +73,13 @@ export class ModelService {
   }
 
   async getAll(): Promise<ModelConfig[]> {
-    return db.models.toArray()
+    const all = await db.models.toArray()
+    // Built-in models first (preserve insertion order), custom models sorted by createdAt ascending
+    const builtins = all.filter((m) => m.isBuiltin)
+    const customs = all
+      .filter((m) => !m.isBuiltin)
+      .sort((a, b) => (a.createdAt ?? 0) - (b.createdAt ?? 0))
+    return [...builtins, ...customs]
   }
 
   async getById(id: string): Promise<ModelConfig | undefined> {
