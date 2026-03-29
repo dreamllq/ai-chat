@@ -16,7 +16,7 @@ Vue 3 AI chat component library (monorepo). Uses Element Plus for UI, Dexie/Inde
 │   ├── src/
 │   │   ├── components/ # 10 Vue SFCs (AiChat, Sidebar, ChatInput, ChatMessage, etc.)
 │   │   ├── composables/# 6 composables (useChat, useSession, useModel, useLocale, useAgent, useObservable)
-│   │   ├── agents/     # LangChain agent implementation + extensible agent registry
+│   │   ├── agents/     # LangChainRunner + message converter + LLM init + MCP client
 │   │   ├── services/   # AgentRegistry singleton + CRUD services for IndexedDB
 │   │   ├── database/   # Dexie schema (4 tables: conversations, messages, models, agents)
 │   │   ├── locales/    # i18n (zh-CN, en, ja) with injection key
@@ -32,12 +32,16 @@ Vue 3 AI chat component library (monorepo). Uses Element Plus for UI, Dexie/Inde
 |------|----------|-------|
 | Add a new UI component | `packages/ai-chat/src/components/` | Export from `src/index.ts` |
 | Add a new composable | `packages/ai-chat/src/composables/` | Export from `src/index.ts` |
-| Add a new AI agent | Implement `AgentRunner` interface, register via `agentRegistry.register()` | See `agents/langchain-chat-agent.ts` |
+| Add a new AI agent | Config-based `registerAgent()` | Define `AgentDefinition` with tools, register via `registerAgent(def)` |
 | Modify DB schema | `packages/ai-chat/src/database/db.ts` | Dexie versioned migration |
 | Add i18n strings | `packages/ai-chat/src/locales/{zh-cn,en,ja}.ts` | All 3 locales must be updated together |
 | Change build output | `packages/ai-chat/vite.config.ts` | ESM + UMD dual format |
 | Demo app changes | `apps/demo/src/App.vue` | Only demo, not the library |
 | Test a component | `packages/ai-chat/src/**/__tests__/*.test.ts` | Collocated `__tests__/` dirs |
+| Tool/MCP integration | `packages/ai-chat/src/agents/langchain-runner.ts` | Unified LangChain runner with tool calling loop |
+| MCP server connection | `packages/ai-chat/src/agents/mcp-client.ts` | MCP integration via @langchain/mcp-adapters |
+| Message conversion | `packages/ai-chat/src/agents/message-converter.ts` | ChatMessage → LangChain BaseMessage conversion |
+| LLM initialization | `packages/ai-chat/src/agents/llm-init.ts` | ChatOpenAI creation from ModelConfig |
 
 ## CONVENTIONS
 
@@ -62,10 +66,12 @@ Vue 3 AI chat component library (monorepo). Uses Element Plus for UI, Dexie/Inde
 
 ## UNIQUE STYLES
 
-- **Agent registry pattern** — `AgentRegistry` class (singleton) holds `Map<id, AgentDefinition>` + `Map<id, AgentRunner>`. Consumers register custom agents via `registerAgent()` helper
+- **Config-based agent registration** — `registerAgent({ id, name, tools, mcpServers })` creates runner internally. Users never implement `AgentRunner` — just provide tool definitions and MCP configs. Framework handles LLM init, message conversion, tool calling loop, streaming.
 - **Dual package exports** — `package.json` exports map `"development"` condition to source `.ts` files, `"import"` to built `.js`. Demo app resolves source directly for HMR
 - **Streaming chat** — `AgentRunner.chat()` returns `AsyncGenerator<ChatChunk>`. `useChat` creates a placeholder message (isStreaming=true), updates it token-by-token, then marks done
 - **Database service classes** — `ConversationService`, `MessageService`, `ModelService`, `AgentService` are plain classes (not composables) wrapping Dexie operations. Composables consume them
+- **Tool calling loop** — `LangChainRunner` implements max-5-iteration invoke → tool_calls → execute → ToolMessage loop internally. Users only provide `ToolDefinition[]` with execute functions.
+- **MCP integration** — `MCPClient` wraps `@langchain/mcp-adapters` MultiServerMCPClient. Lazy-loaded, graceful degradation on connection failure. Tools converted to framework-agnostic `ToolDefinition[]`.
 
 ## COMMANDS
 

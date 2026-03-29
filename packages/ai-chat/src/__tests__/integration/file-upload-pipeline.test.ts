@@ -1,7 +1,7 @@
 /**
  * Integration test: file upload pipeline end-to-end
  *
- * Exercises: useChat.sendMessage(pre-built attachments) → DB (MessageService) → LangChainChatAgent.convertMessages → ChatMessage rendering
+ * Exercises: useChat.sendMessage(pre-built attachments) → DB (MessageService) → LangChainRunner (convertMessages) → ChatMessage rendering
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { ref, nextTick, defineComponent, h } from 'vue'
@@ -9,7 +9,7 @@ import { mount } from '@vue/test-utils'
 import { useChat } from '../../composables/useChat'
 import { MessageService } from '../../services/database'
 import { db } from '../../database/db'
-import { LangChainChatAgent } from '../../agents/langchain-chat-agent'
+import { LangChainRunner } from '../../agents/langchain-runner'
 import { HumanMessage, AIMessage } from '@langchain/core/messages'
 import ChatMessage from '../../components/ChatMessage.vue'
 import type {
@@ -22,7 +22,7 @@ import type {
 
 // ─── Mocks ────────────────────────────────────────────────────────────────────
 
-// Mock @langchain/openai (needed by LangChainChatAgent constructor)
+// Mock @langchain/openai (needed by LangChainRunner via createLLM)
 const mockStream = vi.fn()
 vi.mock('@langchain/openai', () => ({
   ChatOpenAI: vi.fn().mockImplementation(() => ({
@@ -126,7 +126,7 @@ describe('File upload pipeline — integration', () => {
   let chat: ReturnType<typeof useChat>
   let unmount: () => void
   let messageService: MessageService
-  let agent: LangChainChatAgent
+  let agent: LangChainRunner
 
   let currentConversationId: ReturnType<typeof ref<string | null>>
   let currentConversation: ReturnType<typeof ref<Conversation | undefined>>
@@ -150,7 +150,7 @@ describe('File upload pipeline — integration', () => {
     await db.conversations.clear()
 
     messageService = new MessageService()
-    agent = new LangChainChatAgent()
+    agent = new LangChainRunner({})
     vi.clearAllMocks()
 
     currentConversationId = ref<string | null>('conv-1')
@@ -224,7 +224,7 @@ describe('File upload pipeline — integration', () => {
     expect(files[0].mimeType).toBe('image/jpeg')
     expect(files[0].data).toBeUndefined()
 
-    // Step 3: pass to LangChainChatAgent.convertMessages (via agent.chat)
+    // Step 3: pass to LangChainRunner (convertMessages via agent.chat)
     const captured = captureStreamMessages()
     for await (const _ of agent.chat([userMsg!], {
       id: 'model-1',
