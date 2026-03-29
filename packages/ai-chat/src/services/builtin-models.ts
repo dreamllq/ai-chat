@@ -36,4 +36,13 @@ export const BUILTIN_MODELS: BuiltinModelTemplate[] = [
     temperature: 0.7,
     maxTokens: 8192,
   },
+  {
+    id: 'builtin-deepseek-chat',
+    name: 'DeepSeek Chat',
+    provider: 'deepseek',
+    endpoint: 'https://api.deepseek.com/v1',
+    modelName: 'deepseek-chat',
+    temperature: 0.7,
+    maxTokens: 8192,
+  },
 ]

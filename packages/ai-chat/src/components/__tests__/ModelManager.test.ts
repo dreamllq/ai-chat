@@ -7,6 +7,7 @@ import type { ModelConfig } from '../../types'
 // --- Mocks ---
 const createModelMock = vi.fn().mockResolvedValue({})
 const deleteModelMock = vi.fn().mockResolvedValue(undefined)
+const updateModelMock = vi.fn().mockResolvedValue(undefined)
 
 const mockModels = ref<ModelConfig[] | undefined>([
   {
@@ -29,6 +30,7 @@ vi.mock('../../composables/useModel', () => ({
     currentModel: ref(mockModels.value?.[0]),
     selectModel: vi.fn(),
     createModel: createModelMock,
+    updateModel: updateModelMock,
     deleteModel: deleteModelMock,
     initDefault: vi.fn(),
   }),
@@ -41,14 +43,21 @@ vi.mock('../../composables/useLocale', () => ({
       const map: Record<string, string> = {
         'model.title': 'Model Manager',
         'model.create': 'Create Model',
+        'model.addNew': 'Add Model',
         'model.delete': 'Delete',
+        'model.deleteConfirm': 'Are you sure?',
         'model.name': 'Display Name',
         'model.provider': 'Provider',
         'model.endpoint': 'API Endpoint',
         'model.apiKey': 'API Key',
+        'model.apiKeyPlaceholder': 'Enter API key',
         'model.modelName': 'Model Name',
         'model.temperature': 'Temperature',
         'model.maxTokens': 'Max Tokens',
+        'model.save': 'Save',
+        'model.cancel': 'Cancel',
+        'model.builtin': 'Built-in',
+        'model.emptyList': 'No models configured',
       }
       return map[path] ?? path
     },
@@ -176,6 +185,7 @@ describe('ModelManager', () => {
   beforeEach(() => {
     createModelMock.mockClear()
     deleteModelMock.mockClear()
+    updateModelMock.mockClear()
     mockModels.value = [
       {
         id: 'model-1',
@@ -208,6 +218,12 @@ describe('ModelManager', () => {
     expect(wrapper.emitted('update:visible')?.[0]?.[0]).toBe(false)
   })
 
+  it('renders "Add Model" button in left panel header', () => {
+    const btn = wrapper.find('[data-testid="new-model-btn"]')
+    expect(btn.exists()).toBe(true)
+    expect(btn.text()).toContain('Add Model')
+  })
+
   it('renders model list with delete buttons', () => {
     const popconfirms = wrapper.findAll('[data-testid="el-popconfirm"]')
     expect(popconfirms.length).toBeGreaterThanOrEqual(1)
@@ -220,9 +236,68 @@ describe('ModelManager', () => {
     expect(deleteModelMock).toHaveBeenCalledWith('model-1')
   })
 
-  it('renders form fields for creating a model', () => {
+  it('shows create form by default (new mode)', () => {
     const form = wrapper.find('[data-testid="el-form"]')
     expect(form.exists()).toBe(true)
+    // In create mode, there should be a "Create Model" button
+    const buttons = wrapper.findAll('[data-testid="el-button"]')
+    const createBtn = buttons.find((btn) => btn.text().includes('Create'))
+    expect(createBtn).toBeDefined()
+  })
+
+  it('clicking custom model fills form and shows save button', async () => {
+    // Click the first model item (custom model)
+    const items = wrapper.findAll('.model-manager__item')
+    expect(items.length).toBeGreaterThanOrEqual(1)
+    await items[0].trigger('click')
+    await nextTick()
+
+    // Should now be in edit mode with save button
+    const buttons = wrapper.findAll('[data-testid="el-button"]')
+    const saveBtn = buttons.find((btn) => btn.text().includes('Save'))
+    expect(saveBtn).toBeDefined()
+
+    // Form should be filled with model data
+    const inputs = wrapper.findAll('[data-testid="el-input"]')
+    const nameInput = inputs.find((input) => (input.element as HTMLInputElement).value === 'GPT-4')
+    expect(nameInput).toBeDefined()
+  })
+
+  it('clicking already-selected model does nothing (stays in edit mode)', async () => {
+    const items = wrapper.findAll('.model-manager__item')
+    // Select
+    await items[0].trigger('click')
+    await nextTick()
+
+    // Should be in edit mode with save button
+    let buttons = wrapper.findAll('[data-testid="el-button"]')
+    const saveBtn = buttons.find((btn) => btn.text().includes('Save'))
+    expect(saveBtn).toBeDefined()
+
+    // Click same item again — should stay in edit mode
+    await items[0].trigger('click')
+    await nextTick()
+
+    buttons = wrapper.findAll('[data-testid="el-button"]')
+    const saveBtn2 = buttons.find((btn) => btn.text().includes('Save'))
+    expect(saveBtn2).toBeDefined()
+  })
+
+  it('clicking "Add Model" button resets to create mode', async () => {
+    // First select a model to enter edit mode
+    const items = wrapper.findAll('.model-manager__item')
+    await items[0].trigger('click')
+    await nextTick()
+
+    // Click "Add Model" button
+    const newBtn = wrapper.find('[data-testid="new-model-btn"]')
+    await newBtn.trigger('click')
+    await nextTick()
+
+    // Should show create button
+    const buttons = wrapper.findAll('[data-testid="el-button"]')
+    const createBtn = buttons.find((btn) => btn.text().includes('Create'))
+    expect(createBtn).toBeDefined()
   })
 
   it('API key input is password type', () => {
@@ -263,5 +338,68 @@ describe('ModelManager', () => {
     expect(createBtn).toBeDefined()
     await createBtn!.trigger('click')
     expect(createModelMock).toHaveBeenCalled()
+  })
+
+  it('save button in edit mode calls updateModel with all fields for custom model', async () => {
+    // Click the custom model to enter edit mode
+    const items = wrapper.findAll('.model-manager__item')
+    await items[0].trigger('click')
+    await nextTick()
+
+    // Click save
+    const buttons = wrapper.findAll('[data-testid="el-button"]')
+    const saveBtn = buttons.find((btn) => btn.text().includes('Save'))
+    expect(saveBtn).toBeDefined()
+    await saveBtn!.trigger('click')
+
+    // Custom model should update all fields
+    expect(updateModelMock).toHaveBeenCalledWith('model-1', expect.objectContaining({
+      name: 'GPT-4',
+      provider: 'openai',
+      endpoint: 'https://api.openai.com/v1',
+      modelName: 'gpt-4',
+    }))
+  })
+
+  it('save button in edit mode for builtin model only updates limited fields', async () => {
+    mockModels.value = [
+      {
+        id: 'builtin-1',
+        name: 'GPT-4 Builtin',
+        provider: 'openai',
+        endpoint: 'https://api.openai.com/v1',
+        apiKey: '',
+        modelName: 'gpt-4',
+        temperature: 0.7,
+        maxTokens: 4096,
+        isBuiltin: true,
+        createdAt: Date.now(),
+      },
+    ]
+    await nextTick()
+    wrapper = mountComponent()
+
+    // Click the builtin model
+    const items = wrapper.findAll('.model-manager__item')
+    await items[0].trigger('click')
+    await nextTick()
+
+    // Click save
+    const buttons = wrapper.findAll('[data-testid="el-button"]')
+    const saveBtn = buttons.find((btn) => btn.text().includes('Save'))
+    await saveBtn!.trigger('click')
+
+    // Builtin model should only update apiKey, temperature, maxTokens
+    expect(updateModelMock).toHaveBeenCalledWith('builtin-1', expect.objectContaining({
+      apiKey: '',
+      temperature: 0.7,
+      maxTokens: 4096,
+    }))
+    // Should NOT include name, provider, endpoint, modelName
+    const call = updateModelMock.mock.calls[0][1] as Record<string, unknown>
+    expect(call).not.toHaveProperty('name')
+    expect(call).not.toHaveProperty('provider')
+    expect(call).not.toHaveProperty('endpoint')
+    expect(call).not.toHaveProperty('modelName')
   })
 })
