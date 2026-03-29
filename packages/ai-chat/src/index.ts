@@ -48,6 +48,7 @@ const _builtinDef = {
 agentRegistry.register(_builtinDef, new LangChainChatAgent())
 
 export { LangChainChatAgent }
+export { TitleGenerator } from './agents/title-generator'
 export { agentRegistry, registerAgent }
 
 // === Built-in Models ===

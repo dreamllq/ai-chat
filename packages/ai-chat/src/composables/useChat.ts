@@ -2,17 +2,21 @@ import { ref, onUnmounted } from 'vue'
 import { useSession } from './useSession'
 import { useModel } from './useModel'
 import { agentRegistry } from '../services/agent'
-import { MessageService } from '../services/database'
+import { MessageService, ConversationService } from '../services/database'
+import { TitleGenerator } from '../agents/title-generator'
 
 // Module-level singleton state — shared across all useChat() callers
 const isStreaming = ref(false)
 let abortController: AbortController | null = null
+
+const INITIAL_TITLE_MAX_LENGTH = 30
 
 export function useChat() {
   const { currentConversation, currentConversationId, currentMessages } =
     useSession()
   const { currentModel } = useModel()
   const messageService = new MessageService()
+  const conversationService = new ConversationService()
 
   async function sendMessage(content: string, files?: File[]): Promise<void> {
     console.log('[useChat] sendMessage called', { content })
@@ -41,6 +45,8 @@ export function useChat() {
       return
     }
 
+    const isFirstMessage = currentMessages.value.length === 0
+
     const runner = agentRegistry.getRunner(conversation.agentId)
     console.log('[useChat] runner for agent:', conversation.agentId, runner ? 'FOUND' : 'NOT FOUND')
 
@@ -60,6 +66,15 @@ export function useChat() {
         : undefined,
     })
     console.log('[useChat] user message saved')
+
+    // Set initial title from first message content
+    if (isFirstMessage) {
+      const initialTitle =
+        content.length > INITIAL_TITLE_MAX_LENGTH
+          ? content.slice(0, INITIAL_TITLE_MAX_LENGTH) + '...'
+          : content
+      await conversationService.update(conversationId, { title: initialTitle })
+    }
 
     // Agent not found — create assistant error message
     if (!runner) {
@@ -128,6 +143,21 @@ export function useChat() {
     } finally {
       isStreaming.value = false
       abortController = null
+    }
+
+    // After streaming completes, try AI title generation for first message (fire-and-forget)
+    if (isFirstMessage && model) {
+      ;(async () => {
+        try {
+          const msgs = await messageService.getByConversationId(conversationId)
+          const title = await TitleGenerator.generate(msgs, model)
+          if (title) {
+            await conversationService.update(conversationId, { title })
+          }
+        } catch {
+          // Silently ignore — initial title from first message is already set
+        }
+      })()
     }
   }
 
