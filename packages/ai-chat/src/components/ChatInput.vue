@@ -8,6 +8,8 @@ import { agentRegistry } from '../services/agent'
 import ModelManager from './ModelManager.vue'
 import type { FileUploadService } from '../types'
 
+const MANAGE_MODEL_VALUE = '__manage_models__'
+
 const props = defineProps<{
   isStreaming?: boolean
   fileUploadService?: FileUploadService | null
@@ -88,6 +90,10 @@ function handleAgentChange(value: string) {
 }
 
 function handleModelChange(id: string) {
+  if (id === MANAGE_MODEL_VALUE) {
+    managerVisible.value = true
+    return
+  }
   selectModel(id)
 }
 </script>
@@ -122,6 +128,7 @@ function handleModelChange(id: string) {
             :placeholder="t('agent.select')"
             size="small"
             class="chat-input__selector"
+            style="width: 120px"
             @update:model-value="handleAgentChange"
           >
             <ElOption
@@ -145,6 +152,7 @@ function handleModelChange(id: string) {
             :placeholder="t('model.selectModel')"
             size="small"
             class="chat-input__selector"
+            style="width: 140px"
             @update:model-value="handleModelChange"
           >
             <ElOption
@@ -153,15 +161,18 @@ function handleModelChange(id: string) {
               :value="model.id"
               :label="model.name"
             />
+            <div class="chat-input__dropdown-divider" />
+            <ElOption
+              :value="MANAGE_MODEL_VALUE"
+              :label="t('model.manage')"
+              class="chat-input__manage-option"
+            >
+              <div class="chat-input__manage-option-content">
+                <ElIcon :size="14"><Setting /></ElIcon>
+                <span>{{ t('model.manage') }}</span>
+              </div>
+            </ElOption>
           </ElSelect>
-          <ElButton
-            size="small"
-            text
-            class="chat-input__icon-btn"
-            @click="managerVisible = true"
-          >
-            <ElIcon :size="14"><Setting /></ElIcon>
-          </ElButton>
 
           <!-- File upload -->
           <template v-if="fileUploadService">
@@ -334,6 +345,10 @@ function handleModelChange(id: string) {
 }
 
 /* Compact selects in toolbar — strip borders */
+.chat-input__selector {
+  flex-shrink: 0;
+}
+
 .chat-input__selector :deep(.el-input__wrapper) {
   box-shadow: none !important;
   background: transparent;
@@ -350,6 +365,26 @@ function handleModelChange(id: string) {
 
 .chat-input__selector :deep(.el-select__caret) {
   font-size: 12px;
+}
+
+/* Divider in model dropdown */
+.chat-input__dropdown-divider {
+  height: 1px;
+  background-color: var(--el-border-color-lighter);
+  margin: 4px 0;
+}
+
+/* Model management option */
+.chat-input__manage-option-content {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--el-text-color-secondary);
+  font-size: 12px;
+}
+
+.chat-input__manage-option:hover .chat-input__manage-option-content {
+  color: var(--el-color-primary);
 }
 
 /* Agent option layout */

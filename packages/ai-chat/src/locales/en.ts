@@ -28,6 +28,7 @@ export interface AiChatLocale {
     temperature: string
     maxTokens: string
     addNew: string
+    manage: string
     emptyList: string
   }
   agent: {
@@ -80,6 +81,7 @@ export const en: AiChatLocale = {
     temperature: 'Temperature',
     maxTokens: 'Max Tokens',
     addNew: 'Add Model',
+    manage: 'Model Management',
     emptyList: 'No models configured',
   },
   agent: {

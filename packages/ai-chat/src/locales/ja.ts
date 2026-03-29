@@ -30,6 +30,7 @@ export const ja: AiChatLocale = {
     temperature: '温度',
     maxTokens: '最大トークン数',
     addNew: 'モデルを追加',
+    manage: 'モデル管理',
     emptyList: 'モデルが設定されていません',
   },
   agent: {

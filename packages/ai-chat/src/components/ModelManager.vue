@@ -92,12 +92,13 @@ async function handleDelete(id: string) {
     :title="t('model.title')"
     width="760px"
     destroy-on-close
+    append-to-body
     data-testid="el-dialog"
   >
     <div class="model-manager">
       <!-- Left Panel: Model List -->
       <div class="model-manager__list-panel">
-        <ElScrollbar max-height="calc(70vh - 120px)">
+        <ElScrollbar>
           <div v-if="(models ?? []).length === 0" class="model-manager__empty">
             {{ t('model.emptyList') }}
           </div>
@@ -135,7 +136,7 @@ async function handleDelete(id: string) {
 
       <!-- Right Panel: Create Form -->
       <div class="model-manager__form-panel">
-        <ElScrollbar max-height="calc(70vh - 80px)">
+        <ElScrollbar>
           <ElForm
             :model="form"
             label-width="120px"
@@ -223,6 +224,7 @@ async function handleDelete(id: string) {
 <style scoped>
 .model-manager {
   display: flex;
+  max-height: calc(70vh - 100px);
   min-height: 420px;
   overflow: hidden;
 }
@@ -235,6 +237,8 @@ async function handleDelete(id: string) {
   flex-direction: column;
   border-right: 1px solid var(--el-border-color-lighter);
   background: var(--el-fill-color-lighter);
+  min-height: 0;
+  overflow: hidden;
 }
 
 .model-manager__empty {
@@ -309,6 +313,14 @@ async function handleDelete(id: string) {
 .model-manager__form-panel {
   flex: 1;
   min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+
+/* Make scrollbars fill their panels */
+.model-manager__list-panel :deep(.el-scrollbar),
+.model-manager__form-panel :deep(.el-scrollbar) {
+  height: 100%;
 }
 
 .model-manager__form {

@@ -30,6 +30,7 @@ export const zhCn: AiChatLocale = {
     temperature: '温度',
     maxTokens: '最大令牌数',
     addNew: '添加模型',
+    manage: '模型管理',
     emptyList: '暂无模型配置',
   },
   agent: {

@@ -3,9 +3,17 @@ import { liveQuery, ConversationService, MessageService } from '../services/data
 import { useObservable } from './useObservable'
 import type { Conversation, ChatMessage } from '../types'
 
+const STORAGE_KEY = 'ai-chat:selected-conversation-id'
+
 // Module-level singleton state — shared across all useSession() callers
 const currentConversationId = ref<string | null>(null)
 const currentMessages: Ref<ChatMessage[]> = ref<ChatMessage[]>([]) as Ref<ChatMessage[]>
+
+// Restore persisted selection on module load
+try {
+  const saved = localStorage.getItem(STORAGE_KEY)
+  if (saved) currentConversationId.value = saved
+} catch {}
 
 let messagesUnsub: (() => void) | null = null
 let subscriptionInitialized = false
@@ -17,6 +25,9 @@ export function _resetSessionState() {
   messagesUnsub?.()
   messagesUnsub = null
   subscriptionInitialized = false
+  try {
+    localStorage.removeItem(STORAGE_KEY)
+  } catch {}
 }
 
 function ensureSubscription(messageService: MessageService) {
@@ -49,6 +60,21 @@ export function useSession() {
     conversations.value?.find((c) => c.id === currentConversationId.value)
   )
 
+  // Validate persisted selection against loaded conversations
+  watch(conversations, (loaded) => {
+    if (currentConversationId.value && loaded && loaded.length > 0) {
+      const exists = loaded.some((c) => c.id === currentConversationId.value)
+      if (!exists) {
+        // Saved conversation no longer exists — fall back to first available
+        const firstId = loaded[0].id
+        currentConversationId.value = firstId
+        try {
+          localStorage.setItem(STORAGE_KEY, firstId)
+        } catch {}
+      }
+    }
+  })
+
   ensureSubscription(messageService)
 
   async function createConversation(agentId: string, modelId: string): Promise<Conversation> {
@@ -58,6 +84,9 @@ export function useSession() {
       modelId,
     })
     currentConversationId.value = conv.id
+    try {
+      localStorage.setItem(STORAGE_KEY, conv.id)
+    } catch {}
     return conv
   }
 
@@ -65,7 +94,12 @@ export function useSession() {
     await conversationService.delete(id)
     if (currentConversationId.value === id) {
       const remaining = await conversationService.getAll()
-      currentConversationId.value = remaining.length > 0 ? remaining[0].id : null
+      const nextId = remaining.length > 0 ? remaining[0].id : null
+      currentConversationId.value = nextId
+      try {
+        if (nextId) localStorage.setItem(STORAGE_KEY, nextId)
+        else localStorage.removeItem(STORAGE_KEY)
+      } catch {}
     }
   }
 
@@ -75,6 +109,9 @@ export function useSession() {
 
   function switchConversation(id: string): void {
     currentConversationId.value = id
+    try {
+      localStorage.setItem(STORAGE_KEY, id)
+    } catch {}
   }
 
   return {
