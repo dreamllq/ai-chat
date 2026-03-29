@@ -21,6 +21,7 @@ export interface AiChatLocale {
     deleteConfirm: string
     endpoint: string
     apiKey: string
+    apiKeyPlaceholder: string
     modelName: string
     selectModel: string
     name: string
@@ -30,6 +31,9 @@ export interface AiChatLocale {
     addNew: string
     manage: string
     emptyList: string
+    builtin: string
+    save: string
+    cancel: string
   }
   agent: {
     title: string
@@ -74,6 +78,7 @@ export const en: AiChatLocale = {
     deleteConfirm: 'Are you sure you want to delete this model?',
     endpoint: 'API Endpoint',
     apiKey: 'API Key',
+    apiKeyPlaceholder: 'Enter your API key to start using this model',
     modelName: 'Model Name',
     selectModel: 'Select Model',
     name: 'Display Name',
@@ -83,6 +88,9 @@ export const en: AiChatLocale = {
     addNew: 'Add Model',
     manage: 'Model Management',
     emptyList: 'No models configured',
+    builtin: 'Built-in',
+    save: 'Save',
+    cancel: 'Cancel',
   },
   agent: {
     title: 'Agent',

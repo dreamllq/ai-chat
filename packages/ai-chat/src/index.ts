@@ -50,6 +50,9 @@ agentRegistry.register(_builtinDef, new LangChainChatAgent())
 export { LangChainChatAgent }
 export { agentRegistry, registerAgent }
 
+// === Built-in Models ===
+export { BUILTIN_MODELS } from './services/builtin-models'
+
 // === Locales ===
 export { zhCn, en, ja } from './locales'
 export type { AiChatLocale, LocaleName } from './locales'

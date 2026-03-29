@@ -23,6 +23,7 @@ export const ja: AiChatLocale = {
     deleteConfirm: 'このモデルを削除してもよろしいですか？',
     endpoint: 'APIエンドポイント',
     apiKey: 'APIキー',
+    apiKeyPlaceholder: 'このモデルを使用するためにAPIキーを入力してください',
     modelName: 'モデル名',
     selectModel: 'モデルを選択',
     name: '表示名',
@@ -32,6 +33,9 @@ export const ja: AiChatLocale = {
     addNew: 'モデルを追加',
     manage: 'モデル管理',
     emptyList: 'モデルが設定されていません',
+    builtin: '内蔵',
+    save: '保存',
+    cancel: 'キャンセル',
   },
   agent: {
     title: 'エージェント',

@@ -23,6 +23,7 @@ export const zhCn: AiChatLocale = {
     deleteConfirm: '确定要删除此模型吗？',
     endpoint: 'API 地址',
     apiKey: 'API 密钥',
+    apiKeyPlaceholder: '输入 API 密钥以使用此模型',
     modelName: '模型名称',
     selectModel: '选择模型',
     name: '显示名称',
@@ -32,6 +33,9 @@ export const zhCn: AiChatLocale = {
     addNew: '添加模型',
     manage: '模型管理',
     emptyList: '暂无模型配置',
+    builtin: '内置',
+    save: '保存',
+    cancel: '取消',
   },
   agent: {
     title: '智能体',

@@ -59,6 +59,8 @@ export interface ModelConfig {
   temperature?: number
   /** 最大 token 数 */
   maxTokens?: number
+  /** 是否为内置模型 */
+  isBuiltin?: boolean
   /** 创建时间戳 */
   createdAt: number
 }

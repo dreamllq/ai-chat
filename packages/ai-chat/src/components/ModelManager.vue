@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { reactive, computed, ref } from 'vue'
+import { reactive, computed, ref, watch } from 'vue'
 import {
   ElDialog,
   ElForm,
@@ -13,6 +13,7 @@ import {
   ElPopconfirm,
   ElIcon,
   ElScrollbar,
+  ElTag,
 } from 'element-plus'
 import { Delete } from '@element-plus/icons-vue'
 import { useModel } from '../composables/useModel'
@@ -27,7 +28,7 @@ const emit = defineEmits<{
   (e: 'update:visible', value: boolean): void
 }>()
 
-const { models, createModel,
+const { models, createModel, updateModel,
   deleteModel } = useModel()
 const { t } = useLocale()
 
@@ -37,6 +38,8 @@ const dialogVisible = computed({
 })
 
 const selectedModelId = ref<string | null>(null)
+const editingModel = ref<ModelConfig | null>(null)
+const isEditing = computed(() => editingModel.value !== null)
 
 const form = reactive({
   name: '',
@@ -51,11 +54,56 @@ const form = reactive({
 const providers = [
   { value: 'openai', label: 'OpenAI' },
   { value: 'anthropic', label: 'Anthropic' },
+  { value: 'qwen', label: '通义千问 Qwen' },
+  { value: 'zhipu', label: '智谱 Zhipu' },
   { value: 'custom', label: 'Custom' },
 ]
 
+// Auto-fill endpoint and modelName when provider changes (for known providers)
+watch(() => form.provider, (provider) => {
+  const preset: Record<string, { endpoint: string; modelName: string }> = {
+    qwen: { endpoint: 'https://dashscope.aliyuncs.com/compatible-mode/v1', modelName: 'qwen-turbo' },
+    zhipu: { endpoint: 'https://open.bigmodel.cn/api/paas/v4', modelName: 'glm-4-flash' },
+  }
+  const p = preset[provider]
+  if (p && !isEditing.value) {
+    form.endpoint = p.endpoint
+    form.modelName = p.modelName
+  }
+})
+
 function selectModelItem(model: ModelConfig) {
-  selectedModelId.value = selectedModelId.value === model.id ? null : model.id
+  if (selectedModelId.value === model.id) {
+    selectedModelId.value = null
+    editingModel.value = null
+    resetForm()
+  } else {
+    selectedModelId.value = model.id
+    if (model.isBuiltin) {
+      // Enter edit mode for builtin model — pre-fill form
+      editingModel.value = model
+      form.name = model.name
+      form.provider = model.provider
+      form.endpoint = model.endpoint
+      form.apiKey = model.apiKey
+      form.modelName = model.modelName
+      form.temperature = model.temperature ?? 0.7
+      form.maxTokens = model.maxTokens ?? 4096
+    } else {
+      editingModel.value = null
+      resetForm()
+    }
+  }
+}
+
+function resetForm() {
+  form.name = ''
+  form.provider = 'openai'
+  form.endpoint = ''
+  form.apiKey = ''
+  form.modelName = ''
+  form.temperature = 0.7
+  form.maxTokens = 4096
 }
 
 async function handleCreate() {
@@ -68,20 +116,33 @@ async function handleCreate() {
     temperature: form.temperature,
     maxTokens: form.maxTokens,
   })
-  // Reset form
-  form.name = ''
-  form.provider = 'openai';
-  form.endpoint = ''
-  form.apiKey = ''
-  form.modelName = '';
-  form.temperature = 0.7;
-  form.maxTokens = 4096;
+  resetForm()
+}
+
+async function handleUpdate() {
+  if (!editingModel.value) return
+  await updateModel(editingModel.value.id, {
+    apiKey: form.apiKey,
+    temperature: form.temperature,
+    maxTokens: form.maxTokens,
+  })
+  editingModel.value = null
+  selectedModelId.value = null
+  resetForm()
+}
+
+function handleCancelEdit() {
+  editingModel.value = null
+  selectedModelId.value = null
+  resetForm()
 }
 
 async function handleDelete(id: string) {
-  await deleteModel(id);
+  await deleteModel(id)
   if (selectedModelId.value === id) {
-    selectedModelId.value = null;
+    selectedModelId.value = null
+    editingModel.value = null
+    resetForm()
   }
 }
 </script>
@@ -110,10 +171,21 @@ async function handleDelete(id: string) {
             @click="selectModelItem(model)"
           >
             <div class="model-manager__item-content">
-              <span class="model-manager__item-name">{{ model.name }}</span>
+              <div class="model-manager__item-row">
+                <span class="model-manager__item-name">{{ model.name }}</span>
+                <ElTag
+                  v-if="model.isBuiltin"
+                  size="small"
+                  type="info"
+                  class="model-manager__builtin-tag"
+                >
+                  {{ t('model.builtin') }}
+                </ElTag>
+              </div>
               <span class="model-manager__item-meta">{{ model.provider }} / {{ model.modelName }}</span>
             </div>
             <ElPopconfirm
+              v-if="!model.isBuiltin"
               :title="t('model.deleteConfirm')"
               data-testid="el-popconfirm"
               @confirm="handleDelete(model.id)"
@@ -134,87 +206,143 @@ async function handleDelete(id: string) {
         </ElScrollbar>
       </div>
 
-      <!-- Right Panel: Create Form -->
+      <!-- Right Panel: Create/Edit Form -->
       <div class="model-manager__form-panel">
         <ElScrollbar>
-          <ElForm
-            :model="form"
-            label-width="120px"
-            label-position="right"
-            data-testid="el-form"
-            class="model-manager__form"
-          >
-            <ElFormItem :label="t('model.name')">
-              <ElInput
-                v-model="form.name"
-                :placeholder="t('model.name')"
-                data-testid="el-input"
-              />
-            </ElFormItem>
-
-            <ElFormItem :label="t('model.provider')">
-              <ElSelect v-model="form.provider" data-testid="el-select">
-                <ElOption
-                  v-for="p in providers"
-                  :key="p.value"
-                  :value="p.value"
-                  :label="p.label"
-                  data-testid="el-option"
+          <!-- Edit mode for builtin model -->
+          <template v-if="isEditing">
+            <div class="model-manager__edit-header">
+              <span class="model-manager__edit-title">{{ form.name }}</span>
+              <ElTag size="small" type="info">{{ t('model.builtin') }}</ElTag>
+            </div>
+            <ElForm
+              :model="form"
+              label-width="120px"
+              label-position="right"
+              data-testid="el-form"
+              class="model-manager__form"
+            >
+              <ElFormItem :label="t('model.apiKey')">
+                <ElInput
+                  v-model="form.apiKey"
+                  type="password"
+                  show-password
+                  :placeholder="t('model.apiKeyPlaceholder')"
+                  data-testid="el-input"
                 />
-              </ElSelect>
-            </ElFormItem>
+              </ElFormItem>
 
-            <ElFormItem :label="t('model.endpoint')">
-              <ElInput
-                v-model="form.endpoint"
-                :placeholder="t('model.endpoint')"
-                data-testid="el-input"
-              />
-            </ElFormItem>
+              <ElFormItem :label="t('model.temperature')">
+                <ElSlider
+                  v-model="form.temperature"
+                  :min="0"
+                  :max="2"
+                  :step="0.1"
+                  data-testid="el-slider"
+                />
+              </ElFormItem>
 
-            <ElFormItem :label="t('model.apiKey')">
-              <ElInput
-                v-model="form.apiKey"
-                type="password"
-                show-password
-                :placeholder="t('model.apiKey')"
-                data-testid="el-input"
-              />
-            </ElFormItem>
+              <ElFormItem :label="t('model.maxTokens')">
+                <ElInputNumber
+                  v-model="form.maxTokens"
+                  :min="1"
+                  :max="100000"
+                  data-testid="el-input-number"
+                />
+              </ElFormItem>
 
-            <ElFormItem :label="t('model.modelName')">
-              <ElInput
-                v-model="form.modelName"
-                :placeholder="t('model.modelName')"
-                data-testid="el-input"
-              />
-            </ElFormItem>
+              <ElFormItem>
+                <ElButton type="primary" data-testid="el-button" @click="handleUpdate">
+                  {{ t('model.save') }}
+                </ElButton>
+                <ElButton data-testid="el-button" @click="handleCancelEdit">
+                  {{ t('model.cancel') }}
+                </ElButton>
+              </ElFormItem>
+            </ElForm>
+          </template>
 
-            <ElFormItem :label="t('model.temperature')">
-              <ElSlider
-                v-model="form.temperature"
-                :min="0"
-                :max="2"
-                :step="0.1"
-                data-testid="el-slider"
-              />
-            </ElFormItem>
+          <!-- Create mode -->
+          <template v-else>
+            <ElForm
+              :model="form"
+              label-width="120px"
+              label-position="right"
+              data-testid="el-form"
+              class="model-manager__form"
+            >
+              <ElFormItem :label="t('model.name')">
+                <ElInput
+                  v-model="form.name"
+                  :placeholder="t('model.name')"
+                  data-testid="el-input"
+                />
+              </ElFormItem>
 
-            <ElFormItem :label="t('model.maxTokens')">
-              <ElInputNumber
-                v-model="form.maxTokens"
-                :min="1"
-                :max="100000"
-                data-testid="el-input-number"
-              />
-            </ElFormItem>
+              <ElFormItem :label="t('model.provider')">
+                <ElSelect v-model="form.provider" data-testid="el-select">
+                  <ElOption
+                    v-for="p in providers"
+                    :key="p.value"
+                    :value="p.value"
+                    :label="p.label"
+                    data-testid="el-option"
+                  />
+                </ElSelect>
+              </ElFormItem>
 
-            <ElFormItem>
-              <ElButton type="primary" data-testid="el-button" @click="handleCreate">
-                {{ t('model.create') }}
-              </ElButton>
-            </ElFormItem>
-          </ElForm>
+              <ElFormItem :label="t('model.endpoint')">
+                <ElInput
+                  v-model="form.endpoint"
+                  :placeholder="t('model.endpoint')"
+                  data-testid="el-input"
+                />
+              </ElFormItem>
+
+              <ElFormItem :label="t('model.apiKey')">
+                <ElInput
+                  v-model="form.apiKey"
+                  type="password"
+                  show-password
+                  :placeholder="t('model.apiKey')"
+                  data-testid="el-input"
+                />
+              </ElFormItem>
+
+              <ElFormItem :label="t('model.modelName')">
+                <ElInput
+                  v-model="form.modelName"
+                  :placeholder="t('model.modelName')"
+                  data-testid="el-input"
+                />
+              </ElFormItem>
+
+              <ElFormItem :label="t('model.temperature')">
+                <ElSlider
+                  v-model="form.temperature"
+                  :min="0"
+                  :max="2"
+                  :step="0.1"
+                  data-testid="el-slider"
+                />
+              </ElFormItem>
+
+              <ElFormItem :label="t('model.maxTokens')">
+                <ElInputNumber
+                  v-model="form.maxTokens"
+                  :min="1"
+                  :max="100000"
+                  data-testid="el-input-number"
+                />
+              </ElFormItem>
+
+              <ElFormItem>
+                <ElButton type="primary" data-testid="el-button" @click="handleCreate">
+                  {{ t('model.create') }}
+                </ElButton>
+              </ElFormItem>
+            </ElForm>
+          </template>
         </ElScrollbar>
       </div>
     </div>
@@ -279,6 +407,12 @@ async function handleDelete(id: string) {
   flex: 1;
 }
 
+.model-manager__item-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
 .model-manager__item-name {
   font-size: 13px;
   font-weight: 500;
@@ -287,6 +421,10 @@ async function handleDelete(id: string) {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.model-manager__builtin-tag {
+  flex-shrink: 0;
 }
 
 .model-manager__item-meta {
@@ -315,6 +453,20 @@ async function handleDelete(id: string) {
   min-width: 0;
   min-height: 0;
   overflow: hidden;
+}
+
+/* Edit header */
+.model-manager__edit-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 20px 24px 8px;
+}
+
+.model-manager__edit-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--el-text-color-primary);
 }
 
 /* Make scrollbars fill their panels */

@@ -24,12 +24,12 @@ const currentAgentId = ref('langchain-chat')
 
 const { isStreaming, sendMessage, stopStreaming } = useChat()
 const { currentConversationId, createConversation } = useSession()
-const { currentModelId, initDefault } = useModel()
+const { currentModelId, initDefault, initBuiltins } = useModel()
 
 const modelIdForSidebar = computed(() => currentModelId.value ?? undefined)
 
 onMounted(() => {
-  initDefault()
+  initBuiltins().then(() => initDefault())
 })
 
 async function handleSend(payload: { content: string; files?: File[] }) {
