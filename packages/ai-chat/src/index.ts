@@ -30,6 +30,7 @@ export { useChat } from './composables/useChat'
 export { useSession } from './composables/useSession'
 export { useModel } from './composables/useModel'
 export { useLocale } from './composables/useLocale'
+export { useAgent } from './composables/useAgent'
 export { useObservable } from './composables/useObservable'
 
 // === Agents ===

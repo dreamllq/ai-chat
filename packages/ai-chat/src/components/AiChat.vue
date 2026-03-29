@@ -8,6 +8,7 @@ import ChatInput from './ChatInput.vue'
 import { useChat } from '../composables/useChat'
 import { useSession } from '../composables/useSession'
 import { useModel } from '../composables/useModel'
+import { useAgent } from '../composables/useAgent'
 import type { AiChatLocale, LocaleName } from '../locales'
 import type { FileUploadService } from '../types'
 
@@ -20,16 +21,19 @@ const props = withDefaults(defineProps<{
 })
 
 const sidebarCollapsed = ref(false)
-const currentAgentId = ref('langchain-chat')
 
 const { isStreaming, sendMessage, stopStreaming } = useChat()
 const { currentConversationId, createConversation } = useSession()
 const { currentModelId, initDefault, initBuiltins } = useModel()
+const { currentAgentId, selectAgent, initDefault: initDefaultAgent } = useAgent()
 
 const modelIdForSidebar = computed(() => currentModelId.value ?? undefined)
 
 onMounted(() => {
-  initBuiltins().then(() => initDefault())
+  initBuiltins().then(() => {
+    initDefault()
+    initDefaultAgent()
+  })
 })
 
 async function handleSend(payload: { content: string; files?: File[] }) {
@@ -69,9 +73,10 @@ async function handleSend(payload: { content: string; files?: File[] }) {
         </template>
         <template #input>
           <ChatInput
-            v-model:current-agent-id="currentAgentId"
+            :current-agent-id="currentAgentId"
             :is-streaming="isStreaming"
             :file-upload-service="props.fileUploadService"
+            @update:current-agent-id="selectAgent"
             @send="handleSend"
             @stop="stopStreaming"
           />
