@@ -12,7 +12,9 @@
     "isolatedModules": true,
     "baseUrl": ".",
     "paths": {
-      "@/*": ["src/*"]
+      "@/*": ["src/*"],
+      "@ai-chat/vue": ["../../packages/ai-chat/src/index.ts"],
+      "@ai-chat/vue/*": ["../../packages/ai-chat/src/*"]
     }
   },
   "include": ["src/**/*.ts", "src/**/*.vue", "src/**/*.d.ts"],
