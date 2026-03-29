@@ -1,0 +1,65 @@
+// === Components ===
+export { default as AiChat } from './components/AiChat.vue'
+export { default as AiChatProvider } from './components/AiChatProvider.vue'
+export { default as LayoutShell } from './components/LayoutShell.vue'
+export { default as Sidebar } from './components/Sidebar.vue'
+export { default as ChatMessageList } from './components/ChatMessageList.vue'
+export { default as ChatMessage } from './components/ChatMessage.vue'
+export { default as ChatInput } from './components/ChatInput.vue'
+export { default as ModelSelector } from './components/ModelSelector.vue'
+export { default as ModelManager } from './components/ModelManager.vue'
+export { default as AgentSelector } from './components/AgentSelector.vue'
+
+// === Types ===
+export type {
+  MessageRole,
+  ChatMessage,
+  Conversation,
+  ModelConfig,
+  AgentDefinition,
+  AgentRunner,
+  ChatOptions,
+  ChatChunk,
+  FileUploadService,
+  UploadedFile,
+  ChatEventType,
+} from './types'
+
+// === Composables ===
+export { useChat } from './composables/useChat'
+export { useSession } from './composables/useSession'
+export { useModel } from './composables/useModel'
+export { useLocale } from './composables/useLocale'
+export { useObservable } from './composables/useObservable'
+
+// === Agents ===
+// Import the class (prevents tree-shaking) and manually register the built-in agent.
+// The agents/index.ts side-effect registration gets tree-shaken in production builds,
+// so we register here to guarantee it runs.
+import { LangChainChatAgent } from './agents/langchain-chat-agent'
+import { agentRegistry, registerAgent } from './services/agent'
+
+const _builtinDef = {
+  id: 'langchain-chat',
+  name: 'LangChain Chat',
+  description: 'Built-in chat agent powered by LangChain.js',
+  isBuiltin: true,
+}
+agentRegistry.register(_builtinDef, new LangChainChatAgent())
+
+export { LangChainChatAgent }
+export { agentRegistry, registerAgent }
+
+// === Locales ===
+export { zhCn, en, ja } from './locales'
+export type { AiChatLocale, LocaleName } from './locales'
+
+// === Plugin ===
+import type { App } from 'vue'
+import AiChat from './components/AiChat.vue'
+
+export const AiChatPlugin = {
+  install(app: App) {
+    app.component('AiChat', AiChat)
+  },
+}

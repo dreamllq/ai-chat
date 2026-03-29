@@ -1,0 +1,50 @@
+import type { AiChatLocale } from './en'
+
+export const ja: AiChatLocale = {
+  conversation: {
+    newChat: '新しいチャット',
+    deleteConfirm: 'この会話を削除してもよろしいですか？',
+    rename: '名前の変更',
+    empty: '会話がありません',
+  },
+  chat: {
+    placeholder: 'メッセージを入力...',
+    send: '送信',
+    stop: '停止',
+    streaming: 'AIが考えています...',
+    resend: '再送信',
+    copyCode: 'コードをコピー',
+    copySuccess: 'コピーしました！',
+  },
+  model: {
+    title: 'モデル',
+    create: 'モデルを作成',
+    delete: '削除',
+    endpoint: 'APIエンドポイント',
+    apiKey: 'APIキー',
+    modelName: 'モデル名',
+    selectModel: 'モデルを選択',
+    name: '表示名',
+    provider: 'プロバイダー',
+    temperature: '温度',
+    maxTokens: '最大トークン数',
+  },
+  agent: {
+    title: 'エージェント',
+    select: 'エージェントを選択',
+    builtin: '内蔵',
+    custom: 'カスタム',
+  },
+  upload: {
+    button: 'ファイルをアップロード',
+    dragHere: 'ファイルをここにドラッグ',
+  },
+  error: {
+    network: 'ネットワークエラー。接続を確認してください。',
+    apiKey: 'APIキーが無効です。モデル設定を確認してください。',
+    streamInterrupted: 'ストリームが中断されました。',
+    retry: '再試行',
+    agentNotFound: 'エージェントが見つかりません。',
+    modelNotSelected: 'モデルを選択してください。',
+  },
+}

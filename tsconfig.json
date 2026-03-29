@@ -1,0 +1,11 @@
+{
+  "compilerOptions": {
+    "strict": true,
+    "moduleResolution": "bundler",
+    "skipLibCheck": true
+  },
+  "references": [
+    { "path": "packages/ai-chat" },
+    { "path": "apps/demo" }
+  ]
+}

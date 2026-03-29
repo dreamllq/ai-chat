@@ -1,0 +1,220 @@
+import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { mount } from '@vue/test-utils'
+import type { ChatMessage } from '../../types'
+import ChatMessage from '../ChatMessage.vue'
+
+// Mock useLocale
+const mockT = vi.fn((path: string) => {
+  const map: Record<string, string> = {
+    'chat.copyCode': 'Copy Code',
+    'chat.copySuccess': 'Copied!',
+  }
+  return map[path] ?? path
+})
+
+vi.mock('../../composables/useLocale', () => ({
+  useLocale: () => ({
+    t: mockT,
+    locale: { value: {} },
+    setLocale: vi.fn(),
+  }),
+}))
+
+// Mock clipboard API
+Object.defineProperty(navigator, 'clipboard', {
+  value: {
+    writeText: vi.fn(() => Promise.resolve()),
+  },
+  writable: true,
+})
+
+function createMessage(overrides: Partial<ChatMessage> = {}): ChatMessage {
+  return {
+    id: 'msg-1',
+    conversationId: 'conv-1',
+    role: 'user',
+    content: 'Hello',
+    timestamp: Date.now(),
+    ...overrides,
+  }
+}
+
+function mountChatMessage(props: { message: ChatMessage }) {
+  return mount(ChatMessage, {
+    props,
+  })
+}
+
+describe('ChatMessage', () => {
+  beforeEach(() => {
+    mockT.mockClear()
+    vi.mocked(navigator.clipboard.writeText).mockReset()
+  })
+
+  // --- User message ---
+
+  it('renders user message with right-aligned bubble', () => {
+    const wrapper = mountChatMessage({
+      message: createMessage({ role: 'user', content: 'Hello world' }),
+    })
+
+    const container = wrapper.find('.chat-message')
+    expect(container.classes()).toContain('chat-message--user')
+    expect(wrapper.text()).toContain('Hello world')
+  })
+
+  // --- AI message ---
+
+  it('renders AI message with left-aligned bubble and avatar', () => {
+    const wrapper = mountChatMessage({
+      message: createMessage({ role: 'assistant', content: 'Hi there' }),
+    })
+
+    const container = wrapper.find('.chat-message')
+    expect(container.classes()).toContain('chat-message--assistant')
+    expect(wrapper.find('.chat-message__avatar').exists()).toBe(true)
+    expect(wrapper.text()).toContain('Hi there')
+  })
+
+  it('does not show avatar for user messages', () => {
+    const wrapper = mountChatMessage({
+      message: createMessage({ role: 'user' }),
+    })
+
+    expect(wrapper.find('.chat-message__avatar').exists()).toBe(false)
+  })
+
+  // --- Markdown rendering ---
+
+  it('renders bold markdown correctly', () => {
+    const wrapper = mountChatMessage({
+      message: createMessage({ role: 'assistant', content: '**bold text**' }),
+    })
+
+    const bubble = wrapper.find('.chat-message__bubble')
+    expect(bubble.find('strong').exists()).toBe(true)
+    expect(bubble.text()).toContain('bold text')
+  })
+
+  it('renders link markdown correctly', () => {
+    const wrapper = mountChatMessage({
+      message: createMessage({ role: 'assistant', content: '[click here](https://example.com)' }),
+    })
+
+    const bubble = wrapper.find('.chat-message__bubble')
+    const link = bubble.find('a')
+    expect(link.exists()).toBe(true)
+    expect(link.attributes('href')).toBe('https://example.com')
+    expect(link.text()).toBe('click here')
+  })
+
+  it('renders inline code correctly', () => {
+    const wrapper = mountChatMessage({
+      message: createMessage({ role: 'assistant', content: 'Use `console.log()` to debug' }),
+    })
+
+    const bubble = wrapper.find('.chat-message__bubble')
+    const code = bubble.find('code')
+    expect(code.exists()).toBe(true)
+    expect(code.text()).toBe('console.log()')
+  })
+
+  // --- Code blocks ---
+
+  it('renders code block with copy button', () => {
+    const wrapper = mountChatMessage({
+      message: createMessage({
+        role: 'assistant',
+        content: '```javascript\nconsole.log("hello")\n```',
+      }),
+    })
+
+    const copyBtn = wrapper.find('.chat-message__code-copy')
+    expect(copyBtn.exists()).toBe(true)
+    expect(copyBtn.text()).toBe('Copy Code')
+  })
+
+  it('copies code content when copy button is clicked', async () => {
+    const wrapper = mountChatMessage({
+      message: createMessage({
+        role: 'assistant',
+        content: '```javascript\nconsole.log("hello")\n```',
+      }),
+    })
+
+    const copyBtn = wrapper.find('.chat-message__code-copy')
+    await copyBtn.trigger('click')
+
+    expect(navigator.clipboard.writeText).toHaveBeenCalledWith('console.log("hello")')
+  })
+
+  it('shows success text after copying code', async () => {
+    const wrapper = mountChatMessage({
+      message: createMessage({
+        role: 'assistant',
+        content: '```javascript\nconsole.log("hello")\n```',
+      }),
+    })
+
+    const copyBtn = wrapper.find('.chat-message__code-copy')
+    await copyBtn.trigger('click')
+    await wrapper.vm.$nextTick()
+
+    expect(copyBtn.text()).toBe('Copied!')
+  })
+
+  // --- Streaming state ---
+
+  it('shows streaming cursor when isStreaming is true', () => {
+    const wrapper = mountChatMessage({
+      message: createMessage({ role: 'assistant', content: 'Loading...', isStreaming: true }),
+    })
+
+    const cursor = wrapper.find('.chat-message__cursor')
+    expect(cursor.exists()).toBe(true)
+  })
+
+  it('does not show streaming cursor when isStreaming is false', () => {
+    const wrapper = mountChatMessage({
+      message: createMessage({ role: 'assistant', content: 'Done', isStreaming: false }),
+    })
+
+    const cursor = wrapper.find('.chat-message__cursor')
+    expect(cursor.exists()).toBe(false)
+  })
+
+  it('does not show streaming cursor when isStreaming is undefined', () => {
+    const wrapper = mountChatMessage({
+      message: createMessage({ role: 'assistant', content: 'Done' }),
+    })
+
+    const cursor = wrapper.find('.chat-message__cursor')
+    expect(cursor.exists()).toBe(false)
+  })
+
+  // --- system message ---
+
+  it('renders system message without avatar', () => {
+    const wrapper = mountChatMessage({
+      message: createMessage({ role: 'system', content: 'System notification' }),
+    })
+
+    const container = wrapper.find('.chat-message')
+    expect(container.classes()).toContain('chat-message--system')
+    expect(wrapper.find('.chat-message__avatar').exists()).toBe(false)
+    expect(wrapper.text()).toContain('System notification')
+  })
+
+  // --- useLocale integration ---
+
+  it('uses useLocale for copy code text', () => {
+    mountChatMessage({
+      message: createMessage({
+        role: 'assistant',
+        content: '```js\ntest\n```',
+      }),
+    })
+
+    expect(mockT).toHaveBeenCalledWith('chat.copyCode')
+  })
+})

@@ -1,0 +1,151 @@
+import { ref, onUnmounted } from 'vue'
+import { useSession } from './useSession'
+import { useModel } from './useModel'
+import { agentRegistry } from '../services/agent'
+import { MessageService } from '../services/database'
+
+// Module-level singleton state — shared across all useChat() callers
+const isStreaming = ref(false)
+let abortController: AbortController | null = null
+
+export function useChat() {
+  const { currentConversation, currentConversationId, currentMessages } =
+    useSession()
+  const { currentModel } = useModel()
+  const messageService = new MessageService()
+
+  async function sendMessage(content: string, files?: File[]): Promise<void> {
+    console.log('[useChat] sendMessage called', { content })
+
+    const model = currentModel.value
+    const conversation = currentConversation.value
+    const conversationId = currentConversationId.value
+
+    console.log('[useChat] state:', {
+      hasModel: !!model,
+      modelName: model?.name,
+      hasConversation: !!conversation,
+      conversationId,
+      agentId: conversation?.agentId,
+    })
+
+    // Guard: no model configured
+    if (!model) {
+      console.warn('[useChat] BLOCKED: no model selected. Create one in Model Manager first.')
+      return
+    }
+
+    // Guard: no active conversation
+    if (!conversation || !conversationId) {
+      console.warn('[useChat] BLOCKED: no active conversation. Create one first.')
+      return
+    }
+
+    const runner = agentRegistry.getRunner(conversation.agentId)
+    console.log('[useChat] runner for agent:', conversation.agentId, runner ? 'FOUND' : 'NOT FOUND')
+
+    // Save user message to IndexDB
+    await messageService.create({
+      conversationId,
+      role: 'user',
+      content,
+      metadata: files?.length
+        ? {
+            files: files.map((f) => ({
+              name: f.name,
+              size: f.size,
+              type: f.type,
+            })),
+          }
+        : undefined,
+    })
+    console.log('[useChat] user message saved')
+
+    // Agent not found — create assistant error message
+    if (!runner) {
+      await messageService.create({
+        conversationId,
+        role: 'assistant',
+        content: 'Error: Agent not found',
+      })
+      console.warn('[useChat] no runner found for agent:', conversation.agentId)
+      return
+    }
+
+    // Create placeholder assistant message (streaming)
+    const assistantMsg = await messageService.create({
+      conversationId,
+      role: 'assistant',
+      content: '',
+      isStreaming: true,
+    })
+    console.log('[useChat] assistant placeholder created')
+
+    isStreaming.value = true
+    abortController = new AbortController()
+
+    try {
+      const history = await messageService.getByConversationId(conversationId)
+      const messagesForAgent = history.filter((m) => m.id !== assistantMsg.id)
+      console.log('[useChat] calling runner.chat() with', messagesForAgent.length, 'messages')
+
+      const generator = runner.chat(messagesForAgent, model, {
+        signal: abortController.signal,
+      })
+
+      let fullContent = ''
+      for await (const chunk of generator) {
+        if (chunk.type === 'token' && chunk.content) {
+          fullContent += chunk.content
+          await messageService.update(assistantMsg.id, {
+            content: fullContent,
+          })
+        } else if (chunk.type === 'error') {
+          fullContent += `\n\n⚠️ Error: ${chunk.error}`
+          await messageService.update(assistantMsg.id, {
+            content: fullContent,
+            isStreaming: false,
+          })
+          break
+        } else if (chunk.type === 'done') {
+          await messageService.update(assistantMsg.id, {
+            content: fullContent,
+            isStreaming: false,
+          })
+        }
+      }
+      console.log('[useChat] streaming complete')
+    } catch (err) {
+      console.error('[useChat] error during streaming:', err)
+      if ((err as Error)?.name === 'AbortError') {
+        await messageService.update(assistantMsg.id, { isStreaming: false })
+      } else {
+        await messageService.update(assistantMsg.id, {
+          content: `Error: ${(err as Error)?.message ?? 'Unknown error'}`,
+          isStreaming: false,
+        })
+      }
+    } finally {
+      isStreaming.value = false
+      abortController = null
+    }
+  }
+
+  function stopStreaming(): void {
+    console.log('[useChat] stopStreaming called')
+    abortController?.abort()
+  }
+
+  onUnmounted(() => {
+    if (abortController) {
+      abortController.abort()
+    }
+  })
+
+  return {
+    isStreaming,
+    currentMessages,
+    sendMessage,
+    stopStreaming,
+  }
+}

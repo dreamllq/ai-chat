@@ -1,0 +1,99 @@
+{
+  "active_plan": "D:\\github-my\\ai-chat\\.sisyphus\\plans\\ai-chat-component.md",
+  "started_at": "2026-03-28T16:28:40.408Z",
+  "session_ids": [
+    "ses_2cab947b1ffeBJu9Lv9x30zUd6",
+    "ses_2cab5ccddffeKh90DGU6FGvqHD",
+    "ses_2caacfcdcffeN2mhwNGhNXjqoA",
+    "ses_2caae18faffe6amEPguK7LzSYw",
+    "ses_2caabefffffeyimI9mBPWNSOfk",
+    "ses_2caadb345ffeFOrwHdnZpMkgoT",
+    "ses_2caac7fc7ffexIBK165BdumGzT",
+    "ses_2ca984be5ffe2nje2Uvi4J5Wz3",
+    "ses_2ca925e56ffe47MgbXybxW1yTe",
+    "ses_2ca918b40ffex5Vc4yBL45FVPK",
+    "ses_2ca91e176ffeLsLBgFdXhGQlYl",
+    "ses_2ca8511bbffeCcz1VT7khxxfRn",
+    "ses_2ca84826effe7tsRlM5xAPTP83",
+    "ses_2ca785c3bffeP5Qkmumk8MhQUH",
+    "ses_2ca78d7eaffeCKUzW4CHpCnyfA",
+    "ses_2c8d588e8ffe64V6BL0z7GJiWE",
+    "ses_2c8d50688ffe7OyoZS6D62Rxcd",
+    "ses_2c8d54130ffedY9xLiAiiytg1T",
+    "ses_2c8cbfaaeffeGqrRUKEpplSHSd",
+    "ses_2c8cb60faffeJGQloliIAzEiKq",
+    "ses_2c8cba415ffeT29s31YaTcemaj",
+    "ses_2c8aeea39ffeAjEtP2JU6HkLoE",
+    "ses_2c8af2eb0ffeDXoxssNuOi4wdP",
+    "ses_2c8ae71edffenmkHujSGlzOJyS",
+    "ses_2c88bc520ffeD2kVJbmpaLK714",
+    "ses_2c877e380ffeEcqZLakAxIzwfD"
+  ],
+  "plan_name": "ai-chat-component",
+  "agent": "atlas",
+  "task_sessions": {
+    "todo:1": {
+      "task_key": "todo:1",
+      "task_label": "1",
+      "task_title": "项目脚手架 — pnpm Monorepo + Vite + TypeScript",
+      "session_id": "ses_2cab5ccddffeKh90DGU6FGvqHD",
+      "agent": "Sisyphus-Junior",
+      "category": "quick",
+      "updated_at": "2026-03-28T16:37:23.062Z"
+    },
+    "todo:2": {
+      "task_key": "todo:2",
+      "task_label": "2",
+      "task_title": "核心类型定义",
+      "session_id": "ses_2caae18faffe6amEPguK7LzSYw",
+      "agent": "Sisyphus-Junior",
+      "category": "quick",
+      "updated_at": "2026-03-28T16:47:20.141Z"
+    },
+    "todo:7": {
+      "task_key": "todo:7",
+      "task_label": "7",
+      "task_title": "数据库 CRUD 服务",
+      "session_id": "ses_2ca925e56ffe47MgbXybxW1yTe",
+      "agent": "Sisyphus-Junior",
+      "category": "unspecified-high",
+      "updated_at": "2026-03-28T17:15:18.418Z"
+    },
+    "todo:9": {
+      "task_key": "todo:9",
+      "task_label": "9",
+      "task_title": "模型管理服务",
+      "session_id": "ses_2ca8511bbffeCcz1VT7khxxfRn",
+      "agent": "Sisyphus-Junior",
+      "category": "unspecified-high",
+      "updated_at": "2026-03-28T17:31:22.214Z"
+    },
+    "todo:11": {
+      "task_key": "todo:11",
+      "task_label": "11",
+      "task_title": "聊天服务 — 流式消息",
+      "session_id": "ses_2ca78d7eaffeCKUzW4CHpCnyfA",
+      "agent": "Sisyphus-Junior",
+      "category": "deep",
+      "updated_at": "2026-03-28T17:55:59.360Z"
+    },
+    "todo:13": {
+      "task_key": "todo:13",
+      "task_label": "13",
+      "task_title": "Layout Shell 组件 — ChatGPT风格布局",
+      "session_id": "ses_2c8d588e8ffe64V6BL0z7GJiWE",
+      "agent": "Sisyphus-Junior",
+      "category": "visual-engineering",
+      "updated_at": "2026-03-29T01:20:38.366Z"
+    },
+    "todo:14": {
+      "task_key": "todo:14",
+      "task_label": "14",
+      "task_title": "Sidebar 组件 — 会话列表",
+      "session_id": "ses_2c8cbfaaeffeGqrRUKEpplSHSd",
+      "agent": "Sisyphus-Junior",
+      "category": "visual-engineering",
+      "updated_at": "2026-03-29T01:31:15.795Z"
+    }
+  }
+}
