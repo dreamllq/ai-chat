@@ -1,7 +1,7 @@
 /**
- * Integration test: full file upload pipeline end-to-end
+ * Integration test: file upload pipeline end-to-end
  *
- * Exercises: useChat.sendMessage → DB (MessageService) → LangChainChatAgent.convertMessages → ChatMessage rendering
+ * Exercises: useChat.sendMessage(pre-built attachments) → DB (MessageService) → LangChainChatAgent.convertMessages → ChatMessage rendering
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { ref, nextTick, defineComponent, h } from 'vue'
@@ -16,10 +16,7 @@ import type {
   ChatMessage as ChatMessageType,
   Conversation,
   ModelConfig,
-  AgentRunner,
   ChatChunk,
-  FileUploadService,
-  UploadedFile,
   MessageAttachment,
 } from '../../types'
 
@@ -93,28 +90,29 @@ async function flushLiveQuery(): Promise<void> {
   await nextTick()
 }
 
-async function* createMockStream(
-  chunks: ChatChunk[],
-): AsyncGenerator<ChatChunk, void, unknown> {
-  for (const chunk of chunks) {
-    yield chunk
+/** Create a pre-built URL attachment */
+function createUrlAttachment(overrides: Partial<MessageAttachment> = {}): MessageAttachment {
+  return {
+    id: `upload-${overrides.name ?? 'photo.jpg'}`,
+    name: 'photo.jpg',
+    url: 'https://cdn.example.com/photo.jpg',
+    size: 1024,
+    mimeType: 'image/jpeg',
+    type: 'image',
+    ...overrides,
   }
 }
 
-function createMockFile(name: string, type: string, size = 1024): File {
-  return new File(['x'.repeat(size)], name, { type })
-}
-
-function createMockUploadService(): FileUploadService {
+/** Create a pre-built base64 attachment */
+function createBase64Attachment(overrides: Partial<MessageAttachment> = {}): MessageAttachment {
   return {
-    upload: vi.fn(async (file: File): Promise<UploadedFile> => ({
-      id: `upload-${file.name}`,
-      name: file.name,
-      url: `https://cdn.example.com/${file.name}`,
-      size: file.size,
-      mimeType: file.type || 'application/octet-stream',
-    })),
-    getFileUrl: vi.fn(async (fileId: string) => `https://cdn.example.com/${fileId}`),
+    id: crypto.randomUUID(),
+    name: 'doc.pdf',
+    data: 'data:application/pdf;base64,JVBERi0xLjQ=',
+    size: 100,
+    mimeType: 'application/pdf',
+    type: 'document',
+    ...overrides,
   }
 }
 
@@ -192,11 +190,17 @@ describe('File upload pipeline — integration', () => {
     unmount?.()
   })
 
-  // ─── Test 1: URL mode end-to-end ──────────────────────────────────────────
+  // ─── Test 1: URL attachment end-to-end ────────────────────────────────────
 
-  it('URL mode: upload service called → DB has URL attachment → agent produces multimodal HumanMessage', async () => {
-    const mockFile = createMockFile('photo.jpg', 'image/jpeg')
-    const mockService = createMockUploadService()
+  it('URL attachment: pre-built attachment → DB has URL → agent produces multimodal HumanMessage', async () => {
+    const attachments = [
+      createUrlAttachment({
+        name: 'photo.jpg',
+        url: 'https://cdn.example.com/photo.jpg',
+        mimeType: 'image/jpeg',
+        type: 'image',
+      }),
+    ]
 
     // Set up useChat
     const setup = withSetup(useChat)
@@ -204,15 +208,11 @@ describe('File upload pipeline — integration', () => {
     unmount = setup.unmount
     await flushLiveQuery()
 
-    // Step 1: sendMessage with file + upload service
-    await chat.sendMessage('Look at this photo', [mockFile], mockService)
+    // Step 1: sendMessage with pre-built URL attachment
+    await chat.sendMessage('Look at this photo', attachments)
     await flushLiveQuery()
 
-    // Step 2: assert upload was called
-    expect(mockService.upload).toHaveBeenCalledOnce()
-    expect(mockService.upload).toHaveBeenCalledWith(mockFile)
-
-    // Step 3: assert message in DB has URL attachment
+    // Step 2: assert message in DB has URL attachment
     const msgs = await messageService.getByConversationId('conv-1')
     const userMsg = msgs.find((m) => m.role === 'user')
     expect(userMsg).toBeDefined()
@@ -224,7 +224,7 @@ describe('File upload pipeline — integration', () => {
     expect(files[0].mimeType).toBe('image/jpeg')
     expect(files[0].data).toBeUndefined()
 
-    // Step 4: pass to LangChainChatAgent.convertMessages (via agent.chat)
+    // Step 3: pass to LangChainChatAgent.convertMessages (via agent.chat)
     const captured = captureStreamMessages()
     for await (const _ of agent.chat([userMsg!], {
       id: 'model-1',
@@ -238,7 +238,7 @@ describe('File upload pipeline — integration', () => {
       void _
     }
 
-    // Step 5: assert HumanMessage has multimodal content
+    // Step 4: assert HumanMessage has multimodal content
     expect(captured.messages).toHaveLength(1)
     const humanMsg = captured.messages[0] as HumanMessage
     expect(humanMsg).toBeInstanceOf(HumanMessage)
@@ -252,18 +252,25 @@ describe('File upload pipeline — integration', () => {
     })
   })
 
-  // ─── Test 2: Base64 mode end-to-end ───────────────────────────────────────
+  // ─── Test 2: Base64 attachment end-to-end ─────────────────────────────────
 
-  it('Base64 mode: no service → DB has data attachment → agent produces multimodal HumanMessage', async () => {
-    const mockFile = createMockFile('pic.png', 'image/png', 50)
+  it('Base64 attachment: pre-built data attachment → DB has data → agent produces multimodal HumanMessage', async () => {
+    const attachments = [
+      createBase64Attachment({
+        name: 'pic.png',
+        data: 'data:image/png;base64,iVBORw0KGgo=',
+        mimeType: 'image/png',
+        type: 'image',
+      }),
+    ]
 
     const setup = withSetup(useChat)
     chat = setup.result
     unmount = setup.unmount
     await flushLiveQuery()
 
-    // Step 1: sendMessage without upload service
-    await chat.sendMessage('See this', [mockFile], null)
+    // Step 1: sendMessage with pre-built base64 attachment
+    await chat.sendMessage('See this', attachments)
     await flushLiveQuery()
 
     // Step 2: assert message in DB has base64 data
@@ -302,17 +309,28 @@ describe('File upload pipeline — integration', () => {
   // ─── Test 3: Mixed attachments ────────────────────────────────────────────
 
   it('Mixed attachments: image becomes image_url, PDF becomes text description', async () => {
-    const imgFile = createMockFile('diagram.png', 'image/png', 50)
-    const pdfFile = createMockFile('report.pdf', 'application/pdf', 200)
-    const mockService = createMockUploadService()
+    const attachments = [
+      createUrlAttachment({
+        name: 'diagram.png',
+        mimeType: 'image/png',
+        type: 'image',
+        url: 'https://cdn.example.com/diagram.png',
+      }),
+      createUrlAttachment({
+        name: 'report.pdf',
+        mimeType: 'application/pdf',
+        type: 'document',
+        url: 'https://cdn.example.com/report.pdf',
+      }),
+    ]
 
     const setup = withSetup(useChat)
     chat = setup.result
     unmount = setup.unmount
     await flushLiveQuery()
 
-    // Send with URL mode (both files via service)
-    await chat.sendMessage('Analyze these', [imgFile, pdfFile], mockService)
+    // Send with mixed attachments
+    await chat.sendMessage('Analyze these', attachments)
     await flushLiveQuery()
 
     // Verify DB has 2 attachments with correct types
@@ -355,7 +373,7 @@ describe('File upload pipeline — integration', () => {
     })
     expect(content[2]).toEqual({
       type: 'text',
-      text: '[Attached file: report.pdf, 0.2KB]',
+      text: '[Attached file: report.pdf, 1.0KB]',
     })
   })
 
@@ -400,15 +418,15 @@ describe('File upload pipeline — integration', () => {
     expect(legacyDoc.text()).toContain('old.txt')
   })
 
-  // ─── Test 5: No files — unchanged behavior ────────────────────────────────
+  // ─── Test 5: No attachments — unchanged behavior ──────────────────────────
 
-  it('No files: metadata.files is undefined, agent produces string HumanMessage', async () => {
+  it('No attachments: metadata.files is undefined, agent produces string HumanMessage', async () => {
     const setup = withSetup(useChat)
     chat = setup.result
     unmount = setup.unmount
     await flushLiveQuery()
 
-    // Send without files
+    // Send without attachments
     await chat.sendMessage('Just text')
     await flushLiveQuery()
 

@@ -122,7 +122,7 @@ export interface ChatChunk {
 /** 文件上传服务接口 */
 export interface FileUploadService {
   /** 上传文件 */
-  upload(file: File): Promise<UploadedFile>
+  upload(file: File, options?: FileUploadOptions): Promise<UploadedFile>
   /** 获取文件访问 URL */
   getFileUrl(fileId: string): Promise<string>
 }
@@ -139,6 +139,42 @@ export interface UploadedFile {
   size: number
   /** MIME 类型 */
   mimeType: string
+}
+
+/** 文件上传进度事件 */
+export interface FileUploadProgressEvent {
+  /** 已上传字节 */
+  loaded: number
+  /** 总字节 */
+  total: number
+  /** 进度百分比 (0-100) */
+  percent: number
+}
+
+/** 文件上传选项（传给 FileUploadService.upload 的第二参数） */
+export interface FileUploadOptions {
+  /** 上传进度回调 */
+  onProgress?: (event: FileUploadProgressEvent) => void
+  /** 取消信号 */
+  signal?: AbortSignal
+}
+
+/** UI 层文件上传状态（不持久化，仅组件内部使用） */
+export interface FileUploadState {
+  /** 状态唯一标识 */
+  id: string
+  /** 原始文件对象 */
+  file: File
+  /** 上传状态 */
+  status: 'pending' | 'uploading' | 'success' | 'failed'
+  /** 上传进度 (0-100) */
+  progress: number
+  /** 上传成功后的文件信息 */
+  result?: UploadedFile
+  /** 上传失败的错误信息 */
+  error?: Error
+  /** 用于取消上传的 AbortController */
+  abortController?: AbortController
 }
 
 // === 消息附件 ===

@@ -1,5 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { mount } from '@vue/test-utils'
+import { ref, computed } from 'vue'
+import type { MessageAttachment } from '../../types'
 import ChatInput from '../ChatInput.vue'
 
 // Mock useLocale
@@ -39,6 +41,28 @@ vi.mock('../../services/agent', () => ({
     getAllDefinitions: () => [{ id: 'langchain-chat', name: 'Chat', isBuiltin: true }],
     version: { value: 0 },
   },
+}))
+
+// Mock useFileUpload
+const mockFileStates = ref<any[]>([])
+const mockIsAllReady = ref(true)
+const mockAddFile = vi.fn()
+const mockRemoveFile = vi.fn()
+const mockRetryFile = vi.fn()
+const mockGetCompletedAttachments = vi.fn(() => [])
+const mockClear = vi.fn()
+
+vi.mock('../../composables/useFileUpload', () => ({
+  useFileUpload: () => ({
+    fileStates: mockFileStates,
+    isUploading: computed(() => false),
+    isAllReady: mockIsAllReady,
+    addFile: mockAddFile,
+    removeFile: mockRemoveFile,
+    retryFile: mockRetryFile,
+    getCompletedAttachments: mockGetCompletedAttachments,
+    clear: mockClear,
+  }),
 }))
 
 // Element Plus stubs
@@ -100,6 +124,13 @@ function mountChatInput(props: Record<string, unknown> = {}) {
 describe('ChatInput', () => {
   beforeEach(() => {
     mockT.mockClear()
+    mockFileStates.value = []
+    mockIsAllReady.value = true
+    mockAddFile.mockClear()
+    mockRemoveFile.mockClear()
+    mockRetryFile.mockClear()
+    mockGetCompletedAttachments.mockClear()
+    mockClear.mockClear()
   })
 
   it('renders textarea with correct placeholder', () => {
@@ -263,27 +294,23 @@ describe('ChatInput', () => {
     expect(wrapper.emitted('send')![0]).toEqual([{ content: 'Test' }])
   })
 
-  it('sends with files when files are selected', async () => {
-    const mockService = {
-      upload: vi.fn(),
-      getFileUrl: vi.fn(),
-    }
-
-    const wrapper = mountChatInput({ fileUploadService: mockService })
-    const fileInput = wrapper.find('input[type="file"]')
-
-    // Set text
+  it('sends with attachments when files are uploaded', async () => {
+    const wrapper = mountChatInput()
     const textarea = wrapper.find('textarea.chat-input__textarea')
-    await textarea.setValue('Check this file')
-    await wrapper.vm.$nextTick()
 
-    // Simulate file selection
-    const file = new File(['test'], 'test.txt', { type: 'text/plain' })
-    Object.defineProperty(fileInput.element, 'files', {
-      value: [file],
-      configurable: true,
-    })
-    await fileInput.trigger('change')
+    // Simulate a completed upload via the mocked composable
+    const mockAttachment = {
+      id: 'upload-1',
+      name: 'test.txt',
+      url: 'https://cdn.example.com/test.txt',
+      size: 4,
+      mimeType: 'text/plain',
+      type: 'document',
+    }
+    mockGetCompletedAttachments.mockReturnValue([mockAttachment])
+    mockIsAllReady.value = true
+
+    await textarea.setValue('Check this file')
     await wrapper.vm.$nextTick()
 
     // Send
@@ -291,29 +318,25 @@ describe('ChatInput', () => {
     await sendButton!.vm.$emit('click')
     await wrapper.vm.$nextTick()
 
-    const emitted = wrapper.emitted<{ content: string; files?: File[] }[]>('send')
+    const emitted = wrapper.emitted<{ content: string; attachments?: any[] }[]>('send')
     expect(emitted).toBeTruthy()
     expect(emitted![0][0].content).toBe('Check this file')
-    expect(emitted![0][0].files).toHaveLength(1)
-    expect(emitted![0][0].files![0].name).toBe('test.txt')
+    expect(emitted![0][0].attachments).toHaveLength(1)
+    expect(emitted![0][0].attachments![0].name).toBe('test.txt')
   })
 
   it('shows file preview with remove button for selected files', async () => {
-    const mockService = {
-      upload: vi.fn(),
-      getFileUrl: vi.fn(),
-    }
+    const wrapper = mountChatInput()
 
-    const wrapper = mountChatInput({ fileUploadService: mockService })
-    const fileInput = wrapper.find('input[type="file"]')
-
-    // Select a file
-    const file = new File(['test'], 'document.pdf', { type: 'application/pdf' })
-    Object.defineProperty(fileInput.element, 'files', {
-      value: [file],
-      configurable: true,
-    })
-    await fileInput.trigger('change')
+    // Simulate a file in the upload composable
+    mockFileStates.value = [
+      {
+        id: 'state-1',
+        file: new File(['test'], 'document.pdf', { type: 'application/pdf' }),
+        status: 'success',
+        progress: 100,
+      },
+    ]
     await wrapper.vm.$nextTick()
 
     // Should show file name in preview
@@ -324,30 +347,26 @@ describe('ChatInput', () => {
     expect(removeButtons.length).toBeGreaterThanOrEqual(1)
   })
 
-  it('removing a file from preview clears it from selection', async () => {
-    const mockService = {
-      upload: vi.fn(),
-      getFileUrl: vi.fn(),
-    }
+  it('removing a file from preview calls removeFile', async () => {
+    const wrapper = mountChatInput()
 
-    const wrapper = mountChatInput({ fileUploadService: mockService })
-    const fileInput = wrapper.find('input[type="file"]')
-
-    const file = new File(['test'], 'photo.jpg', { type: 'image/jpeg' })
-    Object.defineProperty(fileInput.element, 'files', {
-      value: [file],
-      configurable: true,
-    })
-    await fileInput.trigger('change')
+    // Simulate a file in the upload composable
+    mockFileStates.value = [
+      {
+        id: 'state-1',
+        file: new File(['test'], 'photo.jpg', { type: 'image/jpeg' }),
+        status: 'success',
+        progress: 100,
+      },
+    ]
     await wrapper.vm.$nextTick()
-
-    expect(wrapper.text()).toContain('photo.jpg')
 
     // Click remove
     const removeButton = wrapper.find('.chat-input__file-remove')
     await removeButton.trigger('click')
     await wrapper.vm.$nextTick()
 
-    expect(wrapper.text()).not.toContain('photo.jpg')
+    // Should have called removeFile via the composable
+    expect(mockRemoveFile).toHaveBeenCalledWith('state-1')
   })
 })

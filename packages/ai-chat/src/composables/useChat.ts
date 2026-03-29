@@ -4,23 +4,13 @@ import { useModel } from './useModel'
 import { agentRegistry } from '../services/agent'
 import { MessageService, ConversationService } from '../services/database'
 import { TitleGenerator } from '../agents/title-generator'
-import { getAttachmentType, type MessageAttachment } from '../types'
-import type { FileUploadService } from '../types'
+import type { MessageAttachment } from '../types'
 
 // Module-level singleton state — shared across all useChat() callers
 const isStreaming = ref(false)
 let abortController: AbortController | null = null
 
 const INITIAL_TITLE_MAX_LENGTH = 30
-
-function fileToBase64(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader()
-    reader.onload = () => resolve(reader.result as string)
-    reader.onerror = () => reject(reader.error)
-    reader.readAsDataURL(file)
-  })
-}
 
 export function useChat() {
   const { currentConversation, currentConversationId, currentMessages } =
@@ -31,8 +21,7 @@ export function useChat() {
 
   async function sendMessage(
     content: string,
-    files?: File[],
-    fileUploadService?: FileUploadService | null,
+    attachments?: MessageAttachment[],
   ): Promise<void> {
     console.log('[useChat] sendMessage called', { content })
 
@@ -69,43 +58,8 @@ export function useChat() {
     const runner = agentRegistry.getRunner(conversation.agentId)
     console.log('[useChat] runner for agent:', conversation.agentId, runner ? 'FOUND' : 'NOT FOUND')
 
-    // Process file attachments
-    let fileAttachments: MessageAttachment[] | undefined
-    if (files && files.length > 0) {
-      if (fileUploadService) {
-        // URL mode: upload via service
-        const uploaded = await Promise.all(
-          files.map(async (file) => {
-            const result = await fileUploadService.upload(file)
-            return {
-              id: result.id,
-              name: result.name,
-              url: result.url,
-              size: result.size,
-              mimeType: result.mimeType,
-              type: getAttachmentType(result.mimeType),
-            } satisfies MessageAttachment
-          }),
-        )
-        fileAttachments = uploaded
-      } else {
-        // Base64 fallback
-        const encoded = await Promise.all(
-          files.map(async (file) => {
-            const data = await fileToBase64(file)
-            return {
-              id: crypto.randomUUID(),
-              name: file.name,
-              data,
-              size: file.size,
-              mimeType: file.type || 'application/octet-stream',
-              type: getAttachmentType(file.type || 'application/octet-stream'),
-            } satisfies MessageAttachment
-          }),
-        )
-        fileAttachments = encoded
-      }
-    }
+    // File attachments are now pre-built by the useFileUpload composable
+    const fileAttachments = attachments && attachments.length > 0 ? attachments : undefined
 
     // Save user message to IndexDB
     await messageService.create({

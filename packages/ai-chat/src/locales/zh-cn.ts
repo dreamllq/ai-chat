@@ -57,6 +57,7 @@ export const zhCn: AiChatLocale = {
     download: '下载',
     fileTooLarge: '文件过大',
     unsupportedPreview: '无法预览',
+    removeFile: '删除',
   },
   error: {
     network: '网络错误，请检查网络连接。',

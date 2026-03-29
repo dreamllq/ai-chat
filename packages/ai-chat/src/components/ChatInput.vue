@@ -4,9 +4,10 @@ import { ElSelect, ElOption, ElTag, ElButton, ElIcon } from 'element-plus'
 import { Promotion, CircleClose, UploadFilled, Setting } from '@element-plus/icons-vue'
 import { useLocale } from '../composables/useLocale'
 import { useModel } from '../composables/useModel'
+import { useFileUpload } from '../composables/useFileUpload'
 import { agentRegistry } from '../services/agent'
 import ModelManager from './ModelManager.vue'
-import type { FileUploadService } from '../types'
+import type { FileUploadService, MessageAttachment } from '../types'
 
 const MANAGE_MODEL_VALUE = '__manage_models__'
 
@@ -17,7 +18,7 @@ const props = defineProps<{
 }>()
 
 const emit = defineEmits<{
-  send: [payload: { content: string; files?: File[] }]
+  send: [payload: { content: string; attachments?: MessageAttachment[] }]
   stop: []
   'update:currentAgentId': [value: string]
   'update:currentModelId': [value: string]
@@ -25,15 +26,19 @@ const emit = defineEmits<{
 
 const { t } = useLocale()
 const { models, currentModelId } = useModel()
+const { fileStates, isAllReady, addFile, removeFile, retryFile, getCompletedAttachments, clear } = useFileUpload({
+  fileUploadService: props.fileUploadService
+})
 
 const inputText = ref('')
-const selectedFiles = ref<File[]>([])
 const fileInputRef = ref<HTMLInputElement | null>(null)
 const textareaRef = ref<HTMLTextAreaElement | null>(null)
 const managerVisible = ref(false)
 
 const trimmedText = computed(() => inputText.value.trim())
-const canSend = computed(() => trimmedText.value.length > 0 || selectedFiles.value.length > 0)
+const canSend = computed(() =>
+  (trimmedText.value.length > 0 || fileStates.value.length > 0) && isAllReady.value
+)
 const agents = computed(() => {
   // Depend on version so registry changes trigger re-computation
   void agentRegistry.version.value
@@ -53,13 +58,16 @@ watch(inputText, () => nextTick(autoResize))
 
 function handleSend() {
   if (!canSend.value || props.isStreaming) return
-  const payload: { content: string; files?: File[] } = { content: trimmedText.value }
-  if (selectedFiles.value.length > 0) {
-    payload.files = [...selectedFiles.value]
+  const payload: { content: string; attachments?: MessageAttachment[] } = {
+    content: trimmedText.value,
+  }
+  const attachments = getCompletedAttachments()
+  if (attachments.length > 0) {
+    payload.attachments = attachments
   }
   emit('send', payload)
   inputText.value = ''
-  selectedFiles.value = []
+  clear()
   nextTick(autoResize)
 }
 
@@ -81,14 +89,15 @@ function triggerFileUpload() {
 function handleFileChange(event: Event) {
   const target = event.target as HTMLInputElement
   if (target.files) {
-    const newFiles = Array.from(target.files)
-    selectedFiles.value = [...selectedFiles.value, ...newFiles]
+    for (const file of Array.from(target.files)) {
+      addFile(file)
+    }
   }
   target.value = ''
 }
 
-function removeFile(index: number) {
-  selectedFiles.value.splice(index, 1)
+function handleRemoveFile(id: string) {
+  removeFile(id)
 }
 
 function handleAgentChange(value: string) {
@@ -108,10 +117,33 @@ function handleModelChange(id: string) {
   <div class="chat-input">
     <div class="chat-input__container">
       <!-- File preview area -->
-      <div v-if="selectedFiles.length > 0" class="chat-input__files">
-        <div v-for="(file, index) in selectedFiles" :key="index" class="chat-input__file-item">
-          <span class="chat-input__file-name">{{ file.name }}</span>
-          <button class="chat-input__file-remove" @click="removeFile(index)">×</button>
+      <div v-if="fileStates.length > 0" class="chat-input__files">
+        <div 
+          v-for="item in fileStates" 
+          :key="item.id" 
+          class="chat-input__file-item"
+          :class="{
+            'chat-input__file-item--uploading': item.status === 'uploading',
+            'chat-input__file-item--success': item.status === 'success',
+            'chat-input__file-item--failed': item.status === 'failed'
+          }"
+        >
+          <span class="chat-input__file-name">{{ item.file.name }}</span>
+          
+          <!-- Uploading: progress overlay -->
+          <div v-if="item.status === 'uploading'" class="chat-input__file-progress">
+            <div class="chat-input__file-progress-bar" :style="{ width: item.progress + '%' }"></div>
+            <span class="chat-input__file-progress-text">{{ item.progress }}%</span>
+          </div>
+          
+          <!-- Failed: error overlay + retry -->
+          <div v-if="item.status === 'failed'" class="chat-input__file-error">
+            <span class="chat-input__file-error-text">{{ t('attachment.uploadFailed') }}</span>
+            <button class="chat-input__file-retry" @click="retryFile(item.id)">{{ t('error.retry') }}</button>
+          </div>
+          
+          <!-- Remove button (always visible) -->
+          <button class="chat-input__file-remove" @click="handleRemoveFile(item.id)">×</button>
         </div>
       </div>
 
@@ -300,6 +332,91 @@ function handleModelChange(id: string) {
 .chat-input__file-remove:hover {
   color: var(--el-color-danger);
   background-color: var(--el-fill-color);
+}
+
+/* === File upload status variants === */
+.chat-input__file-item--uploading {
+  position: relative;
+  background-color: var(--el-color-primary-light-9, #ecf5ff);
+}
+
+.chat-input__file-item--success {
+  background-color: var(--el-color-success-light, #f0f9eb);
+}
+
+.chat-input__file-item--failed {
+  position: relative;
+  background-color: var(--el-color-danger-light, #fef0f0);
+}
+
+/* Progress overlay */
+.chat-input__file-progress {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  background: rgba(0, 0, 0, 0.35);
+  border-radius: var(--el-border-radius-base);
+  overflow: hidden;
+}
+
+.chat-input__file-progress-bar {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 100%;
+  background: var(--el-color-primary, #409eff);
+  opacity: 0.3;
+  transition: width 0.3s ease;
+}
+
+.chat-input__file-progress-text {
+  position: relative;
+  z-index: 1;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 600;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+}
+
+/* Error overlay */
+.chat-input__file-error {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  background: rgba(255, 255, 255, 0.85);
+  border-radius: var(--el-border-radius-base);
+  padding: 0 6px;
+}
+
+.chat-input__file-error-text {
+  font-size: 11px;
+  color: var(--el-color-danger, #f56c6c);
+  white-space: nowrap;
+}
+
+.chat-input__file-retry {
+  font-size: 11px;
+  color: var(--el-color-primary, #409eff);
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+  white-space: nowrap;
+}
+
+.chat-input__file-retry:hover {
+  text-decoration: underline;
 }
 
 /* === Textarea === */

@@ -1,3 +1,5 @@
+import type { FileUploadOptions, FileUploadProgressEvent } from '@ai-chat/vue'
+
 /** S3 存储服务配置 */
 export interface S3StorageConfig {
   /** S3 兼容端点地址 */
@@ -16,20 +18,11 @@ export interface S3StorageConfig {
   prefix?: string
 }
 
-/** 上传进度事件 */
-export interface UploadProgressEvent {
-  /** 已上传字节 */
-  loaded: number
-  /** 总字节 */
-  total: number
-  /** 进度百分比 (0-100) */
-  percent: number
-}
+/** 上传进度事件 — re-exported from @ai-chat/vue */
+export type UploadProgressEvent = FileUploadProgressEvent
 
-/** 上传选项 */
-export interface UploadOptions {
-  /** 上传进度回调 */
-  onProgress?: (event: UploadProgressEvent) => void
+/** 上传选项 — extends @ai-chat/vue's FileUploadOptions with S3-specific key */
+export interface UploadOptions extends FileUploadOptions {
   /** 自定义 S3 key (覆盖自动生成的路径) */
   key?: string
 }

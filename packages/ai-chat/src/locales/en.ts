@@ -55,6 +55,7 @@ export interface AiChatLocale {
     download: string
     fileTooLarge: string
     unsupportedPreview: string
+    removeFile: string
   }
   error: {
     network: string
@@ -123,6 +124,7 @@ export const en: AiChatLocale = {
     download: 'Download',
     fileTooLarge: 'File too large',
     unsupportedPreview: 'Preview not available',
+    removeFile: 'Remove',
   },
   error: {
     network: 'Network error. Please check your connection.',

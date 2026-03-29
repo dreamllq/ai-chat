@@ -58,6 +58,15 @@ export class S3StorageService implements FileUploadService {
       })
     }
 
+    // Abort upload when signal fires
+    if (options?.signal) {
+      if (options.signal.aborted) {
+        upload.abort()
+      } else {
+        options.signal.addEventListener('abort', () => upload.abort(), { once: true })
+      }
+    }
+
     await upload.done()
 
     const url = this.getPublicUrl(key)
@@ -70,8 +79,8 @@ export class S3StorageService implements FileUploadService {
     }
   }
 
-  async upload(file: File): Promise<UploadedFile> {
-    return this.uploadWithProgress(file)
+  async upload(file: File, options?: UploadOptions): Promise<UploadedFile> {
+    return this.uploadWithProgress(file, options)
   }
 
   async getFileUrl(fileId: string): Promise<string> {

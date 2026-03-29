@@ -12,7 +12,7 @@ import { useAgent } from '../composables/useAgent'
 import { ConversationService } from '../services/database'
 import { agentRegistry } from '../services/agent'
 import type { AiChatLocale, LocaleName } from '../locales'
-import type { FileUploadService, Conversation } from '../types'
+import type { FileUploadService, Conversation, MessageAttachment } from '../types'
 
 const props = withDefaults(defineProps<{
   locale?: AiChatLocale | LocaleName
@@ -91,7 +91,7 @@ onMounted(() => {
   })
 })
 
-async function handleSend(payload: { content: string; files?: File[] }) {
+async function handleSend(payload: { content: string; attachments?: MessageAttachment[] }) {
   console.log('[AiChat] handleSend called', {
     content: payload.content,
     hasConversation: !!currentConversationId.value,
@@ -112,7 +112,7 @@ async function handleSend(payload: { content: string; files?: File[] }) {
     }
   }
 
-  sendMessage(payload.content, payload.files, props.fileUploadService)
+  sendMessage(payload.content, payload.attachments)
 }
 </script>
 

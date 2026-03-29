@@ -21,6 +21,8 @@ export type {
   ChatOptions,
   ChatChunk,
   FileUploadService,
+  FileUploadProgressEvent,
+  FileUploadOptions,
   UploadedFile,
   AttachmentType,
   MessageAttachment,

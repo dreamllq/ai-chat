@@ -57,6 +57,7 @@ export const ja: AiChatLocale = {
     download: 'ダウンロード',
     fileTooLarge: 'ファイルが大きすぎます',
     unsupportedPreview: 'プレビューできません',
+    removeFile: '削除',
   },
   error: {
     network: 'ネットワークエラー。接続を確認してください。',
