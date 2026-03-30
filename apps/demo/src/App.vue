@@ -9,9 +9,11 @@ import type { S3StorageConfig } from '@ai-chat/storage-s3'
 // Custom Agents — 从独立文件导入，调用 registerAgent() 注册
 // ---------------------------------------------------------------------------
 import { llmToolAgentDef } from './agents/llm-tool-agent'
+import { formSchemaAgentDef } from './agents/form-schema-agent'
 
 // 在模块顶层同步注册（先于组件渲染），确保下拉框能立即列出
 registerAgent(llmToolAgentDef)
+registerAgent(formSchemaAgentDef)
 
 // ---------------------------------------------------------------------------
 // Locale state
