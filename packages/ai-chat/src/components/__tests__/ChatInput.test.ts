@@ -49,7 +49,7 @@ const mockIsAllReady = ref(true)
 const mockAddFile = vi.fn()
 const mockRemoveFile = vi.fn()
 const mockRetryFile = vi.fn()
-const mockGetCompletedAttachments = vi.fn(() => [])
+const mockGetCompletedAttachments = vi.fn<() => MessageAttachment[]>(() => [])
 const mockClear = vi.fn()
 
 vi.mock('../../composables/useFileUpload', () => ({
@@ -299,7 +299,7 @@ describe('ChatInput', () => {
     const textarea = wrapper.find('textarea.chat-input__textarea')
 
     // Simulate a completed upload via the mocked composable
-    const mockAttachment = {
+    const mockAttachment: MessageAttachment = {
       id: 'upload-1',
       name: 'test.txt',
       url: 'https://cdn.example.com/test.txt',

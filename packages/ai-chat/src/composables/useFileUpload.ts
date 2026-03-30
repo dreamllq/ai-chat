@@ -163,23 +163,19 @@ export function useFileUpload(options: UseFileUploadOptions): UseFileUploadRetur
 
   function getCompletedAttachments(): MessageAttachment[] {
     return fileStates.value
-      .filter((s) => s.status === 'success')
-      .map((s) => {
-        if (s.result) {
-          const base64Data = base64DataMap.get(s.id)
-          return {
-            id: s.result.id,
-            name: s.result.name,
-            url: base64Data ? undefined : s.result.url,
-            data: base64Data,
-            size: s.result.size,
-            mimeType: s.result.mimeType,
-            type: getAttachmentType(s.result.mimeType),
-          } satisfies MessageAttachment
+      .filter((s) => s.status === 'success' && s.result != null)
+      .map((s): MessageAttachment => {
+        const result = s.result!
+        const base64Data = base64DataMap.get(s.id)
+        return {
+          id: result.id,
+          name: result.name,
+          ...(base64Data ? { data: base64Data } : { url: result.url }),
+          size: result.size,
+          mimeType: result.mimeType,
+          type: getAttachmentType(result.mimeType),
         }
-        return null
       })
-      .filter((a): a is MessageAttachment => a !== null)
   }
 
   function clear(): void {
