@@ -56,6 +56,14 @@ describe('ChatMessageList', () => {
     mockMessages.value = []
     mockIsStreaming.value = false
     mockT.mockClear()
+
+    // requestAnimationFrame callbacks are not flushed by nextTick() in jsdom,
+    // so stub it to execute synchronously for scroll behavior tests
+    vi.stubGlobal('requestAnimationFrame', (cb: FrameRequestCallback) => {
+      cb(0)
+      return 0
+    })
+    vi.stubGlobal('cancelAnimationFrame', () => {})
   })
 
   it('renders empty list when no messages', () => {
