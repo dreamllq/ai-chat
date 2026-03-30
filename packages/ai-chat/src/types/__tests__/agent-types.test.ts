@@ -198,6 +198,50 @@ describe('AgentDefinition', () => {
   })
 })
 
+// === reasoningContent ===
+
+describe('reasoningContent', () => {
+  it('should accept ChatMessage with optional reasoningContent', () => {
+    const msg: ChatMessage = {
+      id: 'msg-1',
+      conversationId: 'conv-1',
+      role: 'assistant',
+      content: 'The answer is 42',
+      timestamp: Date.now(),
+      reasoningContent: 'Let me think step by step...',
+    }
+    expect(msg.reasoningContent).toBe('Let me think step by step...')
+  })
+
+  it('should accept ChatMessage without reasoningContent', () => {
+    const msg: ChatMessage = {
+      id: 'msg-2',
+      conversationId: 'conv-1',
+      role: 'assistant',
+      content: 'Hello',
+      timestamp: Date.now(),
+    }
+    expect(msg.reasoningContent).toBeUndefined()
+  })
+
+  it('should accept ChatChunk with optional reasoningContent', () => {
+    const chunk: ChatChunk = {
+      type: 'token',
+      content: 'answer',
+      reasoningContent: 'thinking...',
+    }
+    expect(chunk.reasoningContent).toBe('thinking...')
+  })
+
+  it('should accept ChatChunk without reasoningContent', () => {
+    const chunk: ChatChunk = {
+      type: 'token',
+      content: 'answer',
+    }
+    expect(chunk.reasoningContent).toBeUndefined()
+  })
+})
+
 // === AgentRunner backward compatibility ===
 
 describe('AgentRunner', () => {

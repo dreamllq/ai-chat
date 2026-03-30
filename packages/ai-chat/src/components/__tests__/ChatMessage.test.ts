@@ -8,6 +8,8 @@ const mockT = vi.fn((path: string) => {
   const map: Record<string, string> = {
     'chat.copyCode': 'Copy Code',
     'chat.copySuccess': 'Copied!',
+    'chat.thinking': 'Thinking',
+    'chat.thinkingToggle': 'Click to expand',
   }
   return map[path] ?? path
 })
@@ -228,5 +230,80 @@ describe('ChatMessage', () => {
     await new Promise((r) => setTimeout(r, 0))
 
     expect(mockT).toHaveBeenCalledWith('chat.copyCode')
+  })
+
+  // --- Reasoning / Thinking ---
+
+  it('does not show reasoning section when message has no reasoningContent', () => {
+    const wrapper = mountChatMessage({
+      message: createMessage({ role: 'assistant', content: 'Hello' }),
+    })
+
+    expect(wrapper.find('.chat-message__reasoning').exists()).toBe(false)
+  })
+
+  it('shows reasoning section when assistant message has reasoningContent', () => {
+    const wrapper = mountChatMessage({
+      message: createMessage({
+        role: 'assistant',
+        content: 'The answer is 42.',
+        reasoningContent: 'Let me think about this...',
+      }),
+    })
+
+    expect(wrapper.find('.chat-message__reasoning').exists()).toBe(true)
+    expect(wrapper.find('.chat-message__reasoning-title').text()).toBe('Thinking')
+    expect(wrapper.text()).toContain('Let me think about this')
+  })
+
+  it('renders reasoning content as markdown', () => {
+    const wrapper = mountChatMessage({
+      message: createMessage({
+        role: 'assistant',
+        content: 'Answer',
+        reasoningContent: '**important** thought',
+      }),
+    })
+
+    const reasoningContent = wrapper.find('.chat-message__reasoning-content')
+    expect(reasoningContent.find('strong').exists()).toBe(true)
+    expect(reasoningContent.text()).toContain('important')
+  })
+
+  it('toggles reasoning section on header click', async () => {
+    const wrapper = mountChatMessage({
+      message: createMessage({
+        role: 'assistant',
+        content: 'Answer',
+        reasoningContent: 'Some reasoning',
+      }),
+    })
+
+    // Initially expanded (default)
+    const reasoningContent = wrapper.find('.chat-message__reasoning-content')
+    expect(reasoningContent.isVisible()).toBe(true)
+    expect(wrapper.find('.chat-message__reasoning-toggle').text()).toBe('▲')
+
+    // Click to collapse
+    await wrapper.find('.chat-message__reasoning-header').trigger('click')
+    expect(wrapper.find('.chat-message__reasoning-content').element.style.display).toBe('none')
+    expect(wrapper.find('.chat-message__reasoning-toggle').text()).toBe('▼')
+
+    // Click to expand again
+    await wrapper.find('.chat-message__reasoning-header').trigger('click')
+    expect(wrapper.find('.chat-message__reasoning-content').element.style.display).toBe('')
+    expect(wrapper.find('.chat-message__reasoning-toggle').text()).toBe('▲')
+  })
+
+  it('does not show reasoning for user messages even with reasoningContent', () => {
+    const wrapper = mountChatMessage({
+      message: createMessage({
+        role: 'user',
+        content: 'Hello',
+        reasoningContent: 'Some reasoning',
+      }),
+    })
+
+    expect(wrapper.find('.chat-message__reasoning').exists()).toBe(false)
   })
 })

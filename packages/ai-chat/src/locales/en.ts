@@ -13,6 +13,8 @@ export interface AiChatLocale {
     resend: string
     copyCode: string
     copySuccess: string
+    thinking: string
+    thinkingToggle: string
   }
   model: {
     title: string
@@ -82,6 +84,8 @@ export const en: AiChatLocale = {
     resend: 'Resend',
     copyCode: 'Copy Code',
     copySuccess: 'Copied!',
+    thinking: 'Thinking',
+    thinkingToggle: 'Click to expand',
   },
   model: {
     title: 'Model Management',

@@ -50,7 +50,8 @@ export class LangChainRunner implements AgentRunner {
         const stream = await llm.stream(lcMessages, { signal })
         for await (const chunk of stream) {
           if (signal?.aborted) return
-          yield { type: 'token', content: chunk.content as string }
+          const reasoning = (chunk.additional_kwargs?.reasoning_content as string) || undefined
+          yield { type: 'token', content: chunk.content as string, reasoningContent: reasoning }
         }
         yield { type: 'done' }
         return
@@ -102,7 +103,8 @@ export class LangChainRunner implements AgentRunner {
             typeof response.content === 'string'
               ? response.content
               : JSON.stringify(response.content)
-          yield { type: 'token', content: text }
+          const reasoning = (response.additional_kwargs?.reasoning_content as string) || undefined
+          yield { type: 'token', content: text, reasoningContent: reasoning }
           yield { type: 'done' }
           return
         }

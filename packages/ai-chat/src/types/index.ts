@@ -19,6 +19,8 @@ export interface ChatMessage {
   isStreaming?: boolean
   /** 附加元数据 */
   metadata?: Record<string, unknown>
+  /** 推理内容（推理模型的思考过程） */
+  reasoningContent?: string
 }
 
 // === 会话 ===
@@ -156,6 +158,8 @@ export interface ChatChunk {
   content?: string
   /** 错误信息 (type 为 error 时) */
   error?: string
+  /** 推理内容（推理模型的思考过程，type 为 token 时） */
+  reasoningContent?: string
 }
 
 // === 文件上传 ===

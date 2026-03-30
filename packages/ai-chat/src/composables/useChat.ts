@@ -114,22 +114,31 @@ export function useChat() {
       })
 
       let fullContent = ''
+      let fullReasoning = ''
       for await (const chunk of generator) {
-        if (chunk.type === 'token' && chunk.content) {
-          fullContent += chunk.content
+        if (chunk.type === 'token') {
+          if (chunk.content) {
+            fullContent += chunk.content
+          }
+          if (chunk.reasoningContent) {
+            fullReasoning += chunk.reasoningContent
+          }
           await messageService.update(assistantMsg.id, {
             content: fullContent,
+            reasoningContent: fullReasoning || undefined,
           })
         } else if (chunk.type === 'error') {
           fullContent += `\n\n⚠️ Error: ${chunk.error}`
           await messageService.update(assistantMsg.id, {
             content: fullContent,
+            reasoningContent: fullReasoning || undefined,
             isStreaming: false,
           })
           break
         } else if (chunk.type === 'done') {
           await messageService.update(assistantMsg.id, {
             content: fullContent,
+            reasoningContent: fullReasoning || undefined,
             isStreaming: false,
           })
         }

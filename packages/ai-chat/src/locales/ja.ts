@@ -15,6 +15,8 @@ export const ja: AiChatLocale = {
     resend: '再送信',
     copyCode: 'コードをコピー',
     copySuccess: 'コピーしました！',
+    thinking: '思考プロセス',
+    thinkingToggle: 'クリックして展開',
   },
   model: {
     title: 'モデル管理',

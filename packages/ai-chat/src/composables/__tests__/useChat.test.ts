@@ -337,4 +337,29 @@ describe('useChat', () => {
     const assistantMsg = msgs.find((m) => m.role === 'assistant')
     expect(assistantMsg!.content).toContain('Unexpected failure')
   })
+
+  it('accumulates reasoningContent from chunks', async () => {
+    const mockRunner: AgentRunner = {
+      chat: vi.fn().mockReturnValue(
+        createMockStream([
+          { type: 'token', content: '', reasoningContent: 'Let me think...' },
+          { type: 'token', content: '', reasoningContent: ' step by step.' },
+          { type: 'token', content: 'The answer is 42.' },
+          { type: 'done' },
+        ]),
+      ),
+    }
+    mocks.getRunner.mockReturnValue(mockRunner)
+
+    await chat.sendMessage('What is 6*7?')
+    await flushLiveQuery()
+
+    const msgs = await messageService.getByConversationId('conv-1')
+    expect(msgs).toHaveLength(2)
+    const assistantMsg = msgs.find((m) => m.role === 'assistant')
+    expect(assistantMsg).toBeDefined()
+    expect(assistantMsg!.content).toBe('The answer is 42.')
+    expect(assistantMsg!.reasoningContent).toBe('Let me think... step by step.')
+    expect(assistantMsg!.isStreaming).toBe(false)
+  })
 })

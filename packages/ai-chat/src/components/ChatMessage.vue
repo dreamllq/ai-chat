@@ -43,6 +43,16 @@ const showStreamingCursor = computed(
   () => props.message.role === 'assistant' && props.message.isStreaming === true,
 )
 
+// Reasoning / Thinking
+const hasReasoning = computed(
+  () => !!props.message.reasoningContent && props.message.role === 'assistant',
+)
+const renderedReasoning = computed(() => {
+  if (!props.message.reasoningContent) return ''
+  return md.render(props.message.reasoningContent)
+})
+const isReasoningExpanded = ref(true)
+
 // Attachments
 const attachments = computed<MessageAttachment[]>(() => {
   const files = props.message.metadata?.files
@@ -138,6 +148,18 @@ onUpdated(() => {
     </div>
 
     <div class="chat-message__bubble">
+      <!-- Reasoning / Thinking Process -->
+      <div v-if="hasReasoning" class="chat-message__reasoning">
+        <div class="chat-message__reasoning-header" @click="isReasoningExpanded = !isReasoningExpanded">
+          <span class="chat-message__reasoning-icon">💭</span>
+          <span class="chat-message__reasoning-title">{{ t('chat.thinking') }}</span>
+          <span class="chat-message__reasoning-toggle">{{ isReasoningExpanded ? '▲' : '▼' }}</span>
+        </div>
+        <div v-show="isReasoningExpanded" class="chat-message__reasoning-content">
+          <!-- eslint-disable-next-line vue/no-v-html -->
+          <div v-html="renderedReasoning" />
+        </div>
+      </div>
       <!-- eslint-disable-next-line vue/no-v-html -->
       <div ref="contentRef" class="chat-message__content" v-html="renderedContent" />
       <!-- Attachments -->
@@ -419,5 +441,58 @@ onUpdated(() => {
 .chat-message__attachment-size {
   opacity: 0.6;
   font-size: 11px;
+}
+
+.chat-message__reasoning {
+  margin-bottom: 10px;
+  border: 1px solid var(--el-border-color-lighter, #ebeef5);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.chat-message__reasoning-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  background: var(--el-fill-color-lighter, #fafafa);
+  cursor: pointer;
+  user-select: none;
+  font-size: 12px;
+  color: var(--el-text-color-secondary, #909399);
+  transition: background-color 0.2s;
+}
+
+.chat-message__reasoning-header:hover {
+  background: var(--el-fill-color, #f0f2f5);
+}
+
+.chat-message__reasoning-icon {
+  font-size: 13px;
+}
+
+.chat-message__reasoning-title {
+  font-weight: 500;
+}
+
+.chat-message__reasoning-toggle {
+  margin-left: auto;
+  font-size: 10px;
+}
+
+.chat-message__reasoning-content {
+  padding: 8px 12px;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--el-text-color-regular, #606266);
+  background: var(--el-fill-color-lighter, #fafafa);
+}
+
+.chat-message__reasoning-content :deep(p) {
+  margin: 0 0 6px;
+}
+
+.chat-message__reasoning-content :deep(p:last-child) {
+  margin-bottom: 0;
 }
 </style>

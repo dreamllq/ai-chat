@@ -63,7 +63,7 @@ function makeMessage(overrides: Partial<ChatMessage> = {}): ChatMessage {
 }
 
 /** Helper that sets up mockStream to yield the given chunks */
-function mockStreamYield(chunks: { content: string }[]) {
+function mockStreamYield(chunks: { content: string; additional_kwargs?: Record<string, unknown> }[]) {
   mockStream.mockImplementation(async () => {
     return (async function* () {
       for (const c of chunks) {
@@ -343,5 +343,95 @@ describe('LangChainRunner', () => {
         expect.objectContaining({ name: 'search', description: 'Search the web' }),
       ]),
     )
+  })
+
+  // --- Reasoning content tests ---
+
+  it('should yield reasoningContent from streaming chunks', async () => {
+    mockStreamYield([
+      { content: '', additional_kwargs: { reasoning_content: 'Let me think...' } },
+      { content: 'The answer', additional_kwargs: {} },
+    ])
+
+    const runner = new LangChainRunner({})
+    const chunks: unknown[] = []
+    for await (const chunk of runner.chat([makeMessage()], makeModel())) {
+      chunks.push(chunk)
+    }
+
+    expect(chunks).toEqual([
+      { type: 'token', content: '', reasoningContent: 'Let me think...' },
+      { type: 'token', content: 'The answer', reasoningContent: undefined },
+      { type: 'done' },
+    ])
+  })
+
+  it('should accumulate reasoningContent across multiple streaming chunks', async () => {
+    mockStreamYield([
+      { content: '', additional_kwargs: { reasoning_content: 'Step 1: ' } },
+      { content: '', additional_kwargs: { reasoning_content: 'Step 2: ' } },
+      { content: '', additional_kwargs: { reasoning_content: 'Done.' } },
+      { content: 'Final answer', additional_kwargs: {} },
+    ])
+
+    const runner = new LangChainRunner({})
+    const chunks: unknown[] = []
+    for await (const chunk of runner.chat([makeMessage()], makeModel())) {
+      chunks.push(chunk)
+    }
+
+    expect(chunks).toEqual([
+      { type: 'token', content: '', reasoningContent: 'Step 1: ' },
+      { type: 'token', content: '', reasoningContent: 'Step 2: ' },
+      { type: 'token', content: '', reasoningContent: 'Done.' },
+      { type: 'token', content: 'Final answer', reasoningContent: undefined },
+      { type: 'done' },
+    ])
+  })
+
+  it('should handle streaming chunks without reasoningContent (no regression)', async () => {
+    mockStreamYield([{ content: 'Hello' }, { content: ' world' }])
+
+    const runner = new LangChainRunner({})
+    const chunks: unknown[] = []
+    for await (const chunk of runner.chat([makeMessage()], makeModel())) {
+      chunks.push(chunk)
+    }
+
+    expect(chunks).toEqual([
+      { type: 'token', content: 'Hello', reasoningContent: undefined },
+      { type: 'token', content: ' world', reasoningContent: undefined },
+      { type: 'done' },
+    ])
+  })
+
+  it('should extract reasoningContent from invoke response in tool path', async () => {
+    const mockTool: ToolDefinition = {
+      name: 'calc',
+      description: 'Calculator',
+      execute: vi.fn().mockResolvedValue('42'),
+    }
+
+    mockInvoke
+      .mockResolvedValueOnce({
+        tool_calls: [{ name: 'calc', args: { input: '6*7' }, id: 'tc-1' }],
+        content: '',
+      })
+      .mockResolvedValueOnce({
+        tool_calls: [],
+        content: 'The answer is 42',
+        additional_kwargs: { reasoning_content: 'I used the calculator.' },
+      })
+
+    const runner = new LangChainRunner({ tools: [mockTool] })
+    const chunks: unknown[] = []
+    for await (const chunk of runner.chat([makeMessage()], makeModel())) {
+      chunks.push(chunk)
+    }
+
+    expect(chunks).toEqual([
+      { type: 'token', content: 'The answer is 42', reasoningContent: 'I used the calculator.' },
+      { type: 'done' },
+    ])
   })
 })

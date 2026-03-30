@@ -15,6 +15,8 @@ export const zhCn: AiChatLocale = {
     resend: '重新发送',
     copyCode: '复制代码',
     copySuccess: '已复制！',
+    thinking: '思考过程',
+    thinkingToggle: '点击展开',
   },
   model: {
     title: '模型管理',
