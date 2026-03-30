@@ -4,13 +4,12 @@ import type { ModelConfig, ChatOptions } from '../../types'
 // Module-level mock — accessible in both vi.mock and tests
 const mockBindTools = vi.fn().mockReturnThis()
 
-vi.mock('@langchain/openai', () => ({
-  ChatOpenAI: vi.fn().mockImplementation(() => ({
+vi.mock('../chat-model', () => ({
+  EnhancedChatModel: vi.fn().mockImplementation(() => ({
     bindTools: mockBindTools,
   })),
 }))
-
-import { ChatOpenAI } from '@langchain/openai'
+import { EnhancedChatModel as MockedEnhancedChatModel } from '../chat-model'
 import { createLLM } from '../llm-init'
 
 function makeModel(overrides: Partial<ModelConfig> = {}): ModelConfig {
@@ -33,7 +32,7 @@ describe('createLLM', () => {
     vi.clearAllMocks()
   })
 
-  it('should create ChatOpenAI with correct config', () => {
+  it('should create EnhancedChatModel with correct config', () => {
     const model = makeModel({
       endpoint: 'https://custom.api/v1',
       apiKey: 'secret-key',
@@ -44,7 +43,7 @@ describe('createLLM', () => {
 
     createLLM(model)
 
-    expect(ChatOpenAI).toHaveBeenCalledWith(
+    expect(MockedEnhancedChatModel).toHaveBeenCalledWith(
       expect.objectContaining({
         configuration: { baseURL: 'https://custom.api/v1', apiKey: 'secret-key' },
         modelName: 'gpt-4-turbo',
@@ -61,7 +60,7 @@ describe('createLLM', () => {
 
     createLLM(model, options)
 
-    expect(ChatOpenAI).toHaveBeenCalledWith(
+    expect(MockedEnhancedChatModel).toHaveBeenCalledWith(
       expect.objectContaining({
         temperature: 0.3,
         maxTokens: 50,
@@ -74,7 +73,7 @@ describe('createLLM', () => {
 
     createLLM(model)
 
-    expect(ChatOpenAI).toHaveBeenCalledWith(
+    expect(MockedEnhancedChatModel).toHaveBeenCalledWith(
       expect.objectContaining({
         temperature: 0.7,
       }),
@@ -113,7 +112,7 @@ describe('createLLM', () => {
 
     createLLM(model, options)
 
-    expect(ChatOpenAI).toHaveBeenCalledWith(
+    expect(MockedEnhancedChatModel).toHaveBeenCalledWith(
       expect.objectContaining({
         temperature: 0.9,
         maxTokens: 200,

@@ -25,7 +25,7 @@ import type {
 // Mock @langchain/openai (needed by LangChainRunner via createLLM)
 const mockStream = vi.fn()
 vi.mock('@langchain/openai', () => ({
-  ChatOpenAI: vi.fn().mockImplementation(() => ({
+  ChatOpenAICompletions: vi.fn().mockImplementation(() => ({
     stream: mockStream,
   })),
 }))
