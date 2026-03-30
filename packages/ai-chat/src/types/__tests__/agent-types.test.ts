@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { z } from 'zod'
 import type {
   AgentDefinition,
   AgentRunner,
@@ -7,6 +8,8 @@ import type {
   MCPServerConfig,
   MCPTransportType,
   ModelConfig,
+  SimpleToolDefinition,
+  StructuredToolDefinition,
   ToolDefinition,
 } from '../index'
 
@@ -28,18 +31,33 @@ describe('ToolDefinition', () => {
     const tool: ToolDefinition = {
       name: 'calculator',
       description: 'A calculator tool',
-      parameters: {
-        type: 'object',
-        properties: {
-          expression: { type: 'string', description: 'Math expression' },
-        },
-        required: ['expression'],
-      },
       execute: async (input: string) => `Result: ${input}`,
     }
-    expect(tool.parameters).toBeDefined()
-    expect(tool.parameters!.type).toBe('object')
+    // `parameters` no longer exists on ToolDefinition — verify it's removed
+    expect((tool as unknown as Record<string, unknown>).parameters).toBeUndefined()
     expect(tool.name).toBe('calculator')
+  })
+
+  it('should allow StructuredToolDefinition with schema', () => {
+    const tool: StructuredToolDefinition = {
+      name: 'structured',
+      description: 'A structured tool',
+      schema: z.object({ query: z.string() }),
+      execute: async (input) => `Result: ${JSON.stringify(input)}`,
+    }
+    expect(tool.schema).toBeDefined()
+    expect(typeof tool.schema).toBe('object')
+    expect(tool.name).toBe('structured')
+  })
+
+  it('should allow SimpleToolDefinition without schema', () => {
+    const tool: SimpleToolDefinition = {
+      name: 'simple',
+      description: 'A simple tool',
+      execute: async (input: string) => `Result: ${input}`,
+    }
+    expect((tool as unknown as Record<string, unknown>).schema).toBeUndefined()
+    expect(tool.name).toBe('simple')
   })
 
   it('should allow execute to return resolved values', async () => {

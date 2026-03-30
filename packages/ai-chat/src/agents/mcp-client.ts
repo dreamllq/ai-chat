@@ -31,14 +31,30 @@ export class MCPClient {
 
     try {
       const mcpTools = await this.client.getTools()
-      return mcpTools.map(tool => ({
-        name: tool.name,
-        description: tool.description ?? '',
-        execute: async (input: string) => {
-          const result = await tool.invoke(input)
-          return String(result)
-        },
-      }))
+      return mcpTools.map(tool => {
+        // Check if MCP tool exposes a schema (StructuredTool)
+        const schema = (tool as unknown as { schema?: unknown }).schema
+        if (schema && typeof schema === 'object') {
+          return {
+            name: tool.name,
+            description: tool.description ?? '',
+            schema,
+            execute: async (input: unknown) => {
+              const result = await tool.invoke(input as string)
+              return String(result)
+            },
+          }
+        }
+        // Simple tool — string input only
+        return {
+          name: tool.name,
+          description: tool.description ?? '',
+          execute: async (input: string) => {
+            const result = await tool.invoke(input)
+            return String(result)
+          },
+        }
+      })
     } catch (error) {
       console.error('[MCPClient] Failed to get tools:', error)
       return []

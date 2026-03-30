@@ -1,8 +1,8 @@
 import type { AgentRunner, ChatMessage, ModelConfig, ChatOptions, ChatChunk, TokenUsage, ToolDefinition } from '../types'
 import { convertMessages } from './message-converter'
 import { createLLM } from './llm-init'
-import { DynamicTool } from '@langchain/core/tools'
-import { ToolMessage } from '@langchain/core/messages'
+import { DynamicTool, DynamicStructuredTool } from '@langchain/core/tools'
+import { ToolMessage, type BaseMessage } from '@langchain/core/messages'
 
 /** Extract TokenUsage from LangChain response's usage_metadata. */
 function extractTokenUsage(response: { usage_metadata?: Record<string, unknown> }): TokenUsage | undefined {
@@ -35,15 +35,24 @@ export class LangChainRunner implements AgentRunner {
     this.systemPrompt = agentDef.systemPrompt
   }
 
-  private convertTools(tools: ToolDefinition[]): DynamicTool[] {
-    return tools.map(
-      (tool) =>
-        new DynamicTool({
+  private convertTools(tools: ToolDefinition[]): (DynamicTool | DynamicStructuredTool)[] {
+    return tools.map((tool) => {
+      if ('schema' in tool) {
+        // Structured tool — pass schema to LangChain, DynamicStructuredTool
+        return new DynamicStructuredTool({
           name: tool.name,
           description: tool.description,
-          func: tool.execute,
-        }),
-    )
+          schema: tool.schema,
+          func: async (input: unknown) => tool.execute(input as never),
+        })
+      }
+      // Simple tool — no schema, use DynamicTool
+      return new DynamicTool({
+        name: tool.name,
+        description: tool.description,
+        func: tool.execute,
+      })
+    })
   }
 
   async *chat(
@@ -76,7 +85,7 @@ export class LangChainRunner implements AgentRunner {
       // Tools configured — tool calling loop with invoke
       const langchainTools = this.convertTools(this.tools)
       const llm = createLLM(model, options, langchainTools)
-      const lcMessages = convertMessages(messages, systemPrompt)
+      const lcMessages: BaseMessage[] = convertMessages(messages, systemPrompt)
 
       const toolMap = new Map<string, ToolDefinition>()
       for (const tool of this.tools) {
@@ -97,11 +106,20 @@ export class LangChainRunner implements AgentRunner {
             if (signal?.aborted) return
 
             const tool = toolMap.get(tc.name)
-            const input = extractToolInput(tc.args)
 
             let result: string
             try {
-              result = tool ? await tool.execute(input) : `Unknown tool: ${tc.name}`
+              if (tool) {
+                if ('schema' in tool) {
+                  // Structured tool — pass raw args object directly
+                  result = await tool.execute(tc.args as never)
+                } else {
+                  // Simple tool — extract string input
+                  result = await tool.execute(extractToolInput(tc.args))
+                }
+              } else {
+                result = `Unknown tool: ${tc.name}`
+              }
             } catch (e) {
               result = `Tool error: ${String(e)}`
             }

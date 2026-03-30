@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import type { ChatMessage, ModelConfig, ChatOptions, ToolDefinition } from '../../types'
+import { z } from 'zod'
+import type { ChatMessage, ModelConfig, ChatOptions, ToolDefinition, StructuredToolDefinition } from '../../types'
 
 // Module-level mock functions — accessible in both vi.mock and tests
 const mockStream = vi.fn()
@@ -21,6 +22,14 @@ vi.mock('@langchain/core/tools', () => ({
     name,
     description,
     func,
+    _getType: () => 'tool',
+  })),
+  DynamicStructuredTool: vi.fn().mockImplementation(({ name, description, schema, func }: { name: string; description: string; schema: unknown; func: (input: unknown) => Promise<string> }) => ({
+    name,
+    description,
+    schema,
+    func,
+    _getType: () => 'structured_tool',
   })),
 }))
 
@@ -431,6 +440,38 @@ describe('LangChainRunner', () => {
 
     expect(chunks).toEqual([
       { type: 'token', content: 'The answer is 42', reasoningContent: 'I used the calculator.' },
+      { type: 'done' },
+    ])
+  })
+
+  it('should use DynamicStructuredTool for tools with schema', async () => {
+    const structuredTool: StructuredToolDefinition = {
+      name: 'search',
+      description: 'Search with structured params',
+      schema: z.object({ query: z.string(), limit: z.number().optional() }),
+      execute: vi.fn().mockResolvedValue('search results'),
+    }
+
+    mockInvoke
+      .mockResolvedValueOnce({
+        tool_calls: [{ name: 'search', args: { query: 'test', limit: 5 }, id: 'tc-1' }],
+        content: '',
+      })
+      .mockResolvedValueOnce({
+        tool_calls: [],
+        content: 'Found results',
+      })
+
+    const runner = new LangChainRunner({ tools: [structuredTool] })
+    const chunks: unknown[] = []
+    for await (const chunk of runner.chat([makeMessage()], makeModel())) {
+      chunks.push(chunk)
+    }
+
+    // Structured tool receives raw args object, not extracted string
+    expect(structuredTool.execute).toHaveBeenCalledWith({ query: 'test', limit: 5 })
+    expect(chunks).toEqual([
+      { type: 'token', content: 'Found results' },
       { type: 'done' },
     ])
   })

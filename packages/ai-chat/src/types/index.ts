@@ -1,5 +1,3 @@
-// === 消息 ===
-
 /** 聊天消息角色类型 */
 export type MessageRole = 'user' | 'assistant' | 'system'
 
@@ -85,17 +83,32 @@ export interface ModelConfig {
 
 // === 工具 ===
 
-/** 框架无关的工具定义 */
-export interface ToolDefinition {
+import type { ZodType, z } from 'zod'
+
+/** 没有 schema 的简单工具（纯字符串输入） */
+export interface SimpleToolDefinition {
   /** 工具名称 */
   name: string
   /** 工具描述 */
   description: string
-  /** 工具参数 JSON Schema */
-  parameters?: Record<string, unknown>
-  /** 工具执行函数 */
+  /** 工具执行函数，接收字符串输入 */
   execute: (input: string) => Promise<string>
 }
+
+/** 有 Zod Schema 的结构化工具 */
+export interface StructuredToolDefinition<T extends ZodType = ZodType> {
+  /** 工具名称 */
+  name: string
+  /** 工具描述 */
+  description: string
+  /** Zod Schema，定义工具参数结构 */
+  schema: T
+  /** 工具执行函数，接收 schema 解析后的结构化参数 */
+  execute: (input: z.infer<T>) => Promise<string>
+}
+
+/** 工具定义 — 有 schema 时 LLM 看到参数结构，无 schema 时接收纯字符串 */
+export type ToolDefinition = SimpleToolDefinition | StructuredToolDefinition
 
 // === MCP 服务器 ===
 

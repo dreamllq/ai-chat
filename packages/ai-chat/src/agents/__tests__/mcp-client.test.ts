@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import type { MCPServerConfig, ToolDefinition } from '../../types'
+import type { MCPServerConfig, ToolDefinition, StructuredToolDefinition } from '../../types'
 
 // Module-level mocks — accessible in both vi.mock and tests
 const mockGetTools = vi.fn()
@@ -121,9 +121,29 @@ describe('MCPClient', () => {
     expect(tool.description).toBe('Search the web')
 
     // Execute should call the underlying MCP tool and return string
-    const result = await tool.execute('{"query": "test"}')
+    const result = await tool.execute('{"query": "test"}' as never)
     expect(result).toBe('result data')
     expect(mockTool.invoke).toHaveBeenCalledWith('{"query": "test"}')
+  })
+
+  it('should preserve schema when MCP tool has one (StructuredToolDefinition)', async () => {
+    const fakeSchema = { _def: { typeName: 'ZodObject' } }
+    const mockStructuredTool = {
+      name: 'structured_search',
+      description: 'Search with schema',
+      schema: fakeSchema,
+      invoke: vi.fn().mockResolvedValue('structured result'),
+    }
+    mockGetTools.mockResolvedValue([mockStructuredTool])
+
+    const client = new MCPClient([makeStdioConfig()])
+    const tools = await client.getTools()
+
+    expect(tools).toHaveLength(1)
+    const tool = tools[0] as StructuredToolDefinition
+    expect(tool.name).toBe('structured_search')
+    expect(tool.schema).toBe(fakeSchema)
+    expect(tool.execute).toBeTypeOf('function')
   })
 
   // === close() cleanup ===
