@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, nextTick, onMounted, onUpdated, ref } from 'vue'
+import { computed, nextTick, onMounted, onUpdated, ref, watch } from 'vue'
 import MarkdownIt from 'markdown-it'
 import hljs from 'highlight.js'
 import 'highlight.js/styles/github-dark.css'
@@ -52,6 +52,16 @@ const renderedReasoning = computed(() => {
   return md.render(props.message.reasoningContent)
 })
 const isReasoningExpanded = ref(true)
+
+// Auto-collapse reasoning when reasoning is done (content starts after reasoning phase)
+watch(
+  () => props.message.metadata?.reasoningDone,
+  (newVal) => {
+    if (newVal === true) {
+      isReasoningExpanded.value = false
+    }
+  },
+)
 
 // Attachments
 const attachments = computed<MessageAttachment[]>(() => {
@@ -155,9 +165,11 @@ onUpdated(() => {
           <span class="chat-message__reasoning-title">{{ t('chat.thinking') }}</span>
           <span class="chat-message__reasoning-toggle">{{ isReasoningExpanded ? '▲' : '▼' }}</span>
         </div>
-        <div v-show="isReasoningExpanded" class="chat-message__reasoning-content">
-          <!-- eslint-disable-next-line vue/no-v-html -->
-          <div v-html="renderedReasoning" />
+        <div class="chat-message__reasoning-collapse" :class="{ 'chat-message__reasoning-collapse--collapsed': !isReasoningExpanded }">
+          <div class="chat-message__reasoning-content">
+            <!-- eslint-disable-next-line vue/no-v-html -->
+            <div v-html="renderedReasoning" />
+          </div>
         </div>
       </div>
       <!-- eslint-disable-next-line vue/no-v-html -->
@@ -480,7 +492,22 @@ onUpdated(() => {
   font-size: 10px;
 }
 
+.chat-message__reasoning-collapse {
+  display: grid;
+  grid-template-rows: 1fr;
+  transition: grid-template-rows 0.25s ease;
+}
+
+.chat-message__reasoning-collapse--collapsed {
+  grid-template-rows: 0fr;
+}
+
 .chat-message__reasoning-content {
+  overflow: hidden;
+  min-height: 0;
+}
+
+.chat-message__reasoning-content :deep(div) {
   padding: 8px 12px;
   font-size: 13px;
   line-height: 1.5;
@@ -488,11 +515,11 @@ onUpdated(() => {
   background: var(--el-fill-color-lighter, #fafafa);
 }
 
-.chat-message__reasoning-content :deep(p) {
+.chat-message__reasoning-content :deep(div p) {
   margin: 0 0 6px;
 }
 
-.chat-message__reasoning-content :deep(p:last-child) {
+.chat-message__reasoning-content :deep(div p:last-child) {
   margin-bottom: 0;
 }
 </style>

@@ -115,6 +115,8 @@ export function useChat() {
 
       let fullContent = ''
       let fullReasoning = ''
+      let hadReasoning = false
+      let reasoningDoneFired = false
       for await (const chunk of generator) {
         if (chunk.type === 'token') {
           if (chunk.content) {
@@ -122,17 +124,29 @@ export function useChat() {
           }
           if (chunk.reasoningContent) {
             fullReasoning += chunk.reasoningContent
+            hadReasoning = true
           }
-          await messageService.update(assistantMsg.id, {
-            content: fullContent,
-            reasoningContent: fullReasoning || undefined,
-          })
+          // Detect reasoning→content transition: reasoning was present, now content starts flowing
+          if (hadReasoning && !reasoningDoneFired && fullContent && !chunk.reasoningContent) {
+            reasoningDoneFired = true
+            await messageService.update(assistantMsg.id, {
+              content: fullContent,
+              reasoningContent: fullReasoning || undefined,
+              metadata: { ...assistantMsg.metadata, reasoningDone: true },
+            })
+          } else {
+            await messageService.update(assistantMsg.id, {
+              content: fullContent,
+              reasoningContent: fullReasoning || undefined,
+            })
+          }
         } else if (chunk.type === 'error') {
           fullContent += `\n\n⚠️ Error: ${chunk.error}`
           await messageService.update(assistantMsg.id, {
             content: fullContent,
             reasoningContent: fullReasoning || undefined,
             isStreaming: false,
+            ...(hadReasoning && !reasoningDoneFired ? { metadata: { ...assistantMsg.metadata, reasoningDone: true } } : {}),
           })
           break
         } else if (chunk.type === 'done') {
@@ -140,6 +154,7 @@ export function useChat() {
             content: fullContent,
             reasoningContent: fullReasoning || undefined,
             isStreaming: false,
+            ...(hadReasoning && !reasoningDoneFired ? { metadata: { ...assistantMsg.metadata, reasoningDone: true } } : {}),
           })
         }
       }
