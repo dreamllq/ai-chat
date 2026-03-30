@@ -73,4 +73,12 @@ export const ja: AiChatLocale = {
     agentNotFound: 'エージェントが見つかりません。',
     modelNotSelected: 'モデルを選択してください。',
   },
+  timeAgo: {
+    justNow: 'たった今',
+    secondsAgo: '{n}秒前',
+    minutesAgo: '{n}分前',
+    hoursAgo: '{n}時間前',
+    yesterday: '昨日',
+    dateFormat: '{month}月{day}日 {hours}:{minutes}',
+  },
 }

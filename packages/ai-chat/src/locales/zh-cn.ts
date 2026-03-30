@@ -73,4 +73,12 @@ export const zhCn: AiChatLocale = {
     agentNotFound: '未找到智能体。',
     modelNotSelected: '请先选择一个模型。',
   },
+  timeAgo: {
+    justNow: '刚刚',
+    secondsAgo: '{n}秒前',
+    minutesAgo: '{n}分钟前',
+    hoursAgo: '{n}小时前',
+    yesterday: '昨天',
+    dateFormat: '{month}月{day}日 {hours}:{minutes}',
+  },
 }

@@ -71,6 +71,14 @@ export interface AiChatLocale {
     agentNotFound: string
     modelNotSelected: string
   }
+  timeAgo: {
+    justNow: string
+    secondsAgo: string
+    minutesAgo: string
+    hoursAgo: string
+    yesterday: string
+    dateFormat: string
+  }
 }
 
 export const en: AiChatLocale = {
@@ -145,5 +153,13 @@ export const en: AiChatLocale = {
     retry: 'Retry',
     agentNotFound: 'Agent not found.',
     modelNotSelected: 'Please select a model first.',
+  },
+  timeAgo: {
+    justNow: 'just now',
+    secondsAgo: '{n} seconds ago',
+    minutesAgo: '{n} minutes ago',
+    hoursAgo: '{n} hours ago',
+    yesterday: 'yesterday',
+    dateFormat: '{month}/{day} {hours}:{minutes}',
   },
 }

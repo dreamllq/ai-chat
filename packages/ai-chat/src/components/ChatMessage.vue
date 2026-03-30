@@ -39,6 +39,39 @@ const renderedContent = computed(() => md.render(props.message.content))
 const isUser = computed(() => props.message.role === 'user')
 const isAssistant = computed(() => props.message.role === 'assistant')
 const isSystem = computed(() => props.message.role === 'system')
+
+// Relative time display
+function pad(n: number): string {
+  return n < 10 ? `0${n}` : `${n}`
+}
+
+const relativeTime = computed(() => {
+  const now = Date.now()
+  const diff = now - props.message.timestamp
+  if (diff < 0) return t('timeAgo.justNow')
+
+  const seconds = Math.floor(diff / 1000)
+  const minutes = Math.floor(seconds / 60)
+  const hours = Math.floor(minutes / 60)
+  const dayMs = 24 * 60 * 60 * 1000
+
+  if (seconds < 60) return t('timeAgo.justNow')
+  if (minutes < 60) return t('timeAgo.minutesAgo', { n: `${minutes}` })
+  if (hours < 24) return t('timeAgo.hoursAgo', { n: `${hours}` })
+
+  const msgDate = new Date(props.message.timestamp)
+  const todayStart = new Date(now)
+  todayStart.setHours(0, 0, 0, 0)
+  const yesterdayStart = new Date(todayStart.getTime() - dayMs)
+
+  if (msgDate >= yesterdayStart) return t('timeAgo.yesterday')
+
+  const month = `${msgDate.getMonth() + 1}`
+  const day = `${msgDate.getDate()}`
+  const h = pad(msgDate.getHours())
+  const m = pad(msgDate.getMinutes())
+  return t('timeAgo.dateFormat', { month, day, hours: h, minutes: m })
+})
 const showStreamingCursor = computed(
   () => props.message.role === 'assistant' && props.message.isStreaming === true,
 )
@@ -169,7 +202,9 @@ onUpdated(() => {
       <span class="chat-message__avatar-icon">AI</span>
     </div>
 
-    <div class="chat-message__bubble">
+    <div class="chat-message__body">
+      <div class="chat-message__time">{{ relativeTime }}</div>
+      <div class="chat-message__bubble">
       <!-- Reasoning / Thinking Process -->
       <div v-if="hasReasoning" class="chat-message__reasoning">
         <div class="chat-message__reasoning-header" @click="isReasoningExpanded = !isReasoningExpanded">
@@ -243,6 +278,7 @@ onUpdated(() => {
       </div>
       <span v-if="showStreamingCursor" class="chat-message__cursor" />
     </div>
+    </div>
   </div>
 </template>
 
@@ -260,6 +296,33 @@ onUpdated(() => {
 
 .chat-message--system {
   justify-content: center;
+}
+
+.chat-message__body {
+  display: flex;
+  flex-direction: column;
+  max-width: 70%;
+}
+
+.chat-message--user .chat-message__body {
+  align-items: flex-end;
+}
+
+.chat-message--assistant .chat-message__body {
+  align-items: flex-start;
+}
+
+.chat-message--system .chat-message__body {
+  align-items: center;
+  max-width: 90%;
+}
+
+.chat-message__time {
+  font-size: 11px;
+  color: var(--el-text-color-placeholder, #a8abb2);
+  margin-bottom: 4px;
+  user-select: none;
+  padding: 0 4px;
 }
 
 .chat-message__avatar {
@@ -280,7 +343,6 @@ onUpdated(() => {
 }
 
 .chat-message__bubble {
-  max-width: 70%;
   padding: 10px 14px;
   border-radius: 12px;
   line-height: 1.5;
@@ -305,7 +367,6 @@ onUpdated(() => {
   background: var(--el-color-warning-light-9, #fdf6ec);
   color: var(--el-text-color-regular, #606266);
   text-align: center;
-  max-width: 90%;
   font-size: 13px;
 }
 
