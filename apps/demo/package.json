@@ -12,7 +12,8 @@
     "@ai-chat/vue": "workspace:*",
     "@ai-chat/storage-s3": "workspace:*",
     "element-plus": "^2.4.0",
-    "vue": "^3.4.0"
+    "vue": "^3.4.0",
+    "zod": "^4.3.6"
   },
   "devDependencies": {
     "@langchain/core": "^1.1.36",
