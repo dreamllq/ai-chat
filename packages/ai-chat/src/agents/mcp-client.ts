@@ -79,6 +79,7 @@ export class MCPClient {
   private async initialize(): Promise<void> {
     const { MultiServerMCPClient } = await import('@langchain/mcp-adapters')
 
+    // Build connection configs for each MCP server
     const mcpServers: Record<string, Record<string, unknown>> = {}
     for (const config of this.configs) {
       mcpServers[config.name] = this.buildConnectionConfig(config)
@@ -86,7 +87,7 @@ export class MCPClient {
 
     try {
       this.client = new MultiServerMCPClient({
-        mcpServers,
+        mcpServers: mcpServers as Record<string, import('@langchain/mcp-adapters').Connection>,
         onConnectionError: 'ignore',
       })
       this.initialized = true
