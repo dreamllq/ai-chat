@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { mount } from '@vue/test-utils'
-import type { ChatMessage } from '../../types'
+import type { ChatMessage as ChatMessageType } from '../../types'
 import ChatMessage from '../ChatMessage.vue'
 
 // Mock useLocale
@@ -30,7 +30,7 @@ Object.defineProperty(navigator, 'clipboard', {
   writable: true,
 })
 
-function createMessage(overrides: Partial<ChatMessage> = {}): ChatMessage {
+function createMessage(overrides: Partial<ChatMessageType> = {}): ChatMessageType {
   return {
     id: 'msg-1',
     conversationId: 'conv-1',
@@ -41,7 +41,7 @@ function createMessage(overrides: Partial<ChatMessage> = {}): ChatMessage {
   }
 }
 
-function mountChatMessage(props: { message: ChatMessage }) {
+function mountChatMessage(props: { message: ChatMessageType }) {
   return mount(ChatMessage, {
     props,
   })
@@ -286,12 +286,12 @@ describe('ChatMessage', () => {
 
     // Click to collapse
     await wrapper.find('.chat-message__reasoning-header').trigger('click')
-    expect(wrapper.find('.chat-message__reasoning-content').element.style.display).toBe('none')
+    expect((wrapper.find('.chat-message__reasoning-content').element as HTMLElement).style.display).toBe('none')
     expect(wrapper.find('.chat-message__reasoning-toggle').text()).toBe('▼')
 
     // Click to expand again
     await wrapper.find('.chat-message__reasoning-header').trigger('click')
-    expect(wrapper.find('.chat-message__reasoning-content').element.style.display).toBe('')
+    expect((wrapper.find('.chat-message__reasoning-content').element as HTMLElement).style.display).toBe('')
     expect(wrapper.find('.chat-message__reasoning-toggle').text()).toBe('▲')
   })
 
