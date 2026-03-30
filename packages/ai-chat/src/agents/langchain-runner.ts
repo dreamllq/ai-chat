@@ -1,8 +1,22 @@
-import type { AgentRunner, ChatMessage, ModelConfig, ChatOptions, ChatChunk, ToolDefinition } from '../types'
+import type { AgentRunner, ChatMessage, ModelConfig, ChatOptions, ChatChunk, TokenUsage, ToolDefinition } from '../types'
 import { convertMessages } from './message-converter'
 import { createLLM } from './llm-init'
 import { DynamicTool } from '@langchain/core/tools'
 import { ToolMessage } from '@langchain/core/messages'
+
+/** Extract TokenUsage from LangChain response's usage_metadata. */
+function extractTokenUsage(response: { usage_metadata?: Record<string, unknown> }): TokenUsage | undefined {
+  const meta = response.usage_metadata
+  if (!meta) return undefined
+  const promptTokens = typeof meta.input_tokens === 'number' ? meta.input_tokens : 0
+  const completionTokens = typeof meta.output_tokens === 'number' ? meta.output_tokens : 0
+  const totalTokens = typeof meta.total_tokens === 'number' ? meta.total_tokens : promptTokens + completionTokens
+  if (promptTokens === 0 && completionTokens === 0) return undefined
+  // LangChain maps completion_tokens_details.reasoning_tokens → output_token_details.reasoning
+  const outputDetails = meta.output_token_details as Record<string, unknown> | undefined
+  const reasoningTokens = typeof outputDetails?.reasoning === 'number' ? outputDetails.reasoning : undefined
+  return { promptTokens, completionTokens, totalTokens, reasoningTokens }
+}
 
 /** Extract a string input from tool call args (handles both string and object forms). */
 function extractToolInput(args: Record<string, unknown> | string): string {
@@ -48,12 +62,14 @@ export class LangChainRunner implements AgentRunner {
         const llm = createLLM(model, options)
         const lcMessages = convertMessages(messages, systemPrompt)
         const stream = await llm.stream(lcMessages, { signal })
+        let lastChunk: { usage_metadata?: Record<string, unknown> } | null = null
         for await (const chunk of stream) {
           if (signal?.aborted) return
+          lastChunk = chunk as { usage_metadata?: Record<string, unknown> }
           const reasoning = (chunk.additional_kwargs?.reasoning_content as string) || undefined
           yield { type: 'token', content: chunk.content as string, reasoningContent: reasoning }
         }
-        yield { type: 'done' }
+        yield { type: 'done', tokenUsage: lastChunk ? extractTokenUsage(lastChunk) : undefined }
         return
       }
 
@@ -104,8 +120,9 @@ export class LangChainRunner implements AgentRunner {
               ? response.content
               : JSON.stringify(response.content)
           const reasoning = (response.additional_kwargs?.reasoning_content as string) || undefined
+          const tokenUsage = extractTokenUsage(response as unknown as { usage_metadata?: Record<string, unknown> })
           yield { type: 'token', content: text, reasoningContent: reasoning }
-          yield { type: 'done' }
+          yield { type: 'done', tokenUsage }
           return
         }
       }

@@ -17,6 +17,10 @@ export const zhCn: AiChatLocale = {
     copySuccess: '已复制！',
     thinking: '思考过程',
     thinkingToggle: '点击展开',
+    tokenUsage: 'Token 用量',
+    promptTokens: '输入',
+    completionTokens: '输出',
+    totalTokens: '合计',
   },
   model: {
     title: '模型管理',

@@ -19,6 +19,7 @@ export function createLLM(
     temperature: options?.temperature ?? model.temperature ?? 0.7,
     maxTokens: options?.maxTokens ?? model.maxTokens,
     streaming: true,
+    streamUsage: true,
   })
 
   if (tools && tools.length > 0) {

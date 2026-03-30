@@ -49,6 +49,13 @@ function formatTime(timestamp: number): string {
   }
   return date.toLocaleDateString([], { month: 'short', day: 'numeric' })
 }
+
+function formatTokenCount(tokens: number): string {
+  if (tokens >= 1000) {
+    return `${(tokens / 1000).toFixed(1)}k`
+  }
+  return String(tokens)
+}
 </script>
 
 <template>
@@ -86,7 +93,10 @@ function formatTime(timestamp: number): string {
         </div>
         <div v-else class="ai-chat-sidebar__item-content">
           <span class="ai-chat-sidebar__item-title">{{ conv.title }}</span>
-          <span class="ai-chat-sidebar__item-time">{{ formatTime(conv.updatedAt) }}</span>
+          <div class="ai-chat-sidebar__item-meta">
+            <span class="ai-chat-sidebar__item-time">{{ formatTime(conv.updatedAt) }}</span>
+            <span v-if="conv.totalTokens" class="ai-chat-sidebar__item-tokens">{{ formatTokenCount(conv.totalTokens) }}</span>
+          </div>
         </div>
         <div class="ai-chat-sidebar__item-actions">
           <ElPopconfirm
@@ -177,6 +187,12 @@ function formatTime(timestamp: number): string {
   gap: 2px;
 }
 
+.ai-chat-sidebar__item-meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
 .ai-chat-sidebar__item-title {
   font-size: 14px;
   overflow: hidden;
@@ -187,6 +203,14 @@ function formatTime(timestamp: number): string {
 .ai-chat-sidebar__item-time {
   font-size: 12px;
   color: var(--ai-chat-text-secondary, #999);
+}
+
+.ai-chat-sidebar__item-tokens {
+  font-size: 10px;
+  color: var(--ai-chat-text-secondary, #999);
+  background: var(--ai-chat-hover-bg, rgba(0, 0, 0, 0.04));
+  padding: 1px 5px;
+  border-radius: 8px;
 }
 
 .ai-chat-sidebar__item-edit {

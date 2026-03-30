@@ -3,6 +3,18 @@
 /** 聊天消息角色类型 */
 export type MessageRole = 'user' | 'assistant' | 'system'
 
+/** Token 用量信息 */
+export interface TokenUsage {
+  /** 输入 token 数 */
+  promptTokens: number
+  /** 输出 token 数 */
+  completionTokens: number
+  /** 总 token 数 */
+  totalTokens: number
+  /** 推理（思考过程）token 数 */
+  reasoningTokens?: number
+}
+
 /** 聊天消息 */
 export interface ChatMessage {
   /** 消息唯一标识 */
@@ -21,6 +33,8 @@ export interface ChatMessage {
   metadata?: Record<string, unknown>
   /** 推理内容（推理模型的思考过程） */
   reasoningContent?: string
+  /** Token 用量 */
+  tokenUsage?: TokenUsage
 }
 
 // === 会话 ===
@@ -39,6 +53,8 @@ export interface Conversation {
   createdAt: number
   /** 更新时间戳 */
   updatedAt: number
+  /** 累计 Token 用量 */
+  totalTokens?: number
 }
 
 // === 模型配置 ===
@@ -160,6 +176,8 @@ export interface ChatChunk {
   error?: string
   /** 推理内容（推理模型的思考过程，type 为 token 时） */
   reasoningContent?: string
+  /** Token 用量（type 为 done 时） */
+  tokenUsage?: TokenUsage
 }
 
 // === 文件上传 ===

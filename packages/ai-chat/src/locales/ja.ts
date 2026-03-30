@@ -17,6 +17,10 @@ export const ja: AiChatLocale = {
     copySuccess: 'コピーしました！',
     thinking: '思考プロセス',
     thinkingToggle: 'クリックして展開',
+    tokenUsage: 'トークン使用量',
+    promptTokens: '入力',
+    completionTokens: '出力',
+    totalTokens: '合計',
   },
   model: {
     title: 'モデル管理',

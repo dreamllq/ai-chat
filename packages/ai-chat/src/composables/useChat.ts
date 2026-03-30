@@ -4,7 +4,7 @@ import { useModel } from './useModel'
 import { agentRegistry } from '../services/agent'
 import { MessageService, ConversationService } from '../services/database'
 import { TitleGenerator } from '../agents/title-generator'
-import type { MessageAttachment } from '../types'
+import type { MessageAttachment, TokenUsage } from '../types'
 
 // Module-level singleton state — shared across all useChat() callers
 const isStreaming = ref(false)
@@ -104,6 +104,8 @@ export function useChat() {
     isStreaming.value = true
     abortController = new AbortController()
 
+    let tokenUsage: TokenUsage | undefined
+
     try {
       const history = await messageService.getByConversationId(conversationId)
       const messagesForAgent = history.filter((m) => m.id !== assistantMsg.id)
@@ -150,10 +152,12 @@ export function useChat() {
           })
           break
         } else if (chunk.type === 'done') {
+          tokenUsage = chunk.tokenUsage
           await messageService.update(assistantMsg.id, {
             content: fullContent,
             reasoningContent: fullReasoning || undefined,
             isStreaming: false,
+            tokenUsage,
             ...(hadReasoning && !reasoningDoneFired ? { metadata: { ...assistantMsg.metadata, reasoningDone: true } } : {}),
           })
         }
@@ -172,6 +176,21 @@ export function useChat() {
     } finally {
       isStreaming.value = false
       abortController = null
+    }
+
+    // After streaming completes, update conversation's totalTokens
+    if (tokenUsage && conversationId) {
+      try {
+        const conv = await conversationService.getById(conversationId)
+        if (conv) {
+          const prevTokens = conv.totalTokens ?? 0
+          await conversationService.update(conversationId, {
+            totalTokens: prevTokens + tokenUsage.totalTokens,
+          })
+        }
+      } catch {
+        // Silently ignore — token tracking is non-critical
+      }
     }
 
     // After streaming completes, try AI title generation for first message (fire-and-forget)

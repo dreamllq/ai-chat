@@ -15,6 +15,10 @@ export interface AiChatLocale {
     copySuccess: string
     thinking: string
     thinkingToggle: string
+    tokenUsage: string
+    promptTokens: string
+    completionTokens: string
+    totalTokens: string
   }
   model: {
     title: string
@@ -86,6 +90,10 @@ export const en: AiChatLocale = {
     copySuccess: 'Copied!',
     thinking: 'Thinking',
     thinkingToggle: 'Click to expand',
+    tokenUsage: 'Tokens',
+    promptTokens: 'Input',
+    completionTokens: 'Output',
+    totalTokens: 'Total',
   },
   model: {
     title: 'Model Management',

@@ -53,14 +53,26 @@ const renderedReasoning = computed(() => {
 })
 const isReasoningExpanded = ref(false)
 
-// Auto-collapse reasoning when reasoning is done (content starts after reasoning phase)
+// Auto-expand reasoning when streaming starts (reasoning present but not yet done),
+// auto-collapse when reasoning is done (metadata.reasoningDone flips to true).
 watch(
-  () => props.message.metadata?.reasoningDone,
-  (newVal) => {
-    if (newVal === true) {
+  () => [props.message.reasoningContent, props.message.isStreaming, props.message.metadata?.reasoningDone] as const,
+  ([reasoning, streaming, reasoningDone]) => {
+    // Streaming and reasoning is present but not done → expand
+    if (reasoning && streaming && !reasoningDone) {
+      isReasoningExpanded.value = true
+    }
+    // Reasoning done → collapse
+    if (reasoningDone === true) {
       isReasoningExpanded.value = false
     }
   },
+  { immediate: true },
+)
+
+// Token usage
+const hasTokenUsage = computed(
+  () => !!props.message.tokenUsage && props.message.role === 'assistant',
 )
 
 // Attachments
@@ -163,6 +175,7 @@ onUpdated(() => {
         <div class="chat-message__reasoning-header" @click="isReasoningExpanded = !isReasoningExpanded">
           <span class="chat-message__reasoning-icon">💭</span>
           <span class="chat-message__reasoning-title">{{ t('chat.thinking') }}</span>
+          <span v-if="hasTokenUsage && message.tokenUsage!.reasoningTokens" class="chat-message__reasoning-tokens">{{ message.tokenUsage!.reasoningTokens }} tokens</span>
           <span class="chat-message__reasoning-toggle">{{ isReasoningExpanded ? '▲' : '▼' }}</span>
         </div>
         <div class="chat-message__reasoning-collapse" :class="{ 'chat-message__reasoning-collapse--collapsed': !isReasoningExpanded }">
@@ -221,6 +234,12 @@ onUpdated(() => {
             <span class="chat-message__attachment-name">{{ file.name }}</span>
           </div>
         </div>
+      </div>
+      <div v-if="hasTokenUsage" class="chat-message__token-usage">
+        <span class="chat-message__token-usage-label">{{ t('chat.tokenUsage') }}:</span>
+        <span class="chat-message__token-usage-item">{{ t('chat.promptTokens') }} {{ message.tokenUsage!.promptTokens }}</span>
+        <span class="chat-message__token-usage-item">{{ t('chat.completionTokens') }} {{ message.tokenUsage!.completionTokens }}</span>
+        <span class="chat-message__token-usage-item">{{ t('chat.totalTokens') }} {{ message.tokenUsage!.totalTokens }}</span>
       </div>
       <span v-if="showStreamingCursor" class="chat-message__cursor" />
     </div>
@@ -362,6 +381,24 @@ onUpdated(() => {
   animation: chat-cursor-blink 1s step-end infinite;
 }
 
+.chat-message__token-usage {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 6px;
+  font-size: 11px;
+  color: var(--el-text-color-secondary, #909399);
+  user-select: none;
+}
+
+.chat-message__token-usage-label {
+  font-weight: 500;
+}
+
+.chat-message__token-usage-item {
+  opacity: 0.85;
+}
+
 @keyframes chat-cursor-blink {
   0%, 100% { opacity: 1; }
   50% { opacity: 0; }
@@ -485,6 +522,14 @@ onUpdated(() => {
 
 .chat-message__reasoning-title {
   font-weight: 500;
+}
+
+.chat-message__reasoning-tokens {
+  font-size: 11px;
+  color: var(--el-text-color-secondary, #909399);
+  background: var(--el-fill-color, #f0f2f5);
+  padding: 1px 6px;
+  border-radius: 10px;
 }
 
 .chat-message__reasoning-toggle {
