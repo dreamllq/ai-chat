@@ -51,7 +51,7 @@ const renderedReasoning = computed(() => {
   if (!props.message.reasoningContent) return ''
   return md.render(props.message.reasoningContent)
 })
-const isReasoningExpanded = ref(true)
+const isReasoningExpanded = ref(false)
 
 // Auto-collapse reasoning when reasoning is done (content starts after reasoning phase)
 watch(
