@@ -95,7 +95,7 @@ function formatTokenCount(tokens: number): string {
           <span class="ai-chat-sidebar__item-title">{{ conv.title }}</span>
           <div class="ai-chat-sidebar__item-meta">
             <span class="ai-chat-sidebar__item-time">{{ formatTime(conv.updatedAt) }}</span>
-            <span v-if="conv.totalTokens" class="ai-chat-sidebar__item-tokens">{{ formatTokenCount(conv.totalTokens) }}</span>
+            <span v-if="conv.totalTokens" class="ai-chat-sidebar__item-tokens">{{ formatTokenCount(conv.totalTokens) }} tokens</span>
           </div>
         </div>
         <div class="ai-chat-sidebar__item-actions">
