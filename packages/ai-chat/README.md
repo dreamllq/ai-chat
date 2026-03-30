@@ -1,0 +1,739 @@
+# @ai-chat/vue
+
+Vue 3 AI 聊天组件库。内置 LangChain.js 驱动的智能体引擎、IndexedDB 本地持久化、流式对话输出，支持自定义工具和 MCP 服务器集成。
+
+## 特性
+
+- 🧩 **开箱即用** — `<AiChat />` 一行代码即可接入
+- 🤖 **配置式智能体** — 通过 `registerAgent()` 注册，无需手写 Runner
+- 🔧 **工具调用** — 支持纯函数工具和 Zod Schema 结构化工具
+- 🔌 **MCP 集成** — 接入任何兼容 MCP 协议的外部工具服务
+- 🌊 **流式输出** — Token 级实时流式响应
+- 💾 **本地持久化** — 基于 Dexie (IndexedDB)，会话和消息自动保存
+- 🌍 **多语言** — 内置中文、英文、日文，支持自定义 locale
+- 📎 **文件上传** — 通过 `FileUploadService` 接口对接任意存储后端
+
+## 安装
+
+```bash
+pnpm add @ai-chat/vue
+```
+
+> **Peer Dependencies**: 需要 `vue >= 3.3` 和 `element-plus >= 2.4`。
+
+## 快速开始
+
+### 1. 全局注册组件
+
+```ts
+// main.ts
+import { createApp } from 'vue'
+import ElementPlus from 'element-plus'
+import { AiChatPlugin } from '@ai-chat/vue'
+import '@ai-chat/vue/style.css'
+
+const app = createApp(App)
+app.use(ElementPlus)
+app.use(AiChatPlugin)
+app.mount('#app')
+```
+
+### 2. 在模板中使用
+
+```vue
+<template>
+  <AiChat locale="zh-cn" />
+</template>
+```
+
+或者直接在组件中导入：
+
+```vue
+<script setup>
+import { AiChat } from '@ai-chat/vue'
+import '@ai-chat/vue/style.css'
+</script>
+
+<template>
+  <AiChat locale="zh-cn" />
+</template>
+```
+
+### 3. 完整示例
+
+```vue
+<script setup>
+import { ref } from 'vue'
+import { AiChat, registerAgent } from '@ai-chat/vue'
+import '@ai-chat/vue/style.css'
+
+// 注册自定义智能体（可选）
+registerAgent({
+  id: 'my-agent',
+  name: 'My Agent',
+  description: '我的自定义智能体',
+  systemPrompt: '你是一个友好的助手。',
+})
+
+const locale = ref('zh-cn')
+</script>
+
+<template>
+  <div style="width: 100%; height: 100vh;">
+    <AiChat :locale="locale" />
+  </div>
+</template>
+```
+
+## 自定义智能体
+
+通过 `registerAgent()` 注册智能体。框架会自动创建内部 LangChain Runner 处理 LLM 调用、工具执行循环和流式输出，**你只需提供配置**。
+
+### 基础智能体
+
+最简单的智能体只包含 `id` 和 `name`：
+
+```ts
+import { registerAgent } from '@ai-chat/vue'
+
+registerAgent({
+  id: 'simple-chat',
+  name: 'Simple Chat',
+  description: '基础对话智能体',
+  systemPrompt: '你是一个有帮助的 AI 助手，请用中文回复。',
+})
+```
+
+### 带工具的智能体
+
+工具分为两种：**简单工具**（字符串输入）和**结构化工具**（Zod Schema 输入）。
+
+#### 简单工具（字符串输入）
+
+```ts
+import { registerAgent } from '@ai-chat/vue'
+
+registerAgent({
+  id: 'tool-agent',
+  name: 'Tool Agent',
+  description: '支持工具调用的智能体',
+  systemPrompt: '你是一个智能助手。需要计算时使用计算器工具。',
+  tools: [
+    {
+      name: 'calculator',
+      description: '计算数学表达式。例如 "2+3*4"、"100/3"。',
+      execute: async (input: string) => {
+        const result = new Function(`"use strict"; return (${input})`)()
+        return `计算结果: ${result}`
+      },
+    },
+    {
+      name: 'get_current_time',
+      description: '获取当前日期和时间。',
+      execute: async () => {
+        return new Date().toLocaleString('zh-CN')
+      },
+    },
+  ],
+})
+```
+
+#### 结构化工具（Zod Schema）
+
+使用 Zod 定义参数结构，LLM 会看到完整的参数描述并传入结构化 JSON：
+
+```ts
+import { z } from 'zod'
+import { registerAgent } from '@ai-chat/vue'
+
+const FormFieldSchema = z.object({
+  name: z.string().describe('字段名'),
+  label: z.string().describe('显示标签'),
+  type: z.enum(['input', 'select', 'textarea']).describe('字段类型'),
+  required: z.boolean().optional().describe('是否必填'),
+})
+
+const FormSchema = z.object({
+  title: z.string().describe('表单标题'),
+  fields: z.array(FormFieldSchema).describe('字段列表'),
+})
+
+registerAgent({
+  id: 'form-agent',
+  name: 'Form Generator',
+  description: '生成表单 Schema 的智能体',
+  systemPrompt: '你是一个表单生成助手，通过工具生成表单结构。',
+  tools: [
+    {
+      name: 'get_form_schema',
+      description: '获取当前表单 Schema',
+      execute: async () => '暂无表单',
+    },
+    {
+      name: 'submit_form_schema',
+      description: '提交表单 Schema',
+      schema: FormSchema, // LLM 会看到完整的参数结构
+      execute: async (input) => {
+        console.log('表单已生成:', input)
+        return `表单 "${input.title}" 已创建，共 ${input.fields.length} 个字段`
+      },
+    },
+  ],
+})
+```
+
+### 带 MCP 服务器的智能体
+
+MCP（Model Context Protocol）允许接入外部工具服务：
+
+```ts
+import { registerAgent } from '@ai-chat/vue'
+
+registerAgent({
+  id: 'mcp-agent',
+  name: 'MCP Agent',
+  description: '接入 MCP 工具服务的智能体',
+  systemPrompt: '你是一个可以调用外部工具的助手。',
+  mcpServers: [
+    {
+      name: 'my-tools',
+      transport: 'stdio',
+      command: 'npx',
+      args: ['-y', '@example/mcp-server'],
+      env: {
+        API_KEY: 'your-api-key',
+      },
+    },
+    {
+      name: 'remote-tools',
+      transport: 'sse',
+      url: 'https://example.com/mcp/sse',
+      headers: {
+        Authorization: 'Bearer your-token',
+      },
+    },
+  ],
+})
+```
+
+MCP 连接采用懒加载策略，首次使用时才会建立连接，连接失败时优雅降级。
+
+## 组件 API
+
+### `<AiChat />`
+
+主组件，包含完整的聊天界面（侧边栏 + 消息列表 + 输入框）。
+
+| Prop | 类型 | 默认值 | 说明 |
+|------|------|--------|------|
+| `locale` | `AiChatLocale \| LocaleName` | `'en'` | 界面语言，支持 `'zh-cn'`、`'en'`、`'ja'` 或自定义 locale 对象 |
+| `fileUploadService` | `FileUploadService \| null` | `null` | 文件上传服务，实现 `upload()` 和 `getFileUrl()` 方法 |
+
+```vue
+<AiChat
+  locale="zh-cn"
+  :file-upload-service="myUploadService"
+/>
+```
+
+### `<AiChatProvider />`
+
+国际化 Provider 组件。单独使用时只为子树提供 locale 上下文，不含 UI：
+
+```vue
+<AiChatProvider locale="zh-cn">
+  <!-- 你的自定义布局 -->
+</AiChatProvider>
+```
+
+## Composables
+
+所有 composable 均为模块级单例模式，可在任意组件中调用，共享同一份状态。
+
+### `useChat()`
+
+聊天核心逻辑。
+
+```ts
+const { isStreaming, sendMessage, stopStreaming } = useChat()
+
+// 发送消息
+sendMessage('你好')
+
+// 停止流式输出
+stopStreaming()
+```
+
+### `useSession()`
+
+会话管理。
+
+```ts
+const {
+  conversations,          // 会话列表
+  currentConversation,    // 当前会话
+  currentConversationId,  // 当前会话 ID
+  createConversation,     // 创建新会话
+  deleteConversation,     // 删除会话
+  switchConversation,     // 切换会话
+} = useSession()
+```
+
+### `useModel()`
+
+模型配置管理。
+
+```ts
+const {
+  models,          // 已配置的模型列表
+  currentModelId,  // 当前选中的模型 ID
+  selectModel,     // 切换模型
+  addModel,        // 添加模型
+  removeModel,     // 删除模型
+} = useModel()
+```
+
+### `useAgent()`
+
+智能体管理。
+
+```ts
+const {
+  agents,          // 已注册的智能体列表
+  currentAgentId,  // 当前选中的智能体 ID
+  selectAgent,     // 切换智能体
+} = useAgent()
+```
+
+### `useLocale()`
+
+国际化。
+
+```ts
+const { locale, setLocale, t } = useLocale()
+
+// 切换语言
+setLocale('zh-cn')
+
+// 翻译 key
+t('chat.send')  // → '发送'
+```
+
+## 文件上传
+
+`<AiChat>` 通过 `fileUploadService` prop 支持文件上传。该接口只定义行为规范，**不内置任何上传实现**，你可以对接 S3、OSS、自建后端等任意存储服务。
+
+### 工作流程
+
+```
+用户选择文件 → addFile() → fileUploadService.upload() 上传 → 展示进度 → 成功/失败
+                                                      ↓ (无 service)
+                                                 转 Base64 内联
+```
+
+1. 用户点击输入框工具栏的📎按钮选择文件（支持多选）
+2. 如果提供了 `fileUploadService`，调用 `upload()` 上传到远端，UI 实时显示进度
+3. 如果**未提供** `fileUploadService`，文件会自动转为 Base64 Data URL 内联到消息中（无需服务端）
+4. 上传成功后，文件作为 `MessageAttachment` 附加到发送的消息中
+5. 上传失败的文件会显示错误状态和重试按钮
+
+### 接口定义
+
+```ts
+interface FileUploadService {
+  /** 上传文件，返回已上传文件信息 */
+  upload(file: File, options?: FileUploadOptions): Promise<UploadedFile>
+  /** 根据 fileId 获取文件访问 URL（用于消息展示） */
+  getFileUrl(fileId: string): Promise<string>
+}
+
+interface FileUploadOptions {
+  /** 上传进度回调，可用于显示进度条 */
+  onProgress?: (event: FileUploadProgressEvent) => void
+  /** 取消信号，用户移除文件时触发 abort */
+  signal?: AbortSignal
+}
+
+interface FileUploadProgressEvent {
+  loaded: number   // 已上传字节
+  total: number    // 总字节
+  percent: number  // 进度百分比 (0-100)
+}
+
+interface UploadedFile {
+  id: string       // 文件唯一标识
+  name: string     // 文件名
+  url: string      // 文件访问 URL
+  size: number     // 文件大小 (字节)
+  mimeType: string // MIME 类型
+}
+```
+
+### 使用方式
+
+#### 1. 不提供 fileUploadService（Base64 内联模式）
+
+不传 `fileUploadService` 或传 `null` 时，组件会将文件自动转为 Base64 Data URL，直接内联到消息的 `attachments` 中，**无需任何后端服务**：
+
+```vue
+<template>
+  <AiChat locale="zh-cn" />
+</template>
+```
+
+此模式下消息中的 `MessageAttachment` 会包含 `data` 字段（Base64 Data URL），而 `url` 为空。
+
+#### 2. 自定义上传服务（对接任意存储后端）
+
+实现 `FileUploadService` 接口，传入组件即可：
+
+```ts
+import type { FileUploadService } from '@ai-chat/vue'
+
+const myUploadService: FileUploadService = {
+  async upload(file, options) {
+    const formData = new FormData()
+    formData.append('file', file)
+
+    const res = await fetch('/api/upload', {
+      method: 'POST',
+      body: formData,
+      signal: options?.signal, // 支持用户取消
+    })
+
+    const data = await res.json()
+    return {
+      id: data.id,
+      name: file.name,
+      url: data.url,
+      size: file.size,
+      mimeType: file.type,
+    }
+  },
+
+  async getFileUrl(fileId: string) {
+    return `/api/files/${fileId}`
+  },
+}
+```
+
+```vue
+<template>
+  <AiChat locale="zh-cn" :file-upload-service="myUploadService" />
+</template>
+```
+
+此模式下消息中的 `MessageAttachment` 会包含 `url` 字段，`data` 为空。
+
+#### 3. 对接 S3 存储（使用 @ai-chat/storage-s3）
+
+```ts
+import { S3StorageService } from '@ai-chat/storage-s3'
+import type { S3StorageConfig } from '@ai-chat/storage-s3'
+
+const s3Config: S3StorageConfig = {
+  endpoint: 'https://s3.amazonaws.com',
+  region: 'us-east-1',
+  bucket: 'my-chat-files',
+  accessKeyId: 'YOUR_ACCESS_KEY',
+  secretAccessKey: 'YOUR_SECRET_KEY',
+  forcePathStyle: false,
+}
+
+const fileUploadService = new S3StorageService(s3Config)
+```
+
+```vue
+<template>
+  <AiChat locale="zh-cn" :file-upload-service="fileUploadService" />
+</template>
+```
+
+### 附件类型
+
+上传的文件会根据 MIME 类型自动归类为以下 `AttachmentType`：
+
+| 类型 | MIME 前缀 |
+|------|-----------|
+| `image` | `image/*` |
+| `audio` | `audio/*` |
+| `video` | `video/*` |
+| `document` | 其他所有类型 |
+
+### 上传状态管理
+
+组件内部通过 `useFileUpload` composable 管理上传生命周期，每个文件经历以下状态：
+
+```
+pending → uploading → success
+                    → failed → (retry) → uploading → ...
+```
+
+- **进度展示**：上传过程中实时更新进度百分比，UI 显示进度条覆盖层
+- **失败重试**：上传失败的文件显示错误提示和重试按钮，点击重新上传
+- **取消上传**：用户在完成前移除文件，自动 `abort()` 取消进行中的请求
+- **全部就绪检查**：发送按钮仅在所有文件上传成功后才可用
+
+## 国际化
+
+### 使用内置语言
+
+支持三种内置语言：`'zh-cn'`（中文）、`'en'`（英文）、`'ja'`（日文）。
+
+```vue
+<AiChat locale="zh-cn" />
+```
+
+### 自定义 Locale
+
+传入自定义 locale 对象覆盖或扩展翻译：
+
+```ts
+import { en } from '@ai-chat/vue'
+import type { AiChatLocale } from '@ai-chat/vue'
+
+const myLocale: AiChatLocale = {
+  ...en,
+  chat: {
+    ...en.chat,
+    send: 'Send Message',
+    placeholder: 'Type something...',
+  },
+}
+```
+
+```vue
+<AiChat :locale="myLocale" />
+```
+
+## 内置模型
+
+组件内置了三个免费的 OpenAI 兼容模型（用户只需填入 API Key）：
+
+| 模型 | Provider | Endpoint |
+|------|----------|----------|
+| 通义千问 Qwen Turbo | qwen | dashscope.aliyuncs.com |
+| 智谱 GLM-4-Flash | zhipu | open.bigmodel.cn |
+| DeepSeek Chat | deepseek | api.deepseek.com |
+
+用户也可以通过模型管理界面自行添加任意 OpenAI 兼容的模型。
+
+## 类型参考
+
+### Tool（工具）
+
+工具有两种形态：**简单工具**（接收纯字符串）和**结构化工具**（接收 Zod Schema 解析后的对象）。通过 TypeScript 联合类型 `ToolDefinition` 统一表示。
+
+```ts
+import type { ZodType, z } from 'zod'
+
+/** 简单工具 — LLM 传入纯字符串，工具自行解析 */
+interface SimpleToolDefinition {
+  /** 工具名称，需全局唯一 */
+  name: string
+  /** 工具描述，LLM 据此判断是否调用该工具 */
+  description: string
+  /** 执行函数，接收 LLM 输出的字符串 */
+  execute: (input: string) => Promise<string>
+}
+
+/** 结构化工具 — LLM 根据 Schema 生成结构化 JSON 参数 */
+interface StructuredToolDefinition<T extends ZodType = ZodType> {
+  /** 工具名称，需全局唯一 */
+  name: string
+  /** 工具描述 */
+  description: string
+  /** Zod Schema，定义工具的参数结构，LLM 会看到完整的字段描述 */
+  schema: T
+  /** 执行函数，接收 schema 解析后的类型安全对象 */
+  execute: (input: z.infer<T>) => Promise<string>
+}
+
+/** 工具定义联合类型 */
+type ToolDefinition = SimpleToolDefinition | StructuredToolDefinition
+```
+
+**使用示例：**
+
+```ts
+import { z } from 'zod'
+import type { ToolDefinition } from '@ai-chat/vue'
+
+// 简单工具
+const calculator: ToolDefinition = {
+  name: 'calculator',
+  description: '计算数学表达式，例如 "2+3*4"',
+  execute: async (input: string) => {
+    const result = new Function(`"use strict"; return (${input})`)()
+    return `结果: ${result}`
+  },
+}
+
+// 结构化工具
+const weatherSchema = z.object({
+  city: z.string().describe('城市名称'),
+  unit: z.enum(['celsius', 'fahrenheit']).optional().describe('温度单位'),
+})
+
+const weatherTool: ToolDefinition = {
+  name: 'get_weather',
+  description: '查询指定城市的天气信息',
+  schema: weatherSchema,
+  execute: async (input) => {
+    // input 的类型自动推断为 { city: string; unit?: 'celsius' | 'fahrenheit' }
+    return `${input.city} 当前温度 25°C`
+  },
+}
+```
+
+### MCP Server（MCP 服务器）
+
+MCP（Model Context Protocol）用于接入外部工具服务。支持三种传输方式：`stdio`（本地进程）、`http`（HTTP 请求）、`sse`（Server-Sent Events）。
+
+```ts
+/** MCP 传输类型 */
+type MCPTransportType = 'stdio' | 'http' | 'sse'
+
+/** MCP 服务器配置 */
+interface MCPServerConfig {
+  /** 服务器名称，用于日志和调试 */
+  name: string
+  /** 传输方式 */
+  transport: MCPTransportType
+
+  // ── stdio 传输方式 ──
+  /** 可执行文件命令，如 'npx'、'python'（仅 stdio） */
+  command?: string
+  /** 命令参数列表（仅 stdio） */
+  args?: string[]
+  /** 子进程环境变量（仅 stdio） */
+  env?: Record<string, string>
+
+  // ── http / sse 传输方式 ──
+  /** 服务器 URL（仅 http / sse） */
+  url?: string
+  /** 自定义请求头，如 Authorization（仅 http / sse） */
+  headers?: Record<string, string>
+}
+```
+
+**使用示例：**
+
+```ts
+import type { MCPServerConfig } from '@ai-chat/vue'
+
+// 本地 stdio 进程
+const localServer: MCPServerConfig = {
+  name: 'filesystem',
+  transport: 'stdio',
+  command: 'npx',
+  args: ['-y', '@modelcontextprotocol/server-filesystem', '/path/to/dir'],
+  env: {
+    NODE_ENV: 'production',
+  },
+}
+
+// 远程 SSE 服务
+const remoteServer: MCPServerConfig = {
+  name: 'remote-tools',
+  transport: 'sse',
+  url: 'https://mcp.example.com/sse',
+  headers: {
+    Authorization: 'Bearer your-token',
+  },
+}
+```
+
+### Agent（智能体）
+
+```ts
+/** 智能体定义 */
+interface AgentDefinition {
+  /** 智能体唯一标识 */
+  id: string
+  /** 显示名称 */
+  name: string
+  /** 描述，用于智能体选择下拉框 */
+  description?: string
+  /** 头像 URL */
+  avatar?: string
+  /** 系统提示词，注入到对话的 system message 中 */
+  systemPrompt?: string
+  /** 是否为内置智能体（内置智能体不可删除） */
+  isBuiltin?: boolean
+  /** 工具列表，LLM 可在对话中调用 */
+  tools?: ToolDefinition[]
+  /** MCP 服务器列表，连接后自动发现并注册远程工具 */
+  mcpServers?: MCPServerConfig[]
+}
+```
+
+**注册函数签名：**
+
+```ts
+/** 注册智能体（配置模式，框架自动创建 Runner） */
+function registerAgent(agentDef: AgentDefinition): void
+
+/** 注册智能体（自定义 Runner，向后兼容） */
+function registerAgent(agentDef: AgentDefinition, runner: AgentRunner): void
+
+/** 注销智能体 */
+agentRegistry.unregister(agentId: string): void
+
+/** 获取智能体定义 */
+agentRegistry.getDefinition(agentId: string): AgentDefinition | undefined
+
+/** 获取所有已注册智能体 */
+agentRegistry.getAllDefinitions(): AgentDefinition[]
+```
+
+### Model（模型）
+
+```ts
+/** 模型配置 */
+interface ModelConfig {
+  /** 模型唯一标识 */
+  id: string
+  /** 显示名称 */
+  name: string
+  /** 模型提供商 */
+  provider: string
+  /** API 端点（OpenAI 兼容格式） */
+  endpoint: string
+  /** API 密钥 */
+  apiKey: string
+  /** 实际模型名称（传给 API 的 model 参数） */
+  modelName: string
+  /** 温度参数 */
+  temperature?: number
+  /** 最大 token 数 */
+  maxTokens?: number
+  /** 是否为内置模型 */
+  isBuiltin?: boolean
+  /** 创建时间戳 */
+  createdAt: number
+}
+```
+
+## 开发
+
+```bash
+# 安装依赖
+pnpm install
+
+# 启动 Demo 应用
+pnpm dev
+
+# 构建库
+pnpm build
+
+# 运行测试
+pnpm test
+
+# 类型检查
+pnpm type-check
+```
+
+## License
+
+MIT
