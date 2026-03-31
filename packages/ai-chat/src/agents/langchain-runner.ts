@@ -2,7 +2,7 @@ import type { AgentRunner, ChatMessage, ModelConfig, ChatOptions, ChatChunk, Tok
 import { convertMessages } from './message-converter'
 import { createLLM } from './llm-init'
 import { DynamicTool, DynamicStructuredTool } from '@langchain/core/tools'
-import { ToolMessage, type BaseMessage } from '@langchain/core/messages'
+import { ToolMessage, AIMessageChunk, type BaseMessage } from '@langchain/core/messages'
 
 /** Extract TokenUsage from LangChain response's usage_metadata. */
 function extractTokenUsage(response: { usage_metadata?: Record<string, unknown> }): TokenUsage | undefined {
@@ -82,7 +82,7 @@ export class LangChainRunner implements AgentRunner {
         return
       }
 
-      // Tools configured — tool calling loop with invoke
+      // Tools configured — tool calling loop with streaming
       const langchainTools = this.convertTools(this.tools)
       const llm = createLLM(model, options, langchainTools)
       const lcMessages: BaseMessage[] = convertMessages(messages, systemPrompt)
@@ -96,11 +96,29 @@ export class LangChainRunner implements AgentRunner {
       for (let i = 0; i < MAX_ITERATIONS; i++) {
         if (signal?.aborted) return
 
-        const response = await llm.invoke(lcMessages, { signal })
-        const toolCalls = response.tool_calls
+        const stream = await llm.stream(lcMessages, { signal })
+        let accumulated: AIMessageChunk | null = null
+
+        for await (const chunk of stream) {
+          if (signal?.aborted) return
+
+          const content = typeof chunk.content === 'string' ? chunk.content : ''
+          const reasoning = (chunk.additional_kwargs?.reasoning_content as string) || undefined
+
+          if (content || reasoning) {
+            yield { type: 'token', content, reasoningContent: reasoning }
+          }
+
+          // Accumulate chunks to build complete tool_calls after stream ends
+          accumulated = accumulated ? accumulated.concat(chunk) : chunk
+        }
+
+        if (!accumulated) continue
+
+        const toolCalls = accumulated.tool_calls
 
         if (toolCalls && toolCalls.length > 0) {
-          lcMessages.push(response)
+          lcMessages.push(accumulated)
 
           for (const tc of toolCalls) {
             if (signal?.aborted) return
@@ -132,14 +150,10 @@ export class LangChainRunner implements AgentRunner {
             )
           }
         } else {
-          // No tool calls — yield the final response from invoke
-          const text =
-            typeof response.content === 'string'
-              ? response.content
-              : JSON.stringify(response.content)
-          const reasoning = (response.additional_kwargs?.reasoning_content as string) || undefined
-          const tokenUsage = extractTokenUsage(response as unknown as { usage_metadata?: Record<string, unknown> })
-          yield { type: 'token', content: text, reasoningContent: reasoning }
+          // No tool calls — tokens already streamed, just yield done
+          const tokenUsage = extractTokenUsage(
+            accumulated as unknown as { usage_metadata?: Record<string, unknown> },
+          )
           yield { type: 'done', tokenUsage }
           return
         }

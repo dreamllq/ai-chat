@@ -4,12 +4,10 @@ import type { ChatMessage, ModelConfig, ChatOptions, ToolDefinition, StructuredT
 
 // Module-level mock functions — accessible in both vi.mock and tests
 const mockStream = vi.fn()
-const mockInvoke = vi.fn()
 
 vi.mock('../llm-init', () => ({
   createLLM: vi.fn().mockImplementation(() => ({
     stream: mockStream,
-    invoke: mockInvoke,
   })),
 }))
 
@@ -82,6 +80,52 @@ function mockStreamYield(chunks: { content: string; additional_kwargs?: Record<s
   })
 }
 
+/** Mock streaming chunk with concat() and tool_calls support for tool-calling tests */
+interface MockStreamChunk {
+  content: string
+  tool_calls: Array<{ name: string; args: Record<string, unknown>; id: string }>
+  additional_kwargs: Record<string, unknown>
+  usage_metadata?: Record<string, unknown>
+  concat: (other: MockStreamChunk) => MockStreamChunk
+}
+
+function createStreamChunk(data: {
+  content?: string
+  tool_calls?: MockStreamChunk['tool_calls']
+  additional_kwargs?: Record<string, unknown>
+  usage_metadata?: Record<string, unknown>
+}): MockStreamChunk {
+  const content = data.content ?? ''
+  const tool_calls = data.tool_calls ?? []
+  const additional_kwargs = data.additional_kwargs ?? {}
+  const usage_metadata = data.usage_metadata
+
+  return {
+    content,
+    tool_calls,
+    additional_kwargs,
+    usage_metadata,
+    concat(other: MockStreamChunk): MockStreamChunk {
+      return createStreamChunk({
+        content: content + other.content,
+        tool_calls: other.tool_calls.length > 0 ? other.tool_calls : tool_calls,
+        additional_kwargs: { ...additional_kwargs, ...other.additional_kwargs },
+        usage_metadata: other.usage_metadata ?? usage_metadata,
+      })
+    },
+  }
+}
+
+/** Helper that sets up mockStream to yield tool-calling stream responses in sequence */
+function mockStreamToolResponses(responses: Parameters<typeof createStreamChunk>[0][]) {
+  for (const resp of responses) {
+    mockStream.mockImplementationOnce(async () => {
+      const chunk = createStreamChunk(resp)
+      return (async function* () { yield chunk })()
+    })
+  }
+}
+
 describe('LangChainRunner', () => {
   beforeEach(() => {
     vi.clearAllMocks()
@@ -141,15 +185,10 @@ describe('LangChainRunner', () => {
       execute: vi.fn().mockResolvedValue('42'),
     }
 
-    mockInvoke
-      .mockResolvedValueOnce({
-        tool_calls: [{ name: 'calculator', args: { input: '6*7' }, id: 'tc-1' }],
-        content: '',
-      })
-      .mockResolvedValueOnce({
-        tool_calls: [],
-        content: 'The answer is 42',
-      })
+    mockStreamToolResponses([
+      { tool_calls: [{ name: 'calculator', args: { input: '6*7' }, id: 'tc-1' }] },
+      { content: 'The answer is 42' },
+    ])
 
     const runner = new LangChainRunner({ tools: [mockTool] })
     const chunks: unknown[] = []
@@ -176,18 +215,10 @@ describe('LangChainRunner', () => {
       execute: vi.fn().mockResolvedValue('result2'),
     }
 
-    mockInvoke
-      .mockResolvedValueOnce({
-        tool_calls: [
-          { name: 'tool1', args: { input: 'a' }, id: 'tc-1' },
-          { name: 'tool2', args: { input: 'b' }, id: 'tc-2' },
-        ],
-        content: '',
-      })
-      .mockResolvedValueOnce({
-        tool_calls: [],
-        content: 'Combined results',
-      })
+    mockStreamToolResponses([
+      { tool_calls: [{ name: 'tool1', args: { input: 'a' }, id: 'tc-1' }, { name: 'tool2', args: { input: 'b' }, id: 'tc-2' }] },
+      { content: 'Combined results' },
+    ])
 
     const runner = new LangChainRunner({ tools: [tool1, tool2] })
     const chunks: unknown[] = []
@@ -210,15 +241,10 @@ describe('LangChainRunner', () => {
       execute: vi.fn().mockRejectedValue(new Error('Tool crashed')),
     }
 
-    mockInvoke
-      .mockResolvedValueOnce({
-        tool_calls: [{ name: 'failing', args: { input: 'test' }, id: 'tc-1' }],
-        content: '',
-      })
-      .mockResolvedValueOnce({
-        tool_calls: [],
-        content: 'Handled error',
-      })
+    mockStreamToolResponses([
+      { tool_calls: [{ name: 'failing', args: { input: 'test' }, id: 'tc-1' }] },
+      { content: 'Handled error' },
+    ])
 
     const runner = new LangChainRunner({ tools: [failingTool] })
     const chunks: unknown[] = []
@@ -240,10 +266,10 @@ describe('LangChainRunner', () => {
       execute: vi.fn().mockResolvedValue('loop result'),
     }
 
-    // Every invoke returns a tool call — loop never exits naturally
-    mockInvoke.mockResolvedValue({
-      tool_calls: [{ name: 'looper', args: { input: 'loop' }, id: 'tc-loop' }],
-      content: '',
+    // Every stream returns a tool call — loop never exits naturally
+    mockStream.mockImplementation(async () => {
+      const chunk = createStreamChunk({ tool_calls: [{ name: 'looper', args: { input: 'loop' }, id: 'tc-loop' }] })
+      return (async function* () { yield chunk })()
     })
 
     const runner = new LangChainRunner({ tools: [tool] })
@@ -252,7 +278,7 @@ describe('LangChainRunner', () => {
       chunks.push(chunk)
     }
 
-    expect(mockInvoke).toHaveBeenCalledTimes(5)
+    expect(mockStream).toHaveBeenCalledTimes(5)
     expect(chunks).toEqual([
       { type: 'token', content: '\n\n⚠️ Reached maximum tool calling iterations.' },
       { type: 'done' },
@@ -297,15 +323,10 @@ describe('LangChainRunner', () => {
       execute: vi.fn().mockResolvedValue('known result'),
     }
 
-    mockInvoke
-      .mockResolvedValueOnce({
-        tool_calls: [{ name: 'unknown_tool', args: { input: 'test' }, id: 'tc-1' }],
-        content: '',
-      })
-      .mockResolvedValueOnce({
-        tool_calls: [],
-        content: 'Final response after unknown tool',
-      })
+    mockStreamToolResponses([
+      { tool_calls: [{ name: 'unknown_tool', args: { input: 'test' }, id: 'tc-1' }] },
+      { content: 'Final response after unknown tool' },
+    ])
 
     const runner = new LangChainRunner({ tools: [knownTool] })
     const chunks: unknown[] = []
@@ -329,15 +350,10 @@ describe('LangChainRunner', () => {
       execute: vi.fn().mockResolvedValue('results'),
     }
 
-    mockInvoke
-      .mockResolvedValueOnce({
-        tool_calls: [{ name: 'search', args: { input: 'test' }, id: 'tc-1' }],
-        content: '',
-      })
-      .mockResolvedValueOnce({
-        tool_calls: [],
-        content: 'Done',
-      })
+    mockStreamToolResponses([
+      { tool_calls: [{ name: 'search', args: { input: 'test' }, id: 'tc-1' }] },
+      { content: 'Done' },
+    ])
 
     const runner = new LangChainRunner({ tools: [tool] })
     for await (const _ of runner.chat([makeMessage()], makeModel())) {
@@ -414,23 +430,17 @@ describe('LangChainRunner', () => {
     ])
   })
 
-  it('should extract reasoningContent from invoke response in tool path', async () => {
+  it('should stream reasoningContent from tool-calling path', async () => {
     const mockTool: ToolDefinition = {
       name: 'calc',
       description: 'Calculator',
       execute: vi.fn().mockResolvedValue('42'),
     }
 
-    mockInvoke
-      .mockResolvedValueOnce({
-        tool_calls: [{ name: 'calc', args: { input: '6*7' }, id: 'tc-1' }],
-        content: '',
-      })
-      .mockResolvedValueOnce({
-        tool_calls: [],
-        content: 'The answer is 42',
-        additional_kwargs: { reasoning_content: 'I used the calculator.' },
-      })
+    mockStreamToolResponses([
+      { tool_calls: [{ name: 'calc', args: { input: '6*7' }, id: 'tc-1' }] },
+      { content: 'The answer is 42', additional_kwargs: { reasoning_content: 'I used the calculator.' } },
+    ])
 
     const runner = new LangChainRunner({ tools: [mockTool] })
     const chunks: unknown[] = []
@@ -452,15 +462,10 @@ describe('LangChainRunner', () => {
       execute: vi.fn().mockResolvedValue('search results'),
     }
 
-    mockInvoke
-      .mockResolvedValueOnce({
-        tool_calls: [{ name: 'search', args: { query: 'test', limit: 5 }, id: 'tc-1' }],
-        content: '',
-      })
-      .mockResolvedValueOnce({
-        tool_calls: [],
-        content: 'Found results',
-      })
+    mockStreamToolResponses([
+      { tool_calls: [{ name: 'search', args: { query: 'test', limit: 5 }, id: 'tc-1' }] },
+      { content: 'Found results' },
+    ])
 
     const runner = new LangChainRunner({ tools: [structuredTool] })
     const chunks: unknown[] = []
