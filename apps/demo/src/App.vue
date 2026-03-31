@@ -63,7 +63,9 @@ const s3Config: S3StorageConfig = {
   forcePathStyle: import.meta.env.VITE_S3_FORCE_PATH_STYLE === 'true',
 }
 
-const fileUploadService = new S3StorageService(s3Config)
+const fileUploadService = s3Config.region
+  ? new S3StorageService(s3Config)
+  : null
 </script>
 
 <template>
