@@ -1,7 +1,6 @@
 import { db } from '../database/db'
 import type { ChatMessage, Conversation, ModelConfig, AgentDefinition } from '../types'
 import { liveQuery } from 'dexie'
-import { BUILTIN_MODELS } from './builtin-models'
 
 // === Conversation Service ===
 export class ConversationService {
@@ -73,13 +72,7 @@ export class ModelService {
   }
 
   async getAll(): Promise<ModelConfig[]> {
-    const all = await db.models.toArray()
-    // Built-in models first (preserve insertion order), custom models sorted by createdAt ascending
-    const builtins = all.filter((m) => m.isBuiltin)
-    const customs = all
-      .filter((m) => !m.isBuiltin)
-      .sort((a, b) => (a.createdAt ?? 0) - (b.createdAt ?? 0))
-    return [...builtins, ...customs]
+    return db.models.orderBy('createdAt').toArray()
   }
 
   async getById(id: string): Promise<ModelConfig | undefined> {
@@ -91,35 +84,7 @@ export class ModelService {
   }
 
   async delete(id: string): Promise<void> {
-    // Do not allow deleting builtin models
-    const model = await db.models.get(id)
-    if (model?.isBuiltin) throw new Error('Cannot delete builtin model')
     await db.models.delete(id)
-  }
-
-  /**
-   * 初始化内置模型。
-   * 仅在数据库中不存在对应 id 时才会写入，已存在的记录不会被覆盖。
-   */
-  async seedBuiltins(): Promise<void> {
-    for (const template of BUILTIN_MODELS) {
-      const existing = await db.models.get(template.id)
-      if (!existing) {
-        const model: ModelConfig = {
-          id: template.id,
-          name: template.name,
-          provider: template.provider,
-          endpoint: template.endpoint,
-          apiKey: '',
-          modelName: template.modelName,
-          temperature: template.temperature,
-          maxTokens: template.maxTokens,
-          isBuiltin: true,
-          createdAt: Date.now(),
-        }
-        await db.models.add(model)
-      }
-    }
   }
 }
 

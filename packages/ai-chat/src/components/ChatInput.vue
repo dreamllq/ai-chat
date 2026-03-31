@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, nextTick, watch } from 'vue'
-import { ElSelect, ElOption, ElTag, ElButton, ElIcon } from 'element-plus'
+import { ElSelect, ElOption, ElTag, ElButton, ElIcon, ElMessage } from 'element-plus'
 import { Promotion, CircleClose, UploadFilled, Setting } from '@element-plus/icons-vue'
 import { useLocale } from '../composables/useLocale'
 import { useModel } from '../composables/useModel'
@@ -36,14 +36,19 @@ const textareaRef = ref<HTMLTextAreaElement | null>(null)
 const managerVisible = ref(false)
 
 const trimmedText = computed(() => inputText.value.trim())
+const hasModel = computed(() => !!currentModelId.value)
 const canSend = computed(() =>
-  (trimmedText.value.length > 0 || fileStates.value.length > 0) && isAllReady.value
+  hasModel.value && (trimmedText.value.length > 0 || fileStates.value.length > 0) && isAllReady.value
 )
 const agents = computed(() => {
   // Depend on version so registry changes trigger re-computation
   void agentRegistry.version.value
   return agentRegistry.getAllDefinitions()
 })
+
+function getAgentName(agent: { name: string; nameKey?: string }): string {
+  return agent.nameKey ? t(agent.nameKey) : agent.name
+}
 
 function autoResize() {
   const el = textareaRef.value
@@ -57,6 +62,10 @@ function autoResize() {
 watch(inputText, () => nextTick(autoResize))
 
 function handleSend() {
+  if (!hasModel.value) {
+    ElMessage.warning(t('error.modelNotSelected'))
+    return
+  }
   if (!canSend.value || props.isStreaming) return
   const payload: { content: string; attachments?: MessageAttachment[] } = {
     content: trimmedText.value,
@@ -173,10 +182,10 @@ function handleModelChange(id: string) {
               v-for="agent in agents"
               :key="agent.id"
               :value="agent.id"
-              :label="agent.name"
+              :label="getAgentName(agent)"
             >
               <div class="chat-input__agent-option">
-                <span>{{ agent.name }}</span>
+                <span>{{ getAgentName(agent) }}</span>
                 <ElTag v-if="agent.isBuiltin" size="small" type="info">
                   {{ t('agent.builtin') }}
                 </ElTag>

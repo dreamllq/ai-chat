@@ -20,6 +20,15 @@ const agents = computed(() => {
   return agentRegistry.getAllDefinitions()
 })
 
+function getAgentName(agent: { name: string; nameKey?: string }): string {
+  return agent.nameKey ? t(agent.nameKey) : agent.name
+}
+
+function getAgentDesc(agent: { description?: string; descriptionKey?: string }): string | undefined {
+  if (agent.descriptionKey) return t(agent.descriptionKey)
+  return agent.description
+}
+
 const placeholder = computed(() => t('agent.select'))
 
 function handleChange(value: string) {
@@ -38,13 +47,13 @@ function handleChange(value: string) {
       v-for="agent in agents"
       :key="agent.id"
       :value="agent.id"
-      :label="agent.name"
+      :label="getAgentName(agent)"
     >
       <div class="agent-selector__option">
         <div class="agent-selector__option-info">
-          <span class="agent-selector__option-name">{{ agent.name }}</span>
-          <span v-if="agent.description" class="agent-selector__option-desc">
-            {{ agent.description }}
+          <span class="agent-selector__option-name">{{ getAgentName(agent) }}</span>
+          <span v-if="getAgentDesc(agent)" class="agent-selector__option-desc">
+            {{ getAgentDesc(agent) }}
           </span>
         </div>
         <ElTag v-if="agent.isBuiltin" size="small" type="info">

@@ -13,7 +13,6 @@ import {
   ElPopconfirm,
   ElIcon,
   ElScrollbar,
-  ElTag,
 } from 'element-plus'
 import { Delete, Plus } from '@element-plus/icons-vue'
 import { useModel } from '../composables/useModel'
@@ -39,12 +38,11 @@ const dialogVisible = computed({
 
 const selectedModelId = ref<string | null>(null)
 const editingModel = ref<ModelConfig | null>(null)
-/** true = creating a new model (no left-panel item selected) */
 const isNewMode = ref(true)
 
 const form = reactive({
   name: '',
-  provider: 'openai',
+  provider: 'qwen',
   endpoint: '',
   apiKey: '',
   modelName: '',
@@ -52,27 +50,69 @@ const form = reactive({
   maxTokens: 4096,
 })
 
-const providers = [
-  { value: 'openai', label: 'OpenAI' },
-  { value: 'anthropic', label: 'Anthropic' },
-  { value: 'qwen', label: '通义千问 Qwen' },
-  { value: 'zhipu', label: '智谱 Zhipu' },
+const providers = computed(() => [
+  { value: 'qwen', label: '通义千问' },
+  { value: 'zhipu', label: '智谱' },
   { value: 'deepseek', label: 'DeepSeek' },
-  { value: 'custom', label: 'Custom' },
-]
+  { value: 'other', label: t('model.providerOther') },
+])
 
-// Auto-fill endpoint and modelName when provider changes (for known providers)
+const PROVIDER_PRESETS: Record<string, { endpoint: string; modelName: string }> = {
+  qwen: { endpoint: 'https://dashscope.aliyuncs.com/compatible-mode/v1', modelName: 'qwen-turbo' },
+  zhipu: { endpoint: 'https://open.bigmodel.cn/api/paas/v4', modelName: 'glm-4-flash' },
+  deepseek: { endpoint: 'https://api.deepseek.com/v1', modelName: 'deepseek-chat' },
+}
+
+const modelList = ref<string[]>([])
+const isLoadingModels = ref(false)
+
+async function fetchModels() {
+  if (form.provider === 'other' || !form.endpoint || !form.apiKey) {
+    modelList.value = []
+    return
+  }
+  isLoadingModels.value = true
+  try {
+    const response = await fetch(`${form.endpoint}/models`, {
+      headers: { 'Authorization': `Bearer ${form.apiKey}` },
+    })
+    if (!response.ok) throw new Error(`HTTP ${response.status}`)
+    const data = await response.json()
+    modelList.value = (data.data || []).map((m: { id: string }) => m.id).sort()
+  } catch {
+    modelList.value = []
+  } finally {
+    isLoadingModels.value = false
+  }
+}
+
 watch(() => form.provider, (provider) => {
-  const preset: Record<string, { endpoint: string; modelName: string }> = {
-    qwen: { endpoint: 'https://dashscope.aliyuncs.com/compatible-mode/v1', modelName: 'qwen-turbo' },
-    zhipu: { endpoint: 'https://open.bigmodel.cn/api/paas/v4', modelName: 'glm-4-flash' },
-    deepseek: { endpoint: 'https://api.deepseek.com/v1', modelName: 'deepseek-chat' },
+  const preset = PROVIDER_PRESETS[provider]
+  if (preset) {
+    form.endpoint = preset.endpoint
+    if (isNewMode.value) {
+      form.modelName = preset.modelName
+    }
+    if (form.apiKey) {
+      fetchModels()
+    }
+  } else {
+    if (isNewMode.value) {
+      form.endpoint = ''
+      form.modelName = ''
+    }
+    modelList.value = []
   }
-  const p = preset[provider]
-  if (p && isNewMode.value) {
-    form.endpoint = p.endpoint
-    form.modelName = p.modelName
-  }
+})
+
+let apiKeyTimer: ReturnType<typeof setTimeout> | null = null
+watch(() => form.apiKey, () => {
+  if (apiKeyTimer) clearTimeout(apiKeyTimer)
+  apiKeyTimer = setTimeout(() => {
+    if (form.provider !== 'other' && form.endpoint && form.apiKey) {
+      fetchModels()
+    }
+  }, 600)
 })
 
 function fillForm(model: ModelConfig) {
@@ -83,16 +123,22 @@ function fillForm(model: ModelConfig) {
   form.modelName = model.modelName
   form.temperature = model.temperature ?? 0.7
   form.maxTokens = model.maxTokens ?? 4096
+  if (model.provider !== 'other' && model.endpoint && model.apiKey) {
+    fetchModels()
+  } else {
+    modelList.value = []
+  }
 }
 
 function resetForm() {
   form.name = ''
-  form.provider = 'openai'
+  form.provider = 'qwen'
   form.endpoint = ''
   form.apiKey = ''
   form.modelName = ''
   form.temperature = 0.7
   form.maxTokens = 4096
+  modelList.value = []
 }
 
 function handleNewModel() {
@@ -127,25 +173,15 @@ async function handleCreate() {
 async function handleUpdate() {
   if (!editingModel.value) return
   const model = editingModel.value
-  if (model.isBuiltin) {
-    // Builtin models: only allow updating apiKey, temperature, maxTokens
-    await updateModel(model.id, {
-      apiKey: form.apiKey,
-      temperature: form.temperature,
-      maxTokens: form.maxTokens,
-    })
-  } else {
-    // Custom models: allow updating all fields
-    await updateModel(model.id, {
-      name: form.name,
-      provider: form.provider,
-      endpoint: form.endpoint,
-      apiKey: form.apiKey,
-      modelName: form.modelName,
-      temperature: form.temperature,
-      maxTokens: form.maxTokens,
-    })
-  }
+  await updateModel(model.id, {
+    name: form.name,
+    provider: form.provider,
+    endpoint: form.endpoint,
+    apiKey: form.apiKey,
+    modelName: form.modelName,
+    temperature: form.temperature,
+    maxTokens: form.maxTokens,
+  })
   editingModel.value = null
   selectedModelId.value = null
   isNewMode.value = true
@@ -198,19 +234,10 @@ async function handleDelete(id: string) {
             <div class="model-manager__item-content">
               <div class="model-manager__item-row">
                 <span class="model-manager__item-name">{{ model.name }}</span>
-                <ElTag
-                  v-if="model.isBuiltin"
-                  size="small"
-                  type="info"
-                  class="model-manager__builtin-tag"
-                >
-                  {{ t('model.builtin') }}
-                </ElTag>
               </div>
               <span class="model-manager__item-meta">{{ model.provider }} / {{ model.modelName }}</span>
             </div>
             <ElPopconfirm
-              v-if="!model.isBuiltin"
               :title="t('model.deleteConfirm')"
               data-testid="el-popconfirm"
               @confirm="handleDelete(model.id)"
@@ -234,11 +261,10 @@ async function handleDelete(id: string) {
       <!-- Right Panel: Create/Edit Form -->
       <div class="model-manager__form-panel">
         <ElScrollbar>
-          <!-- Edit mode (builtin or custom model selected) -->
+          <!-- Edit mode -->
           <template v-if="!isNewMode && editingModel">
             <div class="model-manager__edit-header">
               <span class="model-manager__edit-title">{{ form.name }}</span>
-              <ElTag v-if="editingModel.isBuiltin" size="small" type="info">{{ t('model.builtin') }}</ElTag>
             </div>
             <ElForm
               :model="form"
@@ -247,36 +273,34 @@ async function handleDelete(id: string) {
               data-testid="el-form"
               class="model-manager__form"
             >
-              <!-- Full fields for custom models -->
-              <template v-if="!editingModel.isBuiltin">
-                <ElFormItem :label="t('model.name')">
-                  <ElInput
-                    v-model="form.name"
-                    :placeholder="t('model.name')"
-                    data-testid="el-input"
-                  />
-                </ElFormItem>
+              <ElFormItem :label="t('model.name')">
+                <ElInput
+                  v-model="form.name"
+                  :placeholder="t('model.name')"
+                  data-testid="el-input"
+                />
+              </ElFormItem>
 
-                <ElFormItem :label="t('model.provider')">
-                  <ElSelect v-model="form.provider" data-testid="el-select">
-                    <ElOption
-                      v-for="p in providers"
-                      :key="p.value"
-                      :value="p.value"
-                      :label="p.label"
-                      data-testid="el-option"
-                    />
-                  </ElSelect>
-                </ElFormItem>
-
-                <ElFormItem :label="t('model.endpoint')">
-                  <ElInput
-                    v-model="form.endpoint"
-                    :placeholder="t('model.endpoint')"
-                    data-testid="el-input"
+              <ElFormItem :label="t('model.provider')">
+                <ElSelect v-model="form.provider" data-testid="el-select">
+                  <ElOption
+                    v-for="p in providers"
+                    :key="p.value"
+                    :value="p.value"
+                    :label="p.label"
+                    data-testid="el-option"
                   />
-                </ElFormItem>
-              </template>
+                </ElSelect>
+              </ElFormItem>
+
+              <ElFormItem :label="t('model.endpoint')">
+                <ElInput
+                  v-model="form.endpoint"
+                  :placeholder="t('model.endpoint')"
+                  :disabled="form.provider !== 'other'"
+                  data-testid="el-input"
+                />
+              </ElFormItem>
 
               <ElFormItem :label="t('model.apiKey')">
                 <ElInput
@@ -288,12 +312,23 @@ async function handleDelete(id: string) {
                 />
               </ElFormItem>
 
-              <ElFormItem v-if="!editingModel.isBuiltin" :label="t('model.modelName')">
-                <ElInput
+              <ElFormItem :label="t('model.modelName')">
+                <ElSelect
                   v-model="form.modelName"
                   :placeholder="t('model.modelName')"
-                  data-testid="el-input"
-                />
+                  filterable
+                  allow-create
+                  default-first-option
+                  :loading="isLoadingModels"
+                  data-testid="el-select"
+                >
+                  <ElOption
+                    v-for="name in modelList"
+                    :key="name"
+                    :value="name"
+                    :label="name"
+                  />
+                </ElSelect>
               </ElFormItem>
 
               <ElFormItem :label="t('model.temperature')">
@@ -356,6 +391,7 @@ async function handleDelete(id: string) {
                 <ElInput
                   v-model="form.endpoint"
                   :placeholder="t('model.endpoint')"
+                  :disabled="form.provider !== 'other'"
                   data-testid="el-input"
                 />
               </ElFormItem>
@@ -371,11 +407,22 @@ async function handleDelete(id: string) {
               </ElFormItem>
 
               <ElFormItem :label="t('model.modelName')">
-                <ElInput
+                <ElSelect
                   v-model="form.modelName"
                   :placeholder="t('model.modelName')"
-                  data-testid="el-input"
-                />
+                  filterable
+                  allow-create
+                  default-first-option
+                  :loading="isLoadingModels"
+                  data-testid="el-select"
+                >
+                  <ElOption
+                    v-for="name in modelList"
+                    :key="name"
+                    :value="name"
+                    :label="name"
+                  />
+                </ElSelect>
               </ElFormItem>
 
               <ElFormItem :label="t('model.temperature')">
@@ -497,10 +544,6 @@ async function handleDelete(id: string) {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-.model-manager__builtin-tag {
-  flex-shrink: 0;
 }
 
 .model-manager__item-meta {

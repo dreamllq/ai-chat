@@ -50,17 +50,16 @@ import { agentRegistry, registerAgent } from './services/agent'
 
 agentRegistry.register({
   id: 'langchain-chat',
-  name: 'LangChain Chat',
+  name: 'Chat',
+  nameKey: 'agent.builtinChatName',
   description: 'Built-in chat agent powered by LangChain.js',
+  descriptionKey: 'agent.builtinChatDesc',
   isBuiltin: true,
 })
 
 export type { ToolDefinition, MCPServerConfig, MCPTransportType } from './types'
 export { TitleGenerator } from './agents/title-generator'
 export { agentRegistry, registerAgent }
-
-// === Built-in Models ===
-export { BUILTIN_MODELS } from './services/builtin-models'
 
 // === Locales ===
 export { zhCn, en, ja } from './locales'

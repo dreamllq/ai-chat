@@ -26,7 +26,7 @@ const sidebarCollapsed = ref(false)
 
 const { isStreaming, sendMessage, stopStreaming } = useChat()
 const { currentConversation, currentConversationId, createConversation } = useSession()
-const { models, currentModelId, selectModel, initDefault, initBuiltins } = useModel()
+const { models, currentModelId, selectModel, initDefault } = useModel()
 const { agents, currentAgentId, selectAgent, initDefault: initDefaultAgent } = useAgent()
 
 const conversationService = new ConversationService()
@@ -85,10 +85,8 @@ watch(currentConversation, async (conv: Conversation | undefined) => {
 })
 
 onMounted(() => {
-  initBuiltins().then(() => {
-    initDefault()
-    initDefaultAgent()
-  })
+  initDefault()
+  initDefaultAgent()
 })
 
 async function handleSend(payload: { content: string; attachments?: MessageAttachment[] }) {

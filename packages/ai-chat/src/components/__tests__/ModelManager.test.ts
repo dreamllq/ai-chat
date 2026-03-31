@@ -13,10 +13,10 @@ const mockModels = ref<ModelConfig[] | undefined>([
   {
     id: 'model-1',
     name: 'GPT-4',
-    provider: 'openai',
-    endpoint: 'https://api.openai.com/v1',
+    provider: 'qwen',
+    endpoint: 'https://dashscope.aliyuncs.com/compatible-mode/v1',
     apiKey: 'sk-test',
-    modelName: 'gpt-4',
+    modelName: 'qwen-turbo',
     temperature: 0.7,
     maxTokens: 4096,
     createdAt: Date.now(),
@@ -56,8 +56,9 @@ vi.mock('../../composables/useLocale', () => ({
         'model.maxTokens': 'Max Tokens',
         'model.save': 'Save',
         'model.cancel': 'Cancel',
-        'model.builtin': 'Built-in',
         'model.emptyList': 'No models configured',
+        'model.providerOther': 'Other',
+        'model.fetchModelsFailed': 'Failed to fetch models',
       }
       return map[path] ?? path
     },
@@ -359,47 +360,5 @@ describe('ModelManager', () => {
       endpoint: 'https://api.openai.com/v1',
       modelName: 'gpt-4',
     }))
-  })
-
-  it('save button in edit mode for builtin model only updates limited fields', async () => {
-    mockModels.value = [
-      {
-        id: 'builtin-1',
-        name: 'GPT-4 Builtin',
-        provider: 'openai',
-        endpoint: 'https://api.openai.com/v1',
-        apiKey: '',
-        modelName: 'gpt-4',
-        temperature: 0.7,
-        maxTokens: 4096,
-        isBuiltin: true,
-        createdAt: Date.now(),
-      },
-    ]
-    await nextTick()
-    wrapper = mountComponent()
-
-    // Click the builtin model
-    const items = wrapper.findAll('.model-manager__item')
-    await items[0].trigger('click')
-    await nextTick()
-
-    // Click save
-    const buttons = wrapper.findAll('[data-testid="el-button"]')
-    const saveBtn = buttons.find((btn) => btn.text().includes('Save'))
-    await saveBtn!.trigger('click')
-
-    // Builtin model should only update apiKey, temperature, maxTokens
-    expect(updateModelMock).toHaveBeenCalledWith('builtin-1', expect.objectContaining({
-      apiKey: '',
-      temperature: 0.7,
-      maxTokens: 4096,
-    }))
-    // Should NOT include name, provider, endpoint, modelName
-    const call = updateModelMock.mock.calls[0][1] as Record<string, unknown>
-    expect(call).not.toHaveProperty('name')
-    expect(call).not.toHaveProperty('provider')
-    expect(call).not.toHaveProperty('endpoint')
-    expect(call).not.toHaveProperty('modelName')
   })
 })

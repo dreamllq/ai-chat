@@ -29,10 +29,12 @@ vi.mock('../../composables/useLocale', () => ({
 }))
 
 // Mock useModel
+const mockCurrentModelId = ref<string | null>(null)
+
 vi.mock('../../composables/useModel', () => ({
   useModel: () => ({
     models: { value: [] },
-    currentModelId: { value: null },
+    currentModelId: mockCurrentModelId,
     selectModel: vi.fn(),
   }),
 }))
@@ -149,6 +151,7 @@ describe('ChatInput file upload (with useFileUpload composable)', () => {
   beforeEach(() => {
     mockT.mockClear()
     mockFileStates.value = []
+    mockCurrentModelId.value = null
     mockAddFile.mockReset()
     mockRemoveFile.mockReset()
     mockRetryFile.mockReset()
@@ -192,6 +195,7 @@ describe('ChatInput file upload (with useFileUpload composable)', () => {
   })
 
   it('send emits { content, attachments } when files are uploaded', async () => {
+    mockCurrentModelId.value = 'model-1'
     // Set up a completed attachment
     const attachment: MessageAttachment = {
       id: 'att-1',
@@ -229,6 +233,7 @@ describe('ChatInput file upload (with useFileUpload composable)', () => {
   })
 
   it('clear called after successful send', async () => {
+    mockCurrentModelId.value = 'model-1'
     mockFileStates.value = [createFileState('data.csv', 'success', 100)]
     mockGetCompletedAttachments.mockReturnValue([
       {
@@ -333,6 +338,7 @@ describe('ChatInput file upload (with useFileUpload composable)', () => {
   })
 
   it('send emits only content when no attachments', async () => {
+    mockCurrentModelId.value = 'model-1'
     // No files — mockFileStates is empty (default)
     const wrapper = mountChatInput()
     const textarea = wrapper.find('textarea.chat-input__textarea')

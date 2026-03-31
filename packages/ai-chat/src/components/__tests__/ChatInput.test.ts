@@ -4,6 +4,16 @@ import { ref, computed } from 'vue'
 import type { MessageAttachment } from '../../types'
 import ChatInput from '../ChatInput.vue'
 
+vi.mock('element-plus', async () => {
+  const actual = await vi.importActual<typeof import('element-plus')>('element-plus')
+  return {
+    ...actual,
+    ElMessage: {
+      warning: vi.fn(),
+    },
+  }
+})
+
 // Mock useLocale
 const mockT = vi.fn((path: string) => {
   const map: Record<string, string> = {
@@ -14,6 +24,7 @@ const mockT = vi.fn((path: string) => {
     'agent.select': 'Select Agent',
     'agent.builtin': 'Built-in',
     'model.selectModel': 'Select Model',
+    'error.modelNotSelected': 'Please select a model first.',
   }
   return map[path] ?? path
 })
@@ -26,11 +37,12 @@ vi.mock('../../composables/useLocale', () => ({
   }),
 }))
 
-// Mock useModel
+const mockCurrentModelId = ref<string | null>(null)
+
 vi.mock('../../composables/useModel', () => ({
   useModel: () => ({
     models: { value: [] },
-    currentModelId: { value: null },
+    currentModelId: mockCurrentModelId,
     selectModel: vi.fn(),
   }),
 }))
@@ -126,6 +138,7 @@ describe('ChatInput', () => {
     mockT.mockClear()
     mockFileStates.value = []
     mockIsAllReady.value = true
+    mockCurrentModelId.value = null
     mockAddFile.mockClear()
     mockRemoveFile.mockClear()
     mockRetryFile.mockClear()
@@ -142,6 +155,7 @@ describe('ChatInput', () => {
   })
 
   it('Enter triggers send with content', async () => {
+    mockCurrentModelId.value = 'model-1'
     const wrapper = mountChatInput()
     const textarea = wrapper.find('textarea.chat-input__textarea')
 
@@ -158,6 +172,7 @@ describe('ChatInput', () => {
   })
 
   it('Shift+Enter does NOT trigger send (adds newline)', async () => {
+    mockCurrentModelId.value = 'model-1'
     const wrapper = mountChatInput()
     const textarea = wrapper.find('textarea.chat-input__textarea')
 
@@ -242,6 +257,7 @@ describe('ChatInput', () => {
   })
 
   it('send clears input after sending', async () => {
+    mockCurrentModelId.value = 'model-1'
     const wrapper = mountChatInput()
     const textarea = wrapper.find('textarea.chat-input__textarea')
 
@@ -269,6 +285,7 @@ describe('ChatInput', () => {
   })
 
   it('send button is enabled when input has content', async () => {
+    mockCurrentModelId.value = 'model-1'
     const wrapper = mountChatInput()
     const textarea = wrapper.find('textarea.chat-input__textarea')
 
@@ -280,6 +297,7 @@ describe('ChatInput', () => {
   })
 
   it('clicking send button emits send with content', async () => {
+    mockCurrentModelId.value = 'model-1'
     const wrapper = mountChatInput()
     const textarea = wrapper.find('textarea.chat-input__textarea')
 
@@ -295,6 +313,7 @@ describe('ChatInput', () => {
   })
 
   it('sends with attachments when files are uploaded', async () => {
+    mockCurrentModelId.value = 'model-1'
     const wrapper = mountChatInput()
     const textarea = wrapper.find('textarea.chat-input__textarea')
 
@@ -345,6 +364,32 @@ describe('ChatInput', () => {
     // Should have a remove button
     const removeButtons = wrapper.findAll('.chat-input__file-remove')
     expect(removeButtons.length).toBeGreaterThanOrEqual(1)
+  })
+
+  it('send button is disabled when no model is selected', async () => {
+    const wrapper = mountChatInput()
+    const textarea = wrapper.find('textarea.chat-input__textarea')
+
+    await textarea.setValue('Hello')
+    await wrapper.vm.$nextTick()
+
+    const sendButton = wrapper.findAllComponents({ name: 'ElButton' }).find(b => b.props('type') === 'primary')
+    expect(sendButton!.props('disabled')).toBe(true)
+  })
+
+  it('Enter with no model selected shows warning and does not send', async () => {
+    const { ElMessage } = await import('element-plus')
+    const wrapper = mountChatInput()
+    const textarea = wrapper.find('textarea.chat-input__textarea')
+
+    await textarea.setValue('Hello')
+    await wrapper.vm.$nextTick()
+
+    await textarea.trigger('keydown', { key: 'Enter' })
+    await wrapper.vm.$nextTick()
+
+    expect(wrapper.emitted('send')).toBeFalsy()
+    expect(ElMessage.warning).toHaveBeenCalledWith('Please select a model first.')
   })
 
   it('removing a file from preview calls removeFile', async () => {

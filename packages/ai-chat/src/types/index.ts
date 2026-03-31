@@ -75,8 +75,6 @@ export interface ModelConfig {
   temperature?: number
   /** 最大 token 数 */
   maxTokens?: number
-  /** 是否为内置模型 */
-  isBuiltin?: boolean
   /** 创建时间戳 */
   createdAt: number
 }
@@ -143,6 +141,10 @@ export interface AgentDefinition {
   name: string
   /** 智能体描述 */
   description?: string
+  /** 国际化 key — 存在时覆盖 name 用于显示 */
+  nameKey?: string
+  /** 国际化 key — 存在时覆盖 description 用于显示 */
+  descriptionKey?: string
   /** 头像 URL */
   avatar?: string
   /** 系统提示词 */

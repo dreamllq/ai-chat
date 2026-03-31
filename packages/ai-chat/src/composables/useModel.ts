@@ -8,9 +8,6 @@ const STORAGE_KEY = 'ai-chat:selected-model-id'
 // Module-level singleton — shared across all useModel() callers
 const currentModelId = ref<string | null>(null)
 
-// Track whether builtins have been seeded (module-level, runs once)
-let builtinSeeded = false
-
 // Restore persisted selection on module load
 try {
   const saved = localStorage.getItem(STORAGE_KEY)
@@ -20,7 +17,6 @@ try {
 /** Reset singleton state (for testing) */
 export function _resetModelState() {
   currentModelId.value = null
-  builtinSeeded = false
   try {
     localStorage.removeItem(STORAGE_KEY)
   } catch {}
@@ -89,13 +85,6 @@ export function useModel() {
     }
   }
 
-  /** Seed builtin models into the database (idempotent, runs once) */
-  async function initBuiltins(): Promise<void> {
-    if (builtinSeeded) return
-    builtinSeeded = true
-    await modelService.seedBuiltins()
-  }
-
   return {
     models,
     currentModelId,
@@ -105,6 +94,5 @@ export function useModel() {
     deleteModel,
     selectModel,
     initDefault,
-    initBuiltins,
   }
 }

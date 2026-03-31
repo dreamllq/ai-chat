@@ -37,15 +37,18 @@ export interface AiChatLocale {
     addNew: string
     manage: string
     emptyList: string
-    builtin: string
     save: string
     cancel: string
+    providerOther: string
+    fetchModelsFailed: string
   }
   agent: {
     title: string
     select: string
     builtin: string
     custom: string
+    builtinChatName: string
+    builtinChatDesc: string
   }
   upload: {
     button: string
@@ -120,15 +123,18 @@ export const en: AiChatLocale = {
     addNew: 'Add Model',
     manage: 'Model Management',
     emptyList: 'No models configured',
-    builtin: 'Built-in',
     save: 'Save',
     cancel: 'Cancel',
+    providerOther: 'Other',
+    fetchModelsFailed: 'Failed to fetch models',
   },
   agent: {
     title: 'Agent',
     select: 'Select Agent',
     builtin: 'Built-in',
     custom: 'Custom',
+    builtinChatName: 'Chat',
+    builtinChatDesc: 'Built-in chat agent powered by LangChain.js',
   },
   upload: {
     button: 'Upload File',
