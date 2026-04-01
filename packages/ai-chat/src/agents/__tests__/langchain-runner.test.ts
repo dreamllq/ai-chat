@@ -386,7 +386,7 @@ describe('LangChainRunner', () => {
 
     expect(chunks).toEqual([
       { type: 'token', content: '', reasoningContent: 'Let me think...' },
-      { type: 'token', content: 'The answer', reasoningContent: undefined },
+      { type: 'token', content: 'The answer' },
       { type: 'done' },
     ])
   })
@@ -409,7 +409,7 @@ describe('LangChainRunner', () => {
       { type: 'token', content: '', reasoningContent: 'Step 1: ' },
       { type: 'token', content: '', reasoningContent: 'Step 2: ' },
       { type: 'token', content: '', reasoningContent: 'Done.' },
-      { type: 'token', content: 'Final answer', reasoningContent: undefined },
+      { type: 'token', content: 'Final answer' },
       { type: 'done' },
     ])
   })
@@ -424,8 +424,8 @@ describe('LangChainRunner', () => {
     }
 
     expect(chunks).toEqual([
-      { type: 'token', content: 'Hello', reasoningContent: undefined },
-      { type: 'token', content: ' world', reasoningContent: undefined },
+      { type: 'token', content: 'Hello' },
+      { type: 'token', content: ' world' },
       { type: 'done' },
     ])
   })
