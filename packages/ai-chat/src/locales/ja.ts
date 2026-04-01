@@ -95,4 +95,18 @@ export const ja: AiChatLocale = {
     yesterday: '昨日',
     dateFormat: '{month}月{day}日 {hours}:{minutes}',
   },
+  subAgent: {
+    callAgent: 'エージェント呼び出し',
+    running: '実行中',
+    completed: '完了',
+    failed: '失敗',
+    viewLogs: 'ログを見る',
+    duration: '所要時間: {duration}',
+    task: 'タスク',
+    output: '出力',
+    noLogs: 'ログなし',
+    depthExceeded: '最大ネスト深度を超えました',
+    agentNotFound: 'エージェントが見つかりません',
+    circularCall: '循環呼び出しを検出しました',
+  },
 }

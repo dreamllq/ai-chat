@@ -9,14 +9,14 @@ describe('Database Schema', () => {
     db.close()
   })
 
-  it('has all 4 tables', () => {
+  it('has all 5 tables', () => {
     expect(db.tables.map((t) => t.name)).toEqual(
-      expect.arrayContaining(['conversations', 'messages', 'models', 'agents'])
+      expect.arrayContaining(['conversations', 'messages', 'models', 'agents', 'subAgentExecutions'])
     )
-    expect(db.tables.length).toBe(4)
+    expect(db.tables.length).toBe(5)
   })
 
   it('has correct schema version', () => {
-    expect(db.verno).toBe(1)
+    expect(db.verno).toBe(2)
   })
 })

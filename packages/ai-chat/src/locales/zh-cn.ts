@@ -95,4 +95,18 @@ export const zhCn: AiChatLocale = {
     yesterday: '昨天',
     dateFormat: '{month}月{day}日 {hours}:{minutes}',
   },
+  subAgent: {
+    callAgent: '调用智能体',
+    running: '运行中',
+    completed: '已完成',
+    failed: '失败',
+    viewLogs: '查看日志',
+    duration: '耗时: {duration}',
+    task: '任务',
+    output: '输出',
+    noLogs: '暂无日志',
+    depthExceeded: '超过最大嵌套深度',
+    agentNotFound: '未找到智能体',
+    circularCall: '检测到循环调用',
+  },
 }

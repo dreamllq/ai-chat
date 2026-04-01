@@ -197,10 +197,74 @@ export interface ChatOptions {
   onToken?: (token: string) => void
 }
 
+// === 子 Agent ===
+
+/** 子 Agent 日志条目 */
+export interface SubAgentLogEntry {
+  /** 时间戳 */
+  timestamp: number
+  /** 日志类型 */
+  type: 'start' | 'token' | 'tool_call' | 'tool_result' | 'done' | 'error'
+  /** 日志内容 */
+  content: string
+}
+
+/** 子 Agent 执行记录（数据库存储） */
+export interface SubAgentExecution {
+  /** 执行记录 ID */
+  id: string
+  /** 父执行记录 ID */
+  parentExecutionId: string | null
+  /** 所属会话 ID */
+  conversationId: string
+  /** 父消息 ID */
+  parentMessageId: string
+  /** 子 Agent ID */
+  agentId: string
+  /** 子 Agent 名称 */
+  agentName: string
+  /** 任务描述 */
+  task: string
+  /** 执行状态 */
+  status: 'running' | 'completed' | 'failed'
+  /** 开始时间 */
+  startTime: number
+  /** 结束时间 */
+  endTime: number | null
+  /** 输出内容 */
+  output: string | null
+  /** 错误信息 */
+  error: string | null
+  /** 嵌套深度 */
+  depth: number
+  /** 日志条目列表 */
+  logs: SubAgentLogEntry[]
+}
+
+/** 子 Agent 调用信息（ChatMessage.metadata 中使用） */
+export interface SubAgentCallInfo {
+  /** 执行记录 ID */
+  executionId: string
+  /** 子 Agent ID */
+  agentId: string
+  /** 子 Agent 名称 */
+  agentName: string
+  /** 任务描述 */
+  task: string
+  /** 执行状态 */
+  status: 'running' | 'completed' | 'failed'
+  /** 开始时间 */
+  startTime: number
+  /** 结束时间 */
+  endTime: number | null
+  /** 嵌套深度 */
+  depth: number
+}
+
 /** 聊天流式响应块 */
 export interface ChatChunk {
   /** 块类型 */
-  type: 'token' | 'done' | 'error'
+  type: 'token' | 'done' | 'error' | 'sub_agent_start' | 'sub_agent_log' | 'sub_agent_end'
   /** 文本内容 (type 为 token 时) */
   content?: string
   /** 错误信息 (type 为 error 时) */
@@ -209,6 +273,10 @@ export interface ChatChunk {
   reasoningContent?: string
   /** Token 用量（type 为 done 时） */
   tokenUsage?: TokenUsage
+  /** 子 Agent 调用信息 (sub_agent_start/log/end 时) */
+  subAgent?: SubAgentCallInfo
+  /** 日志条目 (sub_agent_log 时) */
+  logEntry?: SubAgentLogEntry
 }
 
 // === 文件上传 ===

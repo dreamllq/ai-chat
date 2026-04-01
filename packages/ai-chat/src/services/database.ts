@@ -1,5 +1,5 @@
 import { db } from '../database/db'
-import type { ChatMessage, Conversation, ModelConfig, AgentDefinition } from '../types'
+import type { ChatMessage, Conversation, ModelConfig, AgentDefinition, SubAgentExecution } from '../types'
 import { liveQuery } from 'dexie'
 
 // === Conversation Service ===
@@ -114,6 +114,36 @@ export class AgentService {
     const agent = await db.agents.get(id)
     if (agent?.isBuiltin) throw new Error('Cannot delete builtin agent')
     await db.agents.delete(id)
+  }
+}
+
+// === SubAgentExecution Service ===
+export class SubAgentExecutionService {
+  async create(data: Omit<SubAgentExecution, 'id'>): Promise<SubAgentExecution> {
+    const id = crypto.randomUUID()
+    const execution: SubAgentExecution = { ...data, id }
+    await db.subAgentExecutions.add(execution)
+    return execution
+  }
+
+  async getById(id: string): Promise<SubAgentExecution | undefined> {
+    return db.subAgentExecutions.get(id)
+  }
+
+  async getByParentMessageId(parentMessageId: string): Promise<SubAgentExecution[]> {
+    return db.subAgentExecutions.where('parentMessageId').equals(parentMessageId).toArray()
+  }
+
+  async getByConversationId(conversationId: string): Promise<SubAgentExecution[]> {
+    return db.subAgentExecutions.where('conversationId').equals(conversationId).toArray()
+  }
+
+  async update(id: string, data: Partial<SubAgentExecution>): Promise<void> {
+    await db.subAgentExecutions.update(id, data)
+  }
+
+  async deleteByConversationId(conversationId: string): Promise<void> {
+    await db.subAgentExecutions.where('conversationId').equals(conversationId).delete()
   }
 }
 

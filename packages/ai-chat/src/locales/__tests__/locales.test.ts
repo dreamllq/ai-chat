@@ -53,6 +53,15 @@ describe('Locales', () => {
     expect(jaKeys).toEqual(enKeys)
   })
 
+  it('all subAgent values are non-empty strings in every locale', () => {
+    for (const locale of [en, zhCn, ja]) {
+      for (const [key, value] of Object.entries(locale.subAgent)) {
+        expect(typeof value).toBe('string')
+        expect(value.length).toBeGreaterThan(0)
+      }
+    }
+  })
+
   it('localeInjectionKey is a Symbol', () => {
     expect(typeof localeInjectionKey).toBe('symbol')
   })

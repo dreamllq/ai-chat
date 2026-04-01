@@ -93,6 +93,20 @@ export interface AiChatLocale {
     yesterday: string
     dateFormat: string
   }
+  subAgent: {
+    callAgent: string
+    running: string
+    completed: string
+    failed: string
+    viewLogs: string
+    duration: string
+    task: string
+    output: string
+    noLogs: string
+    depthExceeded: string
+    agentNotFound: string
+    circularCall: string
+  }
 }
 
 export const en: AiChatLocale = {
@@ -189,5 +203,19 @@ export const en: AiChatLocale = {
     hoursAgo: '{n} hours ago',
     yesterday: 'yesterday',
     dateFormat: '{month}/{day} {hours}:{minutes}',
+  },
+  subAgent: {
+    callAgent: 'Call Agent',
+    running: 'Running',
+    completed: 'Completed',
+    failed: 'Failed',
+    viewLogs: 'View Logs',
+    duration: 'Duration: {duration}',
+    task: 'Task',
+    output: 'Output',
+    noLogs: 'No logs available',
+    depthExceeded: 'Maximum nesting depth exceeded',
+    agentNotFound: 'Agent not found',
+    circularCall: 'Circular agent call detected',
   },
 }
