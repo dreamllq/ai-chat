@@ -57,7 +57,7 @@ agentRegistry.register({
   isBuiltin: true,
 })
 
-export type { ToolDefinition, MCPServerConfig, MCPTransportType } from './types'
+export type { ToolDefinition, SkillDefinition, MCPServerConfig, MCPTransportType } from './types'
 export { TitleGenerator } from './agents/title-generator'
 export { agentRegistry, registerAgent }
 

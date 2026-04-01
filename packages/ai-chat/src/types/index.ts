@@ -108,6 +108,20 @@ export interface StructuredToolDefinition<T extends ZodType = ZodType> {
 /** 工具定义 — 有 schema 时 LLM 看到参数结构，无 schema 时接收纯字符串 */
 export type ToolDefinition = SimpleToolDefinition | StructuredToolDefinition
 
+// === 技能 ===
+
+/** 技能定义 — 可复用的智能体能力描述 */
+export interface SkillDefinition {
+  /** 技能名称，必须唯一 */
+  name: string
+  /** 技能描述 — Agent 用来判断是否使用此技能 */
+  description: string
+  /** 技能详细指令（Markdown 格式）— 告诉 Agent 如何使用此技能 */
+  instructions: string
+  /** 可选的额外元数据 */
+  metadata?: Record<string, unknown>
+}
+
 // === MCP 服务器 ===
 
 /** MCP 服务器传输类型 */
@@ -155,6 +169,8 @@ export interface AgentDefinition {
   tools?: ToolDefinition[]
   /** MCP 服务器列表 */
   mcpServers?: MCPServerConfig[]
+  /** 技能列表（需安装 deepagents） */
+  skills?: SkillDefinition[]
 }
 
 /** @internal 智能体运行器接口 — 内部使用，用户不再需要实现此接口 */
