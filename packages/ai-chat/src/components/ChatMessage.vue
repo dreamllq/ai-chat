@@ -3,13 +3,17 @@ import { computed, nextTick, onMounted, onUpdated, ref, watch } from 'vue'
 import MarkdownIt from 'markdown-it'
 import hljs from 'highlight.js'
 import 'highlight.js/styles/github-dark.css'
-import type { ChatMessage as ChatMessageType } from '../types'
+import type { ChatMessage as ChatMessageType, SubAgentCallInfo } from '../types'
 import { isMessageAttachment, isLegacyFileMetadata } from '../types'
 import type { MessageAttachment } from '../types'
 import { useLocale } from '../composables/useLocale'
 
 const props = defineProps<{
   message: ChatMessageType
+}>()
+
+const emit = defineEmits<{
+  'open-sub-agent-log': [call: SubAgentCallInfo]
 }>()
 
 const { t } = useLocale()
@@ -102,6 +106,33 @@ watch(
   },
   { immediate: true },
 )
+
+// Sub-Agent calls
+const hasSubAgentCalls = computed(
+  () => Array.isArray(props.message.metadata?.subAgentCalls) && (props.message.metadata?.subAgentCalls as SubAgentCallInfo[]).length > 0,
+)
+const subAgentCalls = computed(
+  () => (props.message.metadata?.subAgentCalls ?? []) as SubAgentCallInfo[],
+)
+
+function openSubAgentLog(call: SubAgentCallInfo): void {
+  emit('open-sub-agent-log', call)
+}
+
+function getSubAgentStatusLabel(status: string): string {
+  const labels: Record<string, string> = {
+    running: t('subAgent.running'),
+    completed: t('subAgent.completed'),
+    failed: t('subAgent.failed'),
+  }
+  return labels[status] ?? status
+}
+
+function formatDuration(start: number, end: number): string {
+  const ms = end - start
+  if (ms < 1000) return `${ms}ms`
+  return `${(ms / 1000).toFixed(1)}s`
+}
 
 // Token usage
 const hasTokenUsage = computed(
@@ -217,6 +248,36 @@ onUpdated(() => {
           <div class="chat-message__reasoning-content">
             <!-- eslint-disable-next-line vue/no-v-html -->
             <div v-html="renderedReasoning" />
+          </div>
+        </div>
+      </div>
+      <!-- Sub-Agent Calls -->
+      <div v-if="hasSubAgentCalls" class="chat-message__sub-agents">
+        <div class="chat-message__sub-agents-header">
+          <span class="chat-message__sub-agents-icon">🤖</span>
+          <span class="chat-message__sub-agents-title">
+            {{ t('subAgent.callAgent') }} ({{ subAgentCalls.length }})
+          </span>
+        </div>
+        <div class="chat-message__sub-agents-list">
+          <div
+            v-for="call in subAgentCalls"
+            :key="call.executionId"
+            class="chat-message__sub-agent-card"
+            :class="`chat-message__sub-agent-card--${call.status}`"
+            @click="openSubAgentLog(call)"
+          >
+            <div class="chat-message__sub-agent-card__header">
+              <span class="chat-message__sub-agent-card__name">{{ call.agentName }}</span>
+              <span class="chat-message__sub-agent-card__status" :class="`--${call.status}`">
+                {{ getSubAgentStatusLabel(call.status) }}
+              </span>
+            </div>
+            <div class="chat-message__sub-agent-card__task">{{ call.task }}</div>
+            <div v-if="call.status !== 'running'" class="chat-message__sub-agent-card__duration">
+              {{ formatDuration(call.startTime, call.endTime!) }}
+            </div>
+            <div v-if="call.status === 'running'" class="chat-message__sub-agent-card__spinner" />
           </div>
         </div>
       </div>
@@ -627,5 +688,108 @@ onUpdated(() => {
 
 .chat-message__reasoning-content :deep(div p:last-child) {
   margin-bottom: 0;
+}
+
+/* Sub-Agent Calls */
+.chat-message__sub-agents {
+  margin: 8px 0;
+}
+
+.chat-message__sub-agents-header {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.chat-message__sub-agents-title {
+  font-size: 14px;
+  color: var(--el-text-color-secondary, #909399);
+}
+
+.chat-message__sub-agents-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.chat-message__sub-agent-card {
+  padding: 8px 12px;
+  border: 1px solid #e0e0e0;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.chat-message__sub-agent-card:hover {
+  border-color: #409080;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.chat-message__sub-agent-card--running {
+  border-left: 3px solid var(--el-color-primary, #409eff);
+}
+
+.chat-message__sub-agent-card--completed {
+  border-left: 3px solid var(--el-color-success, #67c23a);
+}
+
+.chat-message__sub-agent-card--failed {
+  border-left: 3px solid var(--el-color-danger, #f56c6c);
+}
+
+.chat-message__sub-agent-card__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.chat-message__sub-agent-card__name {
+  font-weight: 500;
+}
+
+.chat-message__sub-agent-card__status {
+  font-size: 12px;
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+.chat-message__sub-agent-card__status--running {
+  background: #ecf5ff;
+  color: var(--el-color-primary, #409eff);
+}
+
+.chat-message__sub-agent-card__status--completed {
+  background: #f0f2ff;
+  color: var(--el-color-success, #67c23a);
+}
+
+.chat-message__sub-agent-card__status--failed {
+  background: #fef0f0;
+  color: var(--el-color-danger, #f56c6c);
+}
+
+.chat-message__sub-agent-card__task {
+  font-size: 13px;
+  color: var(--el-text-color-regular, #606266);
+  margin-top: 4px;
+}
+
+.chat-message__sub-agent-card__duration {
+  font-size: 12px;
+  color: var(--el-text-color-secondary, #909399);
+}
+
+.chat-message__sub-agent-card__spinner {
+  width: 14px;
+  height: 14px;
+  border: 2px solid var(--el-color-primary, #409eff);
+  border-top: 2px solid transparent;
+  border-radius: 50%;
+  animation: chat-sub-agent-spin 1s linear infinite;
+  margin-left: auto;
+}
+
+@keyframes chat-sub-agent-spin {
+  to { transform: rotate(360deg); }
 }
 </style>
