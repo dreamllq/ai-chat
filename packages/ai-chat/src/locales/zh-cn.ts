@@ -110,5 +110,13 @@ export const zhCn: AiChatLocale = {
     depthExceeded: '超过最大嵌套深度',
     agentNotFound: '未找到智能体',
     circularCall: '检测到循环调用',
+    logTitle: '智能体执行日志',
+    logTimeline: '时间线',
+    logStart: '开始',
+    logToken: '令牌',
+    logToolCall: '工具调用',
+    logToolResult: '工具结果',
+    logDone: '完成',
+    logError: '错误',
   },
 }

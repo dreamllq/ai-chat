@@ -7,13 +7,10 @@ import type { ChatMessage as ChatMessageType, SubAgentCallInfo } from '../types'
 import { isMessageAttachment, isLegacyFileMetadata } from '../types'
 import type { MessageAttachment } from '../types'
 import { useLocale } from '../composables/useLocale'
+import SubAgentLogDialog from './SubAgentLogDialog.vue'
 
 const props = defineProps<{
   message: ChatMessageType
-}>()
-
-const emit = defineEmits<{
-  'open-sub-agent-log': [call: SubAgentCallInfo]
 }>()
 
 const { t } = useLocale()
@@ -115,8 +112,12 @@ const subAgentCalls = computed(
   () => (props.message.metadata?.subAgentCalls ?? []) as SubAgentCallInfo[],
 )
 
+const subAgentLogVisible = ref(false)
+const selectedExecutionId = ref<string | null>(null)
+
 function openSubAgentLog(call: SubAgentCallInfo): void {
-  emit('open-sub-agent-log', call)
+  selectedExecutionId.value = call.executionId
+  subAgentLogVisible.value = true
 }
 
 function getSubAgentStatusLabel(status: string): string {
@@ -340,6 +341,7 @@ onUpdated(() => {
       <span v-if="showStreamingCursor" class="chat-message__cursor" />
     </div>
     </div>
+    <SubAgentLogDialog v-model="subAgentLogVisible" :execution-id="selectedExecutionId" />
   </div>
 </template>
 

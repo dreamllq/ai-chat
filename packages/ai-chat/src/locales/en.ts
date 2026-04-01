@@ -108,6 +108,14 @@ export interface AiChatLocale {
     depthExceeded: string
     agentNotFound: string
     circularCall: string
+    logTitle: string
+    logTimeline: string
+    logStart: string
+    logToken: string
+    logToolCall: string
+    logToolResult: string
+    logDone: string
+    logError: string
   }
 }
 
@@ -221,5 +229,13 @@ export const en: AiChatLocale = {
     depthExceeded: 'Maximum nesting depth exceeded',
     agentNotFound: 'Agent not found',
     circularCall: 'Circular agent call detected',
+    logTitle: 'Agent Execution Log',
+    logTimeline: 'Timeline',
+    logStart: 'Start',
+    logToken: 'Token',
+    logToolCall: 'Tool Call',
+    logToolResult: 'Tool Result',
+    logDone: 'Done',
+    logError: 'Error',
   },
 }

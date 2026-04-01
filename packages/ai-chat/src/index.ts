@@ -50,6 +50,7 @@ export { useObservable } from './composables/useObservable'
 // === Agents ===
 // Built-in agent — config-based registration (LangChainRunner created internally by registry)
 import { agentRegistry, registerAgent } from './services/agent'
+import { DeepAgentRunner } from './agents/deep-agent-runner'
 
 agentRegistry.register({
   id: 'langchain-chat',
@@ -60,8 +61,22 @@ agentRegistry.register({
   isBuiltin: true,
 })
 
+agentRegistry.register({
+  id: 'deep-agent-chat',
+  name: 'Deep Chat',
+  nameKey: 'agent.builtinDeepChatName',
+  description: 'Built-in deep chat agent with sub-agent calling capability',
+  descriptionKey: 'agent.builtinDeepChatDesc',
+  isBuiltin: true,
+}, new DeepAgentRunner({
+  id: 'deep-agent-chat',
+  name: 'Deep Chat',
+  isBuiltin: true,
+}))
+
 export type { ToolDefinition, SkillDefinition, MCPServerConfig, MCPTransportType } from './types'
 export { TitleGenerator } from './agents/title-generator'
+export { DeepAgentRunner } from './agents/deep-agent-runner'
 export { agentRegistry, registerAgent }
 
 // === Locales ===

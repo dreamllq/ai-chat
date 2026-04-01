@@ -110,5 +110,13 @@ export const ja: AiChatLocale = {
     depthExceeded: '最大ネスト深度を超えました',
     agentNotFound: 'エージェントが見つかりません',
     circularCall: '循環呼び出しを検出しました',
+    logTitle: 'エージェント実行ログ',
+    logTimeline: 'タイムライン',
+    logStart: '開始',
+    logToken: 'トークン',
+    logToolCall: 'ツール呼び出し',
+    logToolResult: 'ツール結果',
+    logDone: '完了',
+    logError: 'エラー',
   },
 }

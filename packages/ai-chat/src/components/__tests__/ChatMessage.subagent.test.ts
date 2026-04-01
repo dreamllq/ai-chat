@@ -3,6 +3,13 @@ import { mount } from '@vue/test-utils'
 import type { ChatMessage as ChatMessageType, SubAgentCallInfo } from '../../types'
 import ChatMessage from '../ChatMessage.vue'
 
+// Mock SubAgentExecutionService
+vi.mock('../../services/database', () => ({
+  SubAgentExecutionService: vi.fn().mockImplementation(() => ({
+    getById: vi.fn().mockResolvedValue(undefined),
+  })),
+}))
+
 const mockT = vi.fn((path: string) => {
   const map: Record<string, string> = {
     'chat.copyCode': 'Copy Code',
@@ -189,7 +196,7 @@ describe('ChatMessage - Sub-Agent Cards', () => {
     expect(wrapper.find('.chat-message__sub-agent-card__duration').text()).toBe('500ms')
   })
 
-  it('emits open-sub-agent-log when card is clicked', async () => {
+  it('opens sub-agent log dialog when card is clicked', async () => {
     const call = createSubAgentCall()
     const wrapper = mountChatMessage({
       message: createMessage({
@@ -197,10 +204,14 @@ describe('ChatMessage - Sub-Agent Cards', () => {
       }),
     })
 
+    const dialog = wrapper.findComponent({ name: 'SubAgentLogDialog' })
+    expect(dialog.props('modelValue')).toBe(false)
+    expect(dialog.props('executionId')).toBeNull()
+
     await wrapper.find('.chat-message__sub-agent-card').trigger('click')
 
-    expect(wrapper.emitted('open-sub-agent-log')).toHaveLength(1)
-    expect(wrapper.emitted('open-sub-agent-log')![0][0]).toEqual(call)
+    expect(dialog.props('modelValue')).toBe(true)
+    expect(dialog.props('executionId')).toBe('exec-1')
   })
 
   it('does not show sub-agent section for user messages', () => {
