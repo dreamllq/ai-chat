@@ -52,6 +52,17 @@ export const ja: AiChatLocale = {
     builtinChatName: 'チャット',
     builtinChatDesc: 'LangChain.js搭載の内蔵チャットエージェント',
   },
+  skill: {
+    title: 'スキル',
+    addSkill: 'スキルを追加',
+    removeSkill: 'スキルを削除',
+    name: '名前',
+    description: '説明',
+    instructions: '指示',
+    namePlaceholder: 'スキル名を入力',
+    descriptionPlaceholder: 'このスキルを使用する状況を説明',
+    instructionsPlaceholder: 'エージェントへの詳細な指示...',
+  },
   upload: {
     button: 'ファイルをアップロード',
     dragHere: 'ファイルをここにドラッグ',

@@ -52,6 +52,17 @@ export const zhCn: AiChatLocale = {
     builtinChatName: '聊天',
     builtinChatDesc: '基于 LangChain.js 的内置对话智能体',
   },
+  skill: {
+    title: '技能',
+    addSkill: '添加技能',
+    removeSkill: '删除技能',
+    name: '名称',
+    description: '描述',
+    instructions: '指令',
+    namePlaceholder: '输入技能名称',
+    descriptionPlaceholder: '描述何时应使用此技能',
+    instructionsPlaceholder: '详细的智能体指令...',
+  },
   upload: {
     button: '上传文件',
     dragHere: '拖拽文件到此处',
