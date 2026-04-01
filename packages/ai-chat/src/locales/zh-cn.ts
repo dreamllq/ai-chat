@@ -51,6 +51,8 @@ export const zhCn: AiChatLocale = {
     custom: '自定义',
     builtinChatName: '聊天',
     builtinChatDesc: '基于 LangChain.js 的内置对话智能体',
+    builtinDeepChatName: '深度对话',
+    builtinDeepChatDesc: '内置深度对话智能体，支持子智能体调用能力',
   },
   skill: {
     title: '技能',

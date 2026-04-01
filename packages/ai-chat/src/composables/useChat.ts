@@ -4,7 +4,7 @@ import { useModel } from './useModel'
 import { agentRegistry } from '../services/agent'
 import { MessageService, ConversationService } from '../services/database'
 import { TitleGenerator } from '../agents/title-generator'
-import type { MessageAttachment, TokenUsage } from '../types'
+import type { MessageAttachment, SubAgentCallInfo, TokenUsage } from '../types'
 
 // Module-level singleton state — shared across all useChat() callers
 const isStreaming = ref(false)
@@ -159,6 +159,30 @@ export function useChat() {
             isStreaming: false,
             tokenUsage,
             ...(hadReasoning && !reasoningDoneFired ? { metadata: { ...assistantMsg.metadata, reasoningDone: true } } : {}),
+          })
+        } else if (chunk.type === 'sub_agent_start') {
+          if (!assistantMsg.metadata) {
+            assistantMsg.metadata = {}
+          }
+          if (!assistantMsg.metadata.subAgentCalls) {
+            assistantMsg.metadata.subAgentCalls = []
+          }
+          ;(assistantMsg.metadata.subAgentCalls as SubAgentCallInfo[]).push(chunk.subAgent!)
+          await messageService.update(assistantMsg.id, {
+            metadata: { ...assistantMsg.metadata },
+          })
+        } else if (chunk.type === 'sub_agent_log') {
+          // Intentionally skip DB writes for log entries to avoid heavy I/O
+        } else if (chunk.type === 'sub_agent_end') {
+          const calls = assistantMsg.metadata?.subAgentCalls as SubAgentCallInfo[] | undefined
+          if (calls && chunk.subAgent) {
+            const idx = calls.findIndex(c => c.executionId === chunk.subAgent!.executionId)
+            if (idx >= 0) {
+              calls[idx] = { ...calls[idx], status: chunk.subAgent.status, endTime: chunk.subAgent.endTime }
+            }
+          }
+          await messageService.update(assistantMsg.id, {
+            metadata: { ...assistantMsg.metadata },
           })
         }
       }

@@ -51,6 +51,8 @@ export const ja: AiChatLocale = {
     custom: 'カスタム',
     builtinChatName: 'チャット',
     builtinChatDesc: 'LangChain.js搭載の内蔵チャットエージェント',
+    builtinDeepChatName: 'ディープチャット',
+    builtinDeepChatDesc: 'サブエージェント呼び出し機能を備えた内蔵ディープチャットエージェント',
   },
   skill: {
     title: 'スキル',
