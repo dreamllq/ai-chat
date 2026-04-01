@@ -6,17 +6,8 @@ class AgentRegistry {
   private definitions: Map<string, AgentDefinition> = new Map()
   private runners: Map<string, AgentRunner> = new Map()
 
-  /**
-   * Reactive version counter — bumped on every register/unregister.
-   * Consumers can depend on this ref inside computed() to stay reactive.
-   */
   readonly version = ref(0)
 
-  /**
-   * Register an agent. Accepts either:
-   * 1. Config-based: register(agentDef) — creates LangChainRunner internally
-   * 2. Legacy: register(agentDef, runner) — explicit runner (backward compat)
-   */
   register(agentDef: AgentDefinition, runner?: AgentRunner): void {
     this.definitions.set(agentDef.id, agentDef)
 
