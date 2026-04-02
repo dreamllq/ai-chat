@@ -118,5 +118,6 @@ export const zhCn: AiChatLocale = {
     logToolResult: '工具结果',
     logDone: '完成',
     logError: '错误',
+    logReasoning: '思考',
   },
 }

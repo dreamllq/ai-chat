@@ -70,11 +70,11 @@ function makeMessage(overrides: Partial<ChatMessage> = {}): ChatMessage {
 }
 
 /** Helper that sets up mockStream to yield the given chunks */
-function mockStreamYield(chunks: { content: string; additional_kwargs?: Record<string, unknown> }[]) {
+function mockStreamYield(chunks: { content: string; additional_kwargs?: Record<string, unknown>; usage_metadata?: Record<string, unknown> }[]) {
   mockStream.mockImplementation(async () => {
     return (async function* () {
       for (const c of chunks) {
-        yield c
+        yield { ...c, concat: (other: unknown) => ({ ...c, ...(other as Record<string, unknown>) }) }
       }
     })()
   })

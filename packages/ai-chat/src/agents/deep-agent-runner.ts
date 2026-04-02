@@ -51,20 +51,18 @@ export class DeepAgentRunner implements AgentRunner {
 
         const stream = await llm.stream(currentMessages)
 
-        let accToolCalls: Array<{ name: string; args: Record<string, unknown>; id: string }> = []
         let accUsageMetadata: Record<string, unknown> | undefined
-        let rawAccumulated: unknown
+        let accumulated: BaseMessage | undefined
 
         for await (const chunk of stream) {
           const ch = chunk as unknown as Record<string, unknown>
 
-          if (ch.tool_calls && (ch.tool_calls as Array<unknown>).length > 0) {
-            accToolCalls = ch.tool_calls as typeof accToolCalls
-          }
           if (ch.usage_metadata) {
             accUsageMetadata = ch.usage_metadata as Record<string, unknown>
           }
-          rawAccumulated = chunk
+          accumulated = accumulated
+            ? (accumulated as unknown as { concat(other: unknown): BaseMessage }).concat(chunk)
+            : (chunk as BaseMessage)
 
           const content = ch.content as string
           const reasoningContent = (ch.additional_kwargs as Record<string, unknown> | undefined)?.reasoning_content as string | undefined
@@ -76,6 +74,8 @@ export class DeepAgentRunner implements AgentRunner {
             }
           }
         }
+
+        const accToolCalls = (accumulated as unknown as { tool_calls?: Array<{ name: string; args: Record<string, unknown>; id: string }> }).tool_calls ?? []
 
         if (accToolCalls.length === 0) {
           const tokenUsage = extractTokenUsage(accUsageMetadata)
@@ -90,7 +90,7 @@ export class DeepAgentRunner implements AgentRunner {
           return
         }
 
-        currentMessages.push(rawAccumulated as BaseMessage)
+        currentMessages.push(accumulated!)
 
         for (const tc of accToolCalls) {
           let result: string
@@ -201,11 +201,20 @@ export class DeepAgentRunner implements AgentRunner {
       }
 
       for await (const chunk of runner.chat(subMessages, model, subOptions)) {
-        if (chunk.type === 'token' && chunk.content) {
-          output += chunk.content
+        if (chunk.type === 'token') {
+          if (chunk.content) {
+            output += chunk.content
+          }
+          if (chunk.reasoningContent) {
+            yield {
+              type: 'sub_agent_log' as const,
+              logEntry: { timestamp: Date.now(), type: 'reasoning', content: chunk.reasoningContent },
+              subAgent: { ...subAgentInfo },
+            }
+          }
           yield {
             type: 'sub_agent_log' as const,
-            logEntry: { timestamp: Date.now(), type: 'token', content: chunk.content },
+            logEntry: { timestamp: Date.now(), type: 'token', content: chunk.content ?? '' },
             subAgent: { ...subAgentInfo },
           }
         } else if (chunk.type === 'done') {

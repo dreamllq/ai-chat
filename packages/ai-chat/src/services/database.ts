@@ -119,9 +119,9 @@ export class AgentService {
 
 // === SubAgentExecution Service ===
 export class SubAgentExecutionService {
-  async create(data: Omit<SubAgentExecution, 'id'>): Promise<SubAgentExecution> {
-    const id = crypto.randomUUID()
-    const execution: SubAgentExecution = { ...data, id }
+  async create(data: Omit<SubAgentExecution, 'id'>, id?: string): Promise<SubAgentExecution> {
+    const recordId = id ?? crypto.randomUUID()
+    const execution: SubAgentExecution = { ...data, id: recordId }
     await db.subAgentExecutions.add(execution)
     return execution
   }

@@ -118,5 +118,6 @@ export const ja: AiChatLocale = {
     logToolResult: 'ツール結果',
     logDone: '完了',
     logError: 'エラー',
+    logReasoning: '思考',
   },
 }

@@ -42,20 +42,18 @@ export class LangChainRunner implements AgentRunner {
 
         const stream = await llm.stream(currentMessages)
 
-        let accToolCalls: Array<{ name: string; args: Record<string, unknown>; id: string }> = []
         let accUsageMetadata: Record<string, unknown> | undefined
-        let rawAccumulated: unknown
+        let accumulated: BaseMessage | undefined
 
         for await (const chunk of stream) {
           const ch = chunk as unknown as Record<string, unknown>
 
-          if (ch.tool_calls && (ch.tool_calls as Array<unknown>).length > 0) {
-            accToolCalls = ch.tool_calls as typeof accToolCalls
-          }
           if (ch.usage_metadata) {
             accUsageMetadata = ch.usage_metadata as Record<string, unknown>
           }
-          rawAccumulated = chunk
+          accumulated = accumulated
+            ? (accumulated as unknown as { concat(other: unknown): BaseMessage }).concat(chunk)
+            : (chunk as BaseMessage)
 
           const content = ch.content as string
           const reasoningContent = (ch.additional_kwargs as Record<string, unknown> | undefined)?.reasoning_content as string | undefined
@@ -67,6 +65,10 @@ export class LangChainRunner implements AgentRunner {
             }
           }
         }
+
+        // Extract tool_calls from the fully accumulated message — individual streaming chunks
+        // may have partial/incomplete args. Only after concat() are tool_calls fully resolved.
+        const accToolCalls = (accumulated as unknown as { tool_calls?: Array<{ name: string; args: Record<string, unknown>; id: string }> }).tool_calls ?? []
 
         if (accToolCalls.length === 0) {
           const tokenUsage = extractTokenUsage(accUsageMetadata)
@@ -81,7 +83,7 @@ export class LangChainRunner implements AgentRunner {
           return
         }
 
-        currentMessages.push(rawAccumulated as BaseMessage)
+        currentMessages.push(accumulated!)
 
         for (const tc of accToolCalls) {
           const tool = allTools.find(t => t.name === tc.name)

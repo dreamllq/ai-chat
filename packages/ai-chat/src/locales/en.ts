@@ -116,6 +116,7 @@ export interface AiChatLocale {
     logToolResult: string
     logDone: string
     logError: string
+    logReasoning: string
   }
 }
 
@@ -237,5 +238,6 @@ export const en: AiChatLocale = {
     logToolResult: 'Tool Result',
     logDone: 'Done',
     logError: 'Error',
+    logReasoning: 'Thinking',
   },
 }

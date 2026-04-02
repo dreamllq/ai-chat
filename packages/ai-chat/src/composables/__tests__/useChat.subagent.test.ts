@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { ref, nextTick, defineComponent, h } from 'vue'
 import { mount } from '@vue/test-utils'
 import { useChat } from '../useChat'
-import { MessageService } from '../../services/database'
+import { MessageService, SubAgentExecutionService } from '../../services/database'
 import { db } from '../../database/db'
 import type {
   ChatMessage,
@@ -69,6 +69,7 @@ describe('useChat — sub-agent events', () => {
   beforeEach(async () => {
     await db.messages.clear()
     await db.conversations.clear()
+    await db.subAgentExecutions.clear()
 
     messageService = new MessageService()
 
@@ -407,5 +408,67 @@ describe('useChat — sub-agent events', () => {
     const calls = assistantMsg!.metadata?.subAgentCalls as SubAgentCallInfo[]
     expect(calls).toHaveLength(1)
     expect(calls[0].executionId).toBe('exec-meta')
+  })
+
+  it('creates SubAgentExecution record in DB on sub_agent_start and flushes logs on sub_agent_end', async () => {
+    const subAgent: SubAgentCallInfo = {
+      executionId: 'exec-db',
+      agentId: 'sub-agent-db',
+      agentName: 'DB Agent',
+      task: 'DB task',
+      status: 'running',
+      startTime: 1000,
+      endTime: null,
+      depth: 1,
+    }
+
+    const logEntry1 = { timestamp: 1100, type: 'start' as const, content: 'Started' }
+    const logEntry2 = { timestamp: 1200, type: 'token' as const, content: 'Processing...' }
+    const logEntry3 = { timestamp: 1300, type: 'tool_call' as const, content: 'Called tool X' }
+
+    const mockRunner: AgentRunner = {
+      chat: vi.fn().mockReturnValue(
+        createMockStream([
+          { type: 'sub_agent_start', subAgent },
+          { type: 'sub_agent_log', subAgent, logEntry: logEntry1 },
+          { type: 'sub_agent_log', subAgent, logEntry: logEntry2 },
+          { type: 'sub_agent_log', subAgent, logEntry: logEntry3 },
+          { type: 'sub_agent_end', subAgent: { ...subAgent, status: 'completed', endTime: 2000 } },
+          { type: 'token', content: 'Done' },
+          { type: 'done' },
+        ]),
+      ),
+    }
+    mocks.getRunner.mockReturnValue(mockRunner)
+
+    await chat.sendMessage('Test DB persistence')
+    await flushLiveQuery()
+
+    const executionService = new SubAgentExecutionService()
+    const msgs = await messageService.getByConversationId('conv-1')
+    const assistantMsg = msgs.find((m) => m.role === 'assistant')
+    expect(assistantMsg).toBeDefined()
+
+    const executions = await executionService.getByParentMessageId(assistantMsg!.id)
+    expect(executions).toHaveLength(1)
+
+    const execution = executions[0]
+    expect(execution.id).toBe('exec-db')
+    expect(execution.agentId).toBe('sub-agent-db')
+    expect(execution.agentName).toBe('DB Agent')
+    expect(execution.task).toBe('DB task')
+    expect(execution.status).toBe('completed')
+    expect(execution.endTime).toBe(2000)
+    expect(execution.conversationId).toBe('conv-1')
+    expect(execution.parentMessageId).toBe(assistantMsg!.id)
+    expect(execution.logs).toHaveLength(3)
+    expect(execution.logs[0]).toEqual(logEntry1)
+    expect(execution.logs[1]).toEqual(logEntry2)
+    expect(execution.logs[2]).toEqual(logEntry3)
+
+    // Verify the dialog can find the record by executionId (the actual SubAgentLogDialog lookup path)
+    const directLookup = await executionService.getById('exec-db')
+    expect(directLookup).toBeDefined()
+    expect(directLookup!.logs).toHaveLength(3)
   })
 })

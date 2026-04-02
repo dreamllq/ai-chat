@@ -2,9 +2,9 @@ import { ref, onUnmounted } from 'vue'
 import { useSession } from './useSession'
 import { useModel } from './useModel'
 import { agentRegistry } from '../services/agent'
-import { MessageService, ConversationService } from '../services/database'
+import { MessageService, ConversationService, SubAgentExecutionService } from '../services/database'
 import { TitleGenerator } from '../agents/title-generator'
-import type { MessageAttachment, SubAgentCallInfo, TokenUsage } from '../types'
+import type { MessageAttachment, SubAgentCallInfo, SubAgentLogEntry, TokenUsage } from '../types'
 
 // Module-level singleton state — shared across all useChat() callers
 const isStreaming = ref(false)
@@ -18,6 +18,7 @@ export function useChat() {
   const { models } = useModel()
   const messageService = new MessageService()
   const conversationService = new ConversationService()
+  const subAgentExecutionService = new SubAgentExecutionService()
 
   async function sendMessage(
     content: string,
@@ -119,6 +120,33 @@ export function useChat() {
       let fullReasoning = ''
       let hadReasoning = false
       let reasoningDoneFired = false
+      const subAgentLogBuffer: Record<string, SubAgentLogEntry[]> = {}
+      const outputAccumulators: Record<string, string> = {}
+      const reasoningAccumulators: Record<string, string> = {}
+      const pendingThrottledUpdates: Record<string, ReturnType<typeof setTimeout>> = {}
+      const finalizedExecutions = new Set<string>()
+      const THROTTLE_MS = 200
+
+      function scheduleThrottledExecutionUpdate(executionId: string) {
+        if (pendingThrottledUpdates[executionId]) return
+        if (finalizedExecutions.has(executionId)) return
+        pendingThrottledUpdates[executionId] = setTimeout(async () => {
+          delete pendingThrottledUpdates[executionId]
+          if (finalizedExecutions.has(executionId)) return
+          const output = outputAccumulators[executionId] ?? null
+          const reasoningContent = reasoningAccumulators[executionId] ?? null
+          const logs = subAgentLogBuffer[executionId] ?? []
+          try {
+            await subAgentExecutionService.update(executionId, {
+              output,
+              reasoningContent,
+              logs,
+            })
+          } catch (e) {
+            console.warn('[useChat] throttled execution update failed:', e)
+          }
+        }, THROTTLE_MS)
+      }
       for await (const chunk of generator) {
         if (chunk.type === 'token') {
           if (chunk.content) {
@@ -171,8 +199,46 @@ export function useChat() {
           await messageService.update(assistantMsg.id, {
             metadata: { ...assistantMsg.metadata },
           })
+          // Create SubAgentExecution record in DB so the log dialog can load it
+          if (chunk.subAgent) {
+            subAgentLogBuffer[chunk.subAgent.executionId] = []
+            try {
+              await subAgentExecutionService.create({
+                parentExecutionId: null,
+                conversationId,
+                parentMessageId: assistantMsg.id,
+                agentId: chunk.subAgent.agentId,
+                agentName: chunk.subAgent.agentName,
+                task: chunk.subAgent.task,
+                status: 'running',
+                startTime: chunk.subAgent.startTime,
+                endTime: null,
+                output: null,
+                reasoningContent: null,
+                error: null,
+                depth: chunk.subAgent.depth,
+                logs: [],
+              }, chunk.subAgent.executionId)
+            } catch (e) {
+              console.warn('[useChat] failed to create SubAgentExecution record:', e)
+            }
+          }
         } else if (chunk.type === 'sub_agent_log') {
-          // Intentionally skip DB writes for log entries to avoid heavy I/O
+          // Buffer log entries in memory — flushed to DB on sub_agent_end
+          if (chunk.subAgent && chunk.logEntry) {
+            const execId = chunk.subAgent.executionId
+            const buffer = subAgentLogBuffer[execId]
+            if (buffer) {
+              buffer.push(chunk.logEntry)
+            }
+            if (chunk.logEntry.type === 'token' && chunk.logEntry.content) {
+              outputAccumulators[execId] = (outputAccumulators[execId] ?? '') + chunk.logEntry.content
+            }
+            if (chunk.logEntry.type === 'reasoning' && chunk.logEntry.content) {
+              reasoningAccumulators[execId] = (reasoningAccumulators[execId] ?? '') + chunk.logEntry.content
+            }
+            scheduleThrottledExecutionUpdate(execId)
+          }
         } else if (chunk.type === 'sub_agent_end') {
           const calls = assistantMsg.metadata?.subAgentCalls as SubAgentCallInfo[] | undefined
           if (calls && chunk.subAgent) {
@@ -184,6 +250,32 @@ export function useChat() {
           await messageService.update(assistantMsg.id, {
             metadata: { ...assistantMsg.metadata },
           })
+          if (chunk.subAgent) {
+            const execId = chunk.subAgent.executionId
+            const pending = pendingThrottledUpdates[execId]
+            if (pending) {
+              clearTimeout(pending)
+              delete pendingThrottledUpdates[execId]
+            }
+            finalizedExecutions.add(execId)
+
+            const bufferedLogs = subAgentLogBuffer[execId] ?? []
+            const output = outputAccumulators[execId] ?? null
+            const reasoningContent = reasoningAccumulators[execId] ?? null
+            try {
+              await subAgentExecutionService.update(execId, {
+                status: chunk.subAgent.status,
+                endTime: chunk.subAgent.endTime,
+                logs: bufferedLogs,
+                output,
+                reasoningContent,
+              })
+            } catch (e) {
+              console.warn('[useChat] failed to update SubAgentExecution record:', e)
+            }
+            delete outputAccumulators[execId]
+            delete reasoningAccumulators[execId]
+          }
         }
       }
       console.log('[useChat] streaming complete')

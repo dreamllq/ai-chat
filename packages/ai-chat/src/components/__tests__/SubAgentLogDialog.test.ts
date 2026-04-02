@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { mount } from '@vue/test-utils'
 import { nextTick } from 'vue'
+import { db } from '../../database/db'
 import type { SubAgentExecution } from '../../types'
 import SubAgentLogDialog from '../SubAgentLogDialog.vue'
 
@@ -10,6 +11,7 @@ const mockT = vi.fn((path: string, params?: Record<string, string>) => {
     'subAgent.logTimeline': 'Timeline',
     'subAgent.logStart': 'Start',
     'subAgent.logToken': 'Token',
+    'subAgent.logReasoning': 'Thinking',
     'subAgent.logToolCall': 'Tool Call',
     'subAgent.logToolResult': 'Tool Result',
     'subAgent.logDone': 'Done',
@@ -39,14 +41,6 @@ vi.mock('../../composables/useLocale', () => ({
   }),
 }))
 
-const mockGetById = vi.fn()
-
-vi.mock('../../services/database', () => ({
-  SubAgentExecutionService: vi.fn().mockImplementation(() => ({
-    getById: mockGetById,
-  })),
-}))
-
 function createExecution(overrides: Partial<SubAgentExecution> = {}): SubAgentExecution {
   return {
     id: 'exec-1',
@@ -60,6 +54,7 @@ function createExecution(overrides: Partial<SubAgentExecution> = {}): SubAgentEx
     startTime: 1000,
     endTime: 2500,
     output: 'Result found',
+    reasoningContent: null,
     error: null,
     depth: 1,
     logs: [
@@ -71,6 +66,12 @@ function createExecution(overrides: Partial<SubAgentExecution> = {}): SubAgentEx
     ],
     ...overrides,
   }
+}
+
+async function flushLiveQuery(): Promise<void> {
+  await vi.waitFor(() => {}, { timeout: 200 }).catch(() => {})
+  await new Promise((r) => setTimeout(r, 50))
+  await nextTick()
 }
 
 function mountDialog(props: { modelValue: boolean; executionId: string | null }) {
@@ -99,44 +100,43 @@ function mountDialog(props: { modelValue: boolean; executionId: string | null })
 }
 
 describe('SubAgentLogDialog', () => {
-  beforeEach(() => {
+  beforeEach(async () => {
     mockT.mockClear()
-    mockGetById.mockReset()
+    await db.subAgentExecutions.clear()
   })
 
-  it('does not render dialog content when modelValue is false', () => {
-    mockGetById.mockResolvedValue(createExecution())
-    const wrapper = mountDialog({ modelValue: false, executionId: 'exec-1' })
+  it('does not render dialog content when modelValue is false', async () => {
+    const execution = createExecution()
+    await db.subAgentExecutions.add(execution)
 
+    const wrapper = mountDialog({ modelValue: false, executionId: 'exec-1' })
     expect(wrapper.find('[data-testid="sub-agent-log-dialog"]').exists()).toBe(false)
   })
 
   it('loads and renders execution data when dialog is open', async () => {
     const execution = createExecution()
-    mockGetById.mockResolvedValue(execution)
+    await db.subAgentExecutions.add(execution)
 
     const wrapper = mountDialog({ modelValue: true, executionId: 'exec-1' })
-    await nextTick()
-    await nextTick()
+    await flushLiveQuery()
 
-    expect(mockGetById).toHaveBeenCalledWith('exec-1')
     expect(wrapper.find('.sub-agent-log__agent-name').text()).toBe('Research Agent')
     expect(wrapper.find('.sub-agent-log__task').text()).toContain('Search for information')
   })
 
   it('renders timeline entries sorted by timestamp', async () => {
     const execution = createExecution({
+      reasoningContent: null,
       logs: [
         { timestamp: 1500, type: 'done', content: 'Last' },
         { timestamp: 1100, type: 'start', content: 'First' },
-        { timestamp: 1300, type: 'token', content: 'Middle' },
+        { timestamp: 1300, type: 'tool_call', content: 'Middle' },
       ],
     })
-    mockGetById.mockResolvedValue(execution)
+    await db.subAgentExecutions.add(execution)
 
     const wrapper = mountDialog({ modelValue: true, executionId: 'exec-1' })
-    await nextTick()
-    await nextTick()
+    await flushLiveQuery()
 
     const entries = wrapper.findAll('.sub-agent-log__entry')
     expect(entries).toHaveLength(3)
@@ -153,11 +153,10 @@ describe('SubAgentLogDialog', () => {
         { timestamp: 1300, type: 'done', content: 'd' },
       ],
     })
-    mockGetById.mockResolvedValue(execution)
+    await db.subAgentExecutions.add(execution)
 
     const wrapper = mountDialog({ modelValue: true, executionId: 'exec-1' })
-    await nextTick()
-    await nextTick()
+    await flushLiveQuery()
 
     const entries = wrapper.findAll('.sub-agent-log__entry')
     expect(entries[0].find('.sub-agent-log__entry-icon').text()).toBe('🟢')
@@ -169,33 +168,31 @@ describe('SubAgentLogDialog', () => {
     const execution = createExecution({
       logs: [
         { timestamp: 1100, type: 'start', content: 's' },
-        { timestamp: 1200, type: 'token', content: 't' },
-        { timestamp: 1300, type: 'tool_call', content: 'tc' },
+        { timestamp: 1200, type: 'tool_call', content: 'tc' },
         { timestamp: 1400, type: 'tool_result', content: 'tr' },
         { timestamp: 1500, type: 'done', content: 'd' },
         { timestamp: 1600, type: 'error', content: 'e' },
       ],
     })
-    mockGetById.mockResolvedValue(execution)
+    await db.subAgentExecutions.add(execution)
 
     const wrapper = mountDialog({ modelValue: true, executionId: 'exec-1' })
-    await nextTick()
-    await nextTick()
+    await flushLiveQuery()
 
     const entries = wrapper.findAll('.sub-agent-log__entry')
     expect(entries[0].classes()).toContain('sub-agent-log__entry--start')
-    expect(entries[1].classes()).toContain('sub-agent-log__entry--token')
-    expect(entries[2].classes()).toContain('sub-agent-log__entry--tool-call')
-    expect(entries[3].classes()).toContain('sub-agent-log__entry--tool-result')
-    expect(entries[4].classes()).toContain('sub-agent-log__entry--done')
-    expect(entries[5].classes()).toContain('sub-agent-log__entry--error')
+    expect(entries[1].classes()).toContain('sub-agent-log__entry--tool-call')
+    expect(entries[2].classes()).toContain('sub-agent-log__entry--tool-result')
+    expect(entries[3].classes()).toContain('sub-agent-log__entry--done')
+    expect(entries[4].classes()).toContain('sub-agent-log__entry--error')
   })
 
   it('emits update:modelValue with false when dialog closes', async () => {
-    mockGetById.mockResolvedValue(createExecution())
+    const execution = createExecution()
+    await db.subAgentExecutions.add(execution)
 
     const wrapper = mountDialog({ modelValue: true, executionId: 'exec-1' })
-    await nextTick()
+    await flushLiveQuery()
 
     await wrapper.vm.$emit('update:modelValue', false)
 
@@ -204,11 +201,8 @@ describe('SubAgentLogDialog', () => {
   })
 
   it('shows empty state when execution is not found', async () => {
-    mockGetById.mockResolvedValue(undefined)
-
     const wrapper = mountDialog({ modelValue: true, executionId: 'exec-nonexistent' })
-    await nextTick()
-    await nextTick()
+    await flushLiveQuery()
 
     expect(wrapper.find('[data-testid="el-empty"]').exists()).toBe(true)
     expect(wrapper.find('[data-testid="el-empty"]').text()).toBe('No logs available')
@@ -216,45 +210,41 @@ describe('SubAgentLogDialog', () => {
 
   it('shows no logs message when execution has empty logs', async () => {
     const execution = createExecution({ logs: [] })
-    mockGetById.mockResolvedValue(execution)
+    await db.subAgentExecutions.add(execution)
 
     const wrapper = mountDialog({ modelValue: true, executionId: 'exec-1' })
-    await nextTick()
-    await nextTick()
+    await flushLiveQuery()
 
     expect(wrapper.find('.sub-agent-log__empty').text()).toBe('No logs available')
   })
 
   it('displays output section when output is present', async () => {
     const execution = createExecution({ output: 'The answer is 42' })
-    mockGetById.mockResolvedValue(execution)
+    await db.subAgentExecutions.add(execution)
 
     const wrapper = mountDialog({ modelValue: true, executionId: 'exec-1' })
-    await nextTick()
-    await nextTick()
+    await flushLiveQuery()
 
-    expect(wrapper.find('.sub-agent-log__output').exists()).toBe(true)
-    expect(wrapper.find('.sub-agent-log__output-content').text()).toBe('The answer is 42')
+    expect(wrapper.find('.sub-agent-log__bubble').exists()).toBe(true)
+    expect(wrapper.find('.sub-agent-log__bubble-content').text()).toContain('The answer is 42')
   })
 
   it('does not display output section when output is null', async () => {
     const execution = createExecution({ output: null })
-    mockGetById.mockResolvedValue(execution)
+    await db.subAgentExecutions.add(execution)
 
     const wrapper = mountDialog({ modelValue: true, executionId: 'exec-1' })
-    await nextTick()
-    await nextTick()
+    await flushLiveQuery()
 
-    expect(wrapper.find('.sub-agent-log__output').exists()).toBe(false)
+    expect(wrapper.find('.sub-agent-log__bubble').exists()).toBe(false)
   })
 
   it('displays error section when error is present', async () => {
     const execution = createExecution({ error: 'Something went wrong', status: 'failed' })
-    mockGetById.mockResolvedValue(execution)
+    await db.subAgentExecutions.add(execution)
 
     const wrapper = mountDialog({ modelValue: true, executionId: 'exec-1' })
-    await nextTick()
-    await nextTick()
+    await flushLiveQuery()
 
     expect(wrapper.find('.sub-agent-log__error').exists()).toBe(true)
     expect(wrapper.find('.sub-agent-log__error-content').text()).toBe('Something went wrong')
@@ -265,20 +255,40 @@ describe('SubAgentLogDialog', () => {
     const execution = createExecution({
       logs: [{ timestamp: ts, type: 'start', content: 'started' }],
     })
-    mockGetById.mockResolvedValue(execution)
+    await db.subAgentExecutions.add(execution)
 
     const wrapper = mountDialog({ modelValue: true, executionId: 'exec-1' })
-    await nextTick()
-    await nextTick()
+    await flushLiveQuery()
 
     expect(wrapper.find('.sub-agent-log__entry-time').text()).toBe('14:30:45')
   })
 
-  it('does not load execution when executionId is null', async () => {
+  it('does not render sub-agent-log when executionId is null', async () => {
     const wrapper = mountDialog({ modelValue: true, executionId: null })
-    await nextTick()
+    await flushLiveQuery()
 
-    expect(mockGetById).not.toHaveBeenCalled()
     expect(wrapper.find('.sub-agent-log').exists()).toBe(false)
+  })
+
+  it('reactively updates when DB record changes', async () => {
+    const execution = createExecution({ status: 'running', output: null, endTime: null })
+    await db.subAgentExecutions.add(execution)
+
+    const wrapper = mountDialog({ modelValue: true, executionId: 'exec-1' })
+    await flushLiveQuery()
+
+    expect(wrapper.find('.sub-agent-log__status--running').exists()).toBe(true)
+    expect(wrapper.find('.sub-agent-log__bubble').exists()).toBe(false)
+
+    await db.subAgentExecutions.update('exec-1', {
+      status: 'completed',
+      output: 'Done!',
+      endTime: 3000,
+    })
+    await flushLiveQuery()
+
+    expect(wrapper.find('.sub-agent-log__status--completed').exists()).toBe(true)
+    expect(wrapper.find('.sub-agent-log__bubble').exists()).toBe(true)
+    expect(wrapper.find('.sub-agent-log__bubble-content').text()).toContain('Done!')
   })
 })

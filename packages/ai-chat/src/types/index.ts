@@ -204,7 +204,7 @@ export interface SubAgentLogEntry {
   /** 时间戳 */
   timestamp: number
   /** 日志类型 */
-  type: 'start' | 'token' | 'tool_call' | 'tool_result' | 'done' | 'error'
+  type: 'start' | 'token' | 'reasoning' | 'tool_call' | 'tool_result' | 'done' | 'error'
   /** 日志内容 */
   content: string
 }
@@ -233,6 +233,8 @@ export interface SubAgentExecution {
   endTime: number | null
   /** 输出内容 */
   output: string | null
+  /** 推理/思考过程内容 */
+  reasoningContent: string | null
   /** 错误信息 */
   error: string | null
   /** 嵌套深度 */
