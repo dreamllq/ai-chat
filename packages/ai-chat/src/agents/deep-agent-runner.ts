@@ -15,6 +15,7 @@ export class DeepAgentRunner implements AgentRunner {
   private agentDef: AgentDefinition
   private maxDepth: number
   private maxToolIterations: number
+  private _lastSubAgentTokenUsage: TokenUsage | undefined
 
   constructor(agentDef: AgentDefinition, options?: { maxDepth?: number; maxToolIterations?: number }) {
     this.agentDef = agentDef
@@ -44,10 +45,14 @@ export class DeepAgentRunner implements AgentRunner {
 
     let currentMessages: BaseMessage[] = [...lcMessages]
     let iteration = 0
+    let previousIterationTokenUsage: TokenUsage | undefined
 
     try {
       while (iteration < this.maxToolIterations) {
         if (options?.signal?.aborted) return
+
+        yield { type: 'iteration_start' as const, iteration, ...(previousIterationTokenUsage && { tokenUsage: previousIterationTokenUsage }) }
+        previousIterationTokenUsage = undefined
 
         const stream = await llm.stream(currentMessages)
 
@@ -76,12 +81,14 @@ export class DeepAgentRunner implements AgentRunner {
         }
 
         const accToolCalls = (accumulated as unknown as { tool_calls?: Array<{ name: string; args: Record<string, unknown>; id: string }> }).tool_calls ?? []
+        const iterationTokenUsage = extractTokenUsage(accUsageMetadata)
 
         if (accToolCalls.length === 0) {
-          const tokenUsage = extractTokenUsage(accUsageMetadata)
-          yield { type: 'done' as const, ...(tokenUsage && { tokenUsage }) }
+          yield { type: 'done' as const, ...(iterationTokenUsage && { tokenUsage: iterationTokenUsage }) }
           return
         }
+
+        previousIterationTokenUsage = iterationTokenUsage
 
         iteration++
         if (iteration >= this.maxToolIterations) {
@@ -94,6 +101,7 @@ export class DeepAgentRunner implements AgentRunner {
 
         for (const tc of accToolCalls) {
           let result: string
+          let subAgentTokenUsage: TokenUsage | undefined
 
           if (tc.name === 'call_agent') {
             const agentId = tc.args.agentId as string
@@ -104,6 +112,7 @@ export class DeepAgentRunner implements AgentRunner {
               result = validationError
             } else {
               result = yield* this.runSubAgent(agentId, task, callStack, currentDepth, options, model)
+              subAgentTokenUsage = this._lastSubAgentTokenUsage
             }
           } else {
             const tool = allTools.find(t => t.name === tc.name)
@@ -185,6 +194,7 @@ export class DeepAgentRunner implements AgentRunner {
 
     let output = ''
     let failed = false
+    let subTokenUsage: TokenUsage | undefined
 
     try {
       const subMessages: ChatMessage[] = [{
@@ -218,6 +228,7 @@ export class DeepAgentRunner implements AgentRunner {
             subAgent: { ...subAgentInfo },
           }
         } else if (chunk.type === 'done') {
+          subTokenUsage = chunk.tokenUsage
           yield {
             type: 'sub_agent_log' as const,
             logEntry: { timestamp: Date.now(), type: 'done', content: output },
@@ -249,7 +260,9 @@ export class DeepAgentRunner implements AgentRunner {
     subAgentInfo.endTime = endTime
     subAgentInfo.status = failed ? 'failed' : 'completed'
 
-    yield { type: 'sub_agent_end' as const, subAgent: { ...subAgentInfo } }
+    this._lastSubAgentTokenUsage = subTokenUsage
+
+    yield { type: 'sub_agent_end' as const, subAgent: { ...subAgentInfo }, tokenUsage: subTokenUsage }
 
     if (output.length > MAX_OUTPUT_LENGTH) {
       output = output.slice(0, MAX_OUTPUT_LENGTH) + '\n...[output truncated]'
@@ -286,5 +299,7 @@ function extractTokenUsage(metadata?: Record<string, unknown>): TokenUsage | und
   const completionTokens = (metadata.output_tokens as number) ?? 0
   const totalTokens = (metadata.total_tokens as number) ?? 0
   if (!promptTokens && !completionTokens && !totalTokens) return undefined
-  return { promptTokens, completionTokens, totalTokens }
+  const details = metadata.completion_tokens_details as Record<string, unknown> | undefined
+  const reasoningTokens = (details?.reasoning_tokens as number) || undefined
+  return { promptTokens, completionTokens, totalTokens, reasoningTokens }
 }

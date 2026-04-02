@@ -21,6 +21,8 @@ export const ja: AiChatLocale = {
     promptTokens: '入力',
     completionTokens: '出力',
     totalTokens: '合計',
+    stepThinking: '思考プロセス',
+    stepTokens: '{n} tokens',
   },
   model: {
     title: 'モデル管理',

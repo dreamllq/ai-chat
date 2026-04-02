@@ -33,6 +33,8 @@ export interface ChatMessage {
   reasoningContent?: string
   /** Token 用量 */
   tokenUsage?: TokenUsage
+  /** 有序步骤列表（思考过程、子 Agent 调用等按 LLM 调用顺序排列） */
+  steps?: MessageStep[]
 }
 
 // === 会话 ===
@@ -211,36 +213,22 @@ export interface SubAgentLogEntry {
 
 /** 子 Agent 执行记录（数据库存储） */
 export interface SubAgentExecution {
-  /** 执行记录 ID */
   id: string
-  /** 父执行记录 ID */
   parentExecutionId: string | null
-  /** 所属会话 ID */
   conversationId: string
-  /** 父消息 ID */
   parentMessageId: string
-  /** 子 Agent ID */
   agentId: string
-  /** 子 Agent 名称 */
   agentName: string
-  /** 任务描述 */
   task: string
-  /** 执行状态 */
   status: 'running' | 'completed' | 'failed'
-  /** 开始时间 */
   startTime: number
-  /** 结束时间 */
   endTime: number | null
-  /** 输出内容 */
   output: string | null
-  /** 推理/思考过程内容 */
   reasoningContent: string | null
-  /** 错误信息 */
   error: string | null
-  /** 嵌套深度 */
   depth: number
-  /** 日志条目列表 */
   logs: SubAgentLogEntry[]
+  tokenUsage?: TokenUsage
 }
 
 /** 子 Agent 调用信息（ChatMessage.metadata 中使用） */
@@ -263,22 +251,49 @@ export interface SubAgentCallInfo {
   depth: number
 }
 
+/** 思考过程步骤（一次 LLM 调用的推理内容） */
+export interface ThinkingStep {
+  type: 'thinking'
+  content: string
+  tokenUsage?: TokenUsage
+}
+
+/** 子 Agent 步骤（一次子 Agent 调用） */
+export interface SubAgentStep {
+  type: 'sub_agent'
+  executionId: string
+  agentId: string
+  agentName: string
+  task: string
+  status: 'running' | 'completed' | 'failed'
+  startTime: number
+  endTime: number | null
+  depth: number
+  /** 子 Agent 调用消耗的 Token 用量 */
+  tokenUsage?: TokenUsage
+}
+
+/** 消息步骤 — 按 LLM 调用顺序排列 */
+export type MessageStep = ThinkingStep | SubAgentStep
+
 /** 聊天流式响应块 */
 export interface ChatChunk {
   /** 块类型 */
-  type: 'token' | 'done' | 'error' | 'sub_agent_start' | 'sub_agent_log' | 'sub_agent_end'
+  type: 'token' | 'done' | 'error' | 'sub_agent_start' | 'sub_agent_log' | 'sub_agent_end' | 'iteration_start'
   /** 文本内容 (type 为 token 时) */
   content?: string
   /** 错误信息 (type 为 error 时) */
   error?: string
   /** 推理内容（推理模型的思考过程，type 为 token 时） */
   reasoningContent?: string
-  /** Token 用量（type 为 done 时） */
+  /** Token 用量（type 为 done 时，或 iteration_start 时携带上一次迭代的用量） */
   tokenUsage?: TokenUsage
   /** 子 Agent 调用信息 (sub_agent_start/log/end 时) */
   subAgent?: SubAgentCallInfo
   /** 日志条目 (sub_agent_log 时) */
   logEntry?: SubAgentLogEntry
+  /** 迭代序号（type 为 iteration_start 时使用） */
+  iteration?: number
 }
 
 // === 文件上传 ===

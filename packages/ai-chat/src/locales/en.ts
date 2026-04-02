@@ -19,6 +19,8 @@ export interface AiChatLocale {
     promptTokens: string
     completionTokens: string
     totalTokens: string
+    stepThinking: string
+    stepTokens: string
   }
   model: {
     title: string
@@ -141,6 +143,8 @@ export const en: AiChatLocale = {
     promptTokens: 'Input',
     completionTokens: 'Output',
     totalTokens: 'Total',
+    stepThinking: 'Thinking',
+    stepTokens: '{n} tokens',
   },
   model: {
     title: 'Model Management',

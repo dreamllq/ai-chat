@@ -1,9 +1,9 @@
 <script setup lang="ts">
-import { computed, nextTick, onMounted, onUpdated, ref, watch } from 'vue'
+import { computed, nextTick, onMounted, onUpdated, reactive, ref, watch } from 'vue'
 import MarkdownIt from 'markdown-it'
 import hljs from 'highlight.js'
 import 'highlight.js/styles/github-dark.css'
-import type { ChatMessage as ChatMessageType, SubAgentCallInfo } from '../types'
+import type { ChatMessage as ChatMessageType, SubAgentCallInfo, SubAgentStep } from '../types'
 import { isMessageAttachment, isLegacyFileMetadata } from '../types'
 import type { MessageAttachment } from '../types'
 import { useLocale } from '../composables/useLocale'
@@ -85,7 +85,43 @@ const renderedReasoning = computed(() => {
   if (!props.message.reasoningContent) return ''
   return md.render(props.message.reasoningContent)
 })
-const isReasoningExpanded = ref(false)
+const isReasoningExpanded = ref(!!props.message.reasoningContent)
+
+// Steps-based rendering
+const hasSteps = computed(() =>
+  Array.isArray(props.message.steps) && props.message.steps.length > 0,
+)
+const expandedThinkingSteps = reactive<Record<number, boolean>>({})
+
+watch(
+  () => props.message.isStreaming,
+  (streaming) => {
+    if (!streaming) {
+      for (const key of Object.keys(expandedThinkingSteps)) {
+        delete expandedThinkingSteps[Number(key)]
+      }
+    }
+  },
+)
+
+function isThinkingExpanded(index: number): boolean {
+  if (index in expandedThinkingSteps) {
+    return expandedThinkingSteps[index]
+  }
+  if (props.message.isStreaming) {
+    const steps = props.message.steps!
+    return index === steps.length - 1 && steps[index].type === 'thinking'
+  }
+  return false
+}
+
+function toggleThinkingStep(index: number): void {
+  expandedThinkingSteps[index] = !isThinkingExpanded(index)
+}
+
+function renderStepMarkdown(content: string): string {
+  return md.render(content)
+}
 
 // Auto-expand reasoning when streaming starts (reasoning present but not yet done),
 // auto-collapse when reasoning is done (metadata.reasoningDone flips to true).
@@ -115,7 +151,7 @@ const subAgentCalls = computed(
 const subAgentLogVisible = ref(false)
 const selectedExecutionId = ref<string | null>(null)
 
-function openSubAgentLog(call: SubAgentCallInfo): void {
+function openSubAgentLog(call: SubAgentCallInfo | SubAgentStep): void {
   selectedExecutionId.value = call.executionId
   subAgentLogVisible.value = true
 }
@@ -133,6 +169,10 @@ function formatDuration(start: number, end: number): string {
   const ms = end - start
   if (ms < 1000) return `${ms}ms`
   return `${(ms / 1000).toFixed(1)}s`
+}
+
+function formatNumber(n: number): string {
+  return n.toLocaleString()
 }
 
 // Token usage
@@ -237,6 +277,94 @@ onUpdated(() => {
     <div class="chat-message__body">
       <div class="chat-message__time">{{ relativeTime }}</div>
       <div class="chat-message__bubble">
+      <!-- Steps-based rendering -->
+      <template v-if="hasSteps">
+        <div v-for="(step, index) in message.steps" :key="index">
+          <!-- ThinkingStep -->
+          <div v-if="step.type === 'thinking'" class="chat-message__reasoning">
+            <div class="chat-message__reasoning-header" @click="toggleThinkingStep(index)">
+              <span class="chat-message__reasoning-icon">💭</span>
+              <span class="chat-message__reasoning-title">{{ t('chat.stepThinking') }}</span>
+              <span v-if="step.tokenUsage" class="chat-message__reasoning-tokens">{{ t('chat.stepTokens', { n: formatNumber(step.tokenUsage.reasoningTokens ?? step.tokenUsage.totalTokens) }) }}</span>
+              <span class="chat-message__reasoning-toggle">{{ isThinkingExpanded(index) ? '▲' : '▼' }}</span>
+            </div>
+            <div class="chat-message__reasoning-collapse" :class="{ 'chat-message__reasoning-collapse--collapsed': !isThinkingExpanded(index) }">
+              <div class="chat-message__reasoning-content">
+                <!-- eslint-disable-next-line vue/no-v-html -->
+                <div v-html="renderStepMarkdown(step.content)" />
+              </div>
+            </div>
+          </div>
+          <!-- SubAgentStep -->
+          <div v-else class="chat-message__sub-agent-card" :class="`chat-message__sub-agent-card--${step.status}`" @click="openSubAgentLog(step)">
+            <div class="chat-message__sub-agent-card__header">
+              <span class="chat-message__sub-agent-card__name">{{ step.agentName }}</span>
+              <span class="chat-message__sub-agent-card__status" :class="`--${step.status}`">
+                {{ getSubAgentStatusLabel(step.status) }}
+              </span>
+            </div>
+            <div class="chat-message__sub-agent-card__task">{{ step.task }}</div>
+            <div v-if="step.status !== 'running' && step.endTime" class="chat-message__sub-agent-card__duration">
+              {{ formatDuration(step.startTime, step.endTime) }}
+            </div>
+            <span v-if="step.tokenUsage" class="chat-message__reasoning-tokens">{{ t('chat.stepTokens', { n: formatNumber(step.tokenUsage.totalTokens) }) }}</span>
+            <div v-if="step.status === 'running'" class="chat-message__sub-agent-card__spinner" />
+          </div>
+        </div>
+        <!-- eslint-disable-next-line vue/no-v-html -->
+        <div ref="contentRef" class="chat-message__content" v-html="renderedContent" />
+        <!-- Attachments -->
+        <div v-if="attachments.length > 0 || legacyFiles.length > 0" class="chat-message__attachments">
+          <div
+            v-for="attachment in attachments"
+            :key="attachment.id"
+            class="chat-message__attachment"
+            :class="`chat-message__attachment--${attachment.type}`"
+          >
+            <img
+              v-if="attachment.type === 'image' && (attachment.url || attachment.data)"
+              :src="attachment.url || attachment.data"
+              :alt="attachment.name"
+              class="chat-message__attachment-image"
+            />
+            <audio
+              v-else-if="attachment.type === 'audio' && (attachment.url || attachment.data)"
+              controls
+              :src="attachment.url || attachment.data"
+            />
+            <video
+              v-else-if="attachment.type === 'video' && (attachment.url || attachment.data)"
+              controls
+              :src="attachment.url || attachment.data"
+              class="chat-message__attachment-video"
+            />
+            <div v-else class="chat-message__attachment-doc">
+              <span class="chat-message__attachment-icon">📎</span>
+              <span class="chat-message__attachment-name">{{ attachment.name }}</span>
+              <span class="chat-message__attachment-size">{{ formatSize(attachment.size) }}</span>
+            </div>
+          </div>
+          <div
+            v-for="(file, index) in legacyFiles"
+            :key="`legacy-${index}`"
+            class="chat-message__attachment chat-message__attachment--document"
+          >
+            <div class="chat-message__attachment-doc">
+              <span class="chat-message__attachment-icon">📎</span>
+              <span class="chat-message__attachment-name">{{ file.name }}</span>
+            </div>
+          </div>
+        </div>
+        <div v-if="hasTokenUsage" class="chat-message__token-usage">
+          <span class="chat-message__token-usage-label">{{ t('chat.tokenUsage') }}:</span>
+          <span class="chat-message__token-usage-item">{{ t('chat.promptTokens') }} {{ formatNumber(message.tokenUsage!.promptTokens) }}</span>
+          <span class="chat-message__token-usage-item">{{ t('chat.completionTokens') }} {{ formatNumber(message.tokenUsage!.completionTokens) }}</span>
+          <span class="chat-message__token-usage-item">{{ t('chat.totalTokens') }} {{ formatNumber(message.tokenUsage!.totalTokens) }}</span>
+        </div>
+        <span v-if="showStreamingCursor" class="chat-message__cursor" />
+      </template>
+      <!-- Legacy rendering (no steps) -->
+      <template v-else>
       <!-- Reasoning / Thinking Process -->
       <div v-if="hasReasoning" class="chat-message__reasoning">
         <div class="chat-message__reasoning-header" @click="isReasoningExpanded = !isReasoningExpanded">
@@ -334,11 +462,12 @@ onUpdated(() => {
       </div>
       <div v-if="hasTokenUsage" class="chat-message__token-usage">
         <span class="chat-message__token-usage-label">{{ t('chat.tokenUsage') }}:</span>
-        <span class="chat-message__token-usage-item">{{ t('chat.promptTokens') }} {{ message.tokenUsage!.promptTokens }}</span>
-        <span class="chat-message__token-usage-item">{{ t('chat.completionTokens') }} {{ message.tokenUsage!.completionTokens }}</span>
-        <span class="chat-message__token-usage-item">{{ t('chat.totalTokens') }} {{ message.tokenUsage!.totalTokens }}</span>
+        <span class="chat-message__token-usage-item">{{ t('chat.promptTokens') }} {{ formatNumber(message.tokenUsage!.promptTokens) }}</span>
+        <span class="chat-message__token-usage-item">{{ t('chat.completionTokens') }} {{ formatNumber(message.tokenUsage!.completionTokens) }}</span>
+        <span class="chat-message__token-usage-item">{{ t('chat.totalTokens') }} {{ formatNumber(message.tokenUsage!.totalTokens) }}</span>
       </div>
       <span v-if="showStreamingCursor" class="chat-message__cursor" />
+      </template>
     </div>
     </div>
     <SubAgentLogDialog v-model="subAgentLogVisible" :execution-id="selectedExecutionId" />

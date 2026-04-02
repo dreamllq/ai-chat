@@ -132,6 +132,10 @@ function formatTime(timestamp: number): string {
   return `${h}:${m}:${s}`
 }
 
+function formatNumber(n: number): string {
+  return n.toLocaleString()
+}
+
 function formatDuration(start: number, end: number): string {
   const ms = end - start
   if (ms < 1000) return `${ms}ms`
@@ -183,6 +187,7 @@ const statusLabel = computed(() => {
             <div class="sub-agent-log__reasoning-header" @click="isReasoningExpanded = !isReasoningExpanded">
               <span class="sub-agent-log__reasoning-icon">💭</span>
               <span class="sub-agent-log__reasoning-title">{{ t('chat.thinking') }}</span>
+              <span v-if="execution.tokenUsage?.reasoningTokens" class="sub-agent-log__reasoning-tokens">{{ formatNumber(execution.tokenUsage!.reasoningTokens) }} tokens</span>
               <span class="sub-agent-log__reasoning-toggle">{{ isReasoningExpanded ? '▲' : '▼' }}</span>
             </div>
             <div class="sub-agent-log__reasoning-collapse" :class="{ 'sub-agent-log__reasoning-collapse--collapsed': !isReasoningExpanded }">
@@ -191,6 +196,11 @@ const statusLabel = computed(() => {
                 <div v-html="renderedReasoning" />
               </div>
             </div>
+          </div>
+          <div v-if="execution.tokenUsage" class="sub-agent-log__token-usage">
+            <span class="sub-agent-log__token-usage-item">{{ t('chat.promptTokens') }} {{ formatNumber(execution.tokenUsage!.promptTokens) }}</span>
+            <span class="sub-agent-log__token-usage-item">{{ t('chat.completionTokens') }} {{ formatNumber(execution.tokenUsage!.completionTokens) }}</span>
+            <span class="sub-agent-log__token-usage-item">{{ t('chat.totalTokens') }} {{ formatNumber(execution.tokenUsage!.totalTokens) }}</span>
           </div>
           <!-- eslint-disable-next-line vue/no-v-html -->
           <div v-if="execution.output" class="sub-agent-log__bubble-content" v-html="renderedOutput" />
@@ -525,6 +535,14 @@ const statusLabel = computed(() => {
   font-weight: 500;
 }
 
+.sub-agent-log__reasoning-tokens {
+  font-size: 11px;
+  color: var(--el-text-color-secondary, #909399);
+  background: var(--el-fill-color, #f0f2f5);
+  padding: 1px 6px;
+  border-radius: 10px;
+}
+
 .sub-agent-log__reasoning-toggle {
   margin-left: auto;
   font-size: 10px;
@@ -559,6 +577,18 @@ const statusLabel = computed(() => {
 
 .sub-agent-log__reasoning-content :deep(div p:last-child) {
   margin-bottom: 0;
+}
+
+.sub-agent-log__token-usage {
+  display: flex;
+  gap: 12px;
+  padding: 4px 0;
+  font-size: 12px;
+  color: var(--el-text-color-secondary, #909399);
+}
+
+.sub-agent-log__token-usage-item {
+  font-size: 11px;
 }
 
 .sub-agent-log__error {

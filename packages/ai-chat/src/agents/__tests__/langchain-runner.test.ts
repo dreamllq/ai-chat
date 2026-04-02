@@ -141,6 +141,7 @@ describe('LangChainRunner', () => {
     }
 
     expect(chunks).toEqual([
+      { type: 'iteration_start', iteration: 0 },
       { type: 'token', content: 'Hello' },
       { type: 'token', content: ' world' },
       { type: 'done' },
@@ -198,6 +199,8 @@ describe('LangChainRunner', () => {
 
     expect(mockTool.execute).toHaveBeenCalledWith('6*7')
     expect(chunks).toEqual([
+      { type: 'iteration_start', iteration: 0 },
+      { type: 'iteration_start', iteration: 1 },
       { type: 'token', content: 'The answer is 42' },
       { type: 'done' },
     ])
@@ -229,6 +232,8 @@ describe('LangChainRunner', () => {
     expect(tool1.execute).toHaveBeenCalledWith('a')
     expect(tool2.execute).toHaveBeenCalledWith('b')
     expect(chunks).toEqual([
+      { type: 'iteration_start', iteration: 0 },
+      { type: 'iteration_start', iteration: 1 },
       { type: 'token', content: 'Combined results' },
       { type: 'done' },
     ])
@@ -254,6 +259,8 @@ describe('LangChainRunner', () => {
 
     // Tool error is caught; loop continues and yields final response
     expect(chunks).toEqual([
+      { type: 'iteration_start', iteration: 0 },
+      { type: 'iteration_start', iteration: 1 },
       { type: 'token', content: 'Handled error' },
       { type: 'done' },
     ])
@@ -280,6 +287,11 @@ describe('LangChainRunner', () => {
 
     expect(mockStream).toHaveBeenCalledTimes(5)
     expect(chunks).toEqual([
+      { type: 'iteration_start', iteration: 0 },
+      { type: 'iteration_start', iteration: 1 },
+      { type: 'iteration_start', iteration: 2 },
+      { type: 'iteration_start', iteration: 3 },
+      { type: 'iteration_start', iteration: 4 },
       { type: 'token', content: '\n\n⚠️ Reached maximum tool calling iterations.' },
       { type: 'done' },
     ])
@@ -311,9 +323,10 @@ describe('LangChainRunner', () => {
       chunks.push(chunk)
     }
 
-    expect(chunks).toHaveLength(1)
-    expect(chunks[0]).toMatchObject({ type: 'error' })
-    expect((chunks[0] as { error: string }).error).toContain('API connection failed')
+    expect(chunks).toHaveLength(2)
+    expect(chunks[0]).toMatchObject({ type: 'iteration_start' })
+    expect(chunks[1]).toMatchObject({ type: 'error' })
+    expect((chunks[1] as { error: string }).error).toContain('API connection failed')
   })
 
   it('should handle unknown tool name gracefully and continue loop', async () => {
@@ -338,6 +351,8 @@ describe('LangChainRunner', () => {
     expect(knownTool.execute).not.toHaveBeenCalled()
     // The loop should still continue and produce a final response
     expect(chunks).toEqual([
+      { type: 'iteration_start', iteration: 0 },
+      { type: 'iteration_start', iteration: 1 },
       { type: 'token', content: 'Final response after unknown tool' },
       { type: 'done' },
     ])
@@ -385,6 +400,7 @@ describe('LangChainRunner', () => {
     }
 
     expect(chunks).toEqual([
+      { type: 'iteration_start', iteration: 0 },
       { type: 'token', content: '', reasoningContent: 'Let me think...' },
       { type: 'token', content: 'The answer' },
       { type: 'done' },
@@ -406,6 +422,7 @@ describe('LangChainRunner', () => {
     }
 
     expect(chunks).toEqual([
+      { type: 'iteration_start', iteration: 0 },
       { type: 'token', content: '', reasoningContent: 'Step 1: ' },
       { type: 'token', content: '', reasoningContent: 'Step 2: ' },
       { type: 'token', content: '', reasoningContent: 'Done.' },
@@ -424,6 +441,7 @@ describe('LangChainRunner', () => {
     }
 
     expect(chunks).toEqual([
+      { type: 'iteration_start', iteration: 0 },
       { type: 'token', content: 'Hello' },
       { type: 'token', content: ' world' },
       { type: 'done' },
@@ -449,6 +467,8 @@ describe('LangChainRunner', () => {
     }
 
     expect(chunks).toEqual([
+      { type: 'iteration_start', iteration: 0 },
+      { type: 'iteration_start', iteration: 1 },
       { type: 'token', content: 'The answer is 42', reasoningContent: 'I used the calculator.' },
       { type: 'done' },
     ])
@@ -476,6 +496,8 @@ describe('LangChainRunner', () => {
     // Structured tool receives raw args object, not extracted string
     expect(structuredTool.execute).toHaveBeenCalledWith({ query: 'test', limit: 5 })
     expect(chunks).toEqual([
+      { type: 'iteration_start', iteration: 0 },
+      { type: 'iteration_start', iteration: 1 },
       { type: 'token', content: 'Found results' },
       { type: 'done' },
     ])

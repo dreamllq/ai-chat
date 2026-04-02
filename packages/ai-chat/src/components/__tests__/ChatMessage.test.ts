@@ -279,19 +279,19 @@ describe('ChatMessage', () => {
       }),
     })
 
-    // Initially expanded (default)
-    const reasoningContent = wrapper.find('.chat-message__reasoning-content')
-    expect(reasoningContent.isVisible()).toBe(true)
+    // Initially expanded (reasoningContent present)
+    const collapseEl = wrapper.find('.chat-message__reasoning-collapse')
+    expect(collapseEl.classes()).not.toContain('chat-message__reasoning-collapse--collapsed')
     expect(wrapper.find('.chat-message__reasoning-toggle').text()).toBe('▲')
 
     // Click to collapse
     await wrapper.find('.chat-message__reasoning-header').trigger('click')
-    expect((wrapper.find('.chat-message__reasoning-content').element as HTMLElement).style.display).toBe('none')
+    expect(wrapper.find('.chat-message__reasoning-collapse').classes()).toContain('chat-message__reasoning-collapse--collapsed')
     expect(wrapper.find('.chat-message__reasoning-toggle').text()).toBe('▼')
 
     // Click to expand again
     await wrapper.find('.chat-message__reasoning-header').trigger('click')
-    expect((wrapper.find('.chat-message__reasoning-content').element as HTMLElement).style.display).toBe('')
+    expect(wrapper.find('.chat-message__reasoning-collapse').classes()).not.toContain('chat-message__reasoning-collapse--collapsed')
     expect(wrapper.find('.chat-message__reasoning-toggle').text()).toBe('▲')
   })
 

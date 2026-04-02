@@ -180,6 +180,7 @@ describe('DeepAgentRunner', () => {
     }
 
     expect(chunks).toEqual([
+      { type: 'iteration_start', iteration: 0 },
       { type: 'token', content: 'Hello' },
       { type: 'token', content: ' world' },
       { type: 'done' },
@@ -586,6 +587,9 @@ describe('DeepAgentRunner', () => {
 
     expect(mockStream).toHaveBeenCalledTimes(3)
     expect(chunks).toEqual([
+      { type: 'iteration_start', iteration: 0 },
+      { type: 'iteration_start', iteration: 1 },
+      { type: 'iteration_start', iteration: 2 },
       { type: 'token', content: '\n\n⚠️ Reached maximum tool calling iterations.' },
       { type: 'done' },
     ])
@@ -602,9 +606,10 @@ describe('DeepAgentRunner', () => {
       chunks.push(chunk)
     }
 
-    expect(chunks).toHaveLength(1)
-    expect(chunks[0]).toMatchObject({ type: 'error' })
-    expect((chunks[0] as { error: string }).error).toContain('API connection failed')
+    expect(chunks).toHaveLength(2)
+    expect(chunks[0]).toMatchObject({ type: 'iteration_start' })
+    expect(chunks[1]).toMatchObject({ type: 'error' })
+    expect((chunks[1] as { error: string }).error).toContain('API connection failed')
   })
 
   // 16. System prompt handling
@@ -640,6 +645,7 @@ describe('DeepAgentRunner', () => {
     }
 
     expect(chunks).toEqual([
+      { type: 'iteration_start', iteration: 0 },
       { type: 'token', content: '', reasoningContent: 'Thinking...' },
       { type: 'token', content: 'Answer' },
       { type: 'done' },

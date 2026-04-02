@@ -21,6 +21,8 @@ export const zhCn: AiChatLocale = {
     promptTokens: '输入',
     completionTokens: '输出',
     totalTokens: '合计',
+    stepThinking: '思考过程',
+    stepTokens: '{n} tokens',
   },
   model: {
     title: '模型管理',

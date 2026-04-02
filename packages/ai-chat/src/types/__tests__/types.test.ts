@@ -94,10 +94,10 @@ describe('Core Types', () => {
     const errorChunk: ChatChunk = { type: 'error', error: 'Something failed' }
 
     const chunks: ChatChunk[] = [tokenChunk, doneChunk, errorChunk]
-    expectTypeOf(chunks[0].type).toEqualTypeOf<'token' | 'done' | 'error' | 'sub_agent_start' | 'sub_agent_log' | 'sub_agent_end'>()
+    expectTypeOf(chunks[0].type).toEqualTypeOf<'token' | 'done' | 'error' | 'sub_agent_start' | 'sub_agent_log' | 'sub_agent_end' | 'iteration_start'>()
 
     for (const chunk of chunks) {
-      expectTypeOf(chunk.type).toEqualTypeOf<'token' | 'done' | 'error' | 'sub_agent_start' | 'sub_agent_log' | 'sub_agent_end'>()
+      expectTypeOf(chunk.type).toEqualTypeOf<'token' | 'done' | 'error' | 'sub_agent_start' | 'sub_agent_log' | 'sub_agent_end' | 'iteration_start'>()
     }
   })
 

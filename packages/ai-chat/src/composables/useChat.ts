@@ -4,7 +4,7 @@ import { useModel } from './useModel'
 import { agentRegistry } from '../services/agent'
 import { MessageService, ConversationService, SubAgentExecutionService } from '../services/database'
 import { TitleGenerator } from '../agents/title-generator'
-import type { MessageAttachment, SubAgentCallInfo, SubAgentLogEntry, TokenUsage } from '../types'
+import type { MessageAttachment, SubAgentCallInfo, SubAgentLogEntry, TokenUsage, MessageStep, ThinkingStep } from '../types'
 
 // Module-level singleton state — shared across all useChat() callers
 const isStreaming = ref(false)
@@ -127,6 +127,26 @@ export function useChat() {
       const finalizedExecutions = new Set<string>()
       const THROTTLE_MS = 200
 
+      // Steps tracking
+      let iterationAware = false
+      let currentThinkingStep: ThinkingStep | null = null
+      const steps: MessageStep[] = []
+
+      function finalizeCurrentThinkingStep(tokenUsageOverride?: TokenUsage): void {
+        if (currentThinkingStep) {
+          if (tokenUsageOverride) {
+            currentThinkingStep.tokenUsage = tokenUsageOverride
+          }
+          currentThinkingStep = null
+        }
+      }
+
+      function updateStepsToDB(): Promise<unknown> {
+        return messageService.update(assistantMsg.id, {
+          steps: [...steps],
+        })
+      }
+
       function scheduleThrottledExecutionUpdate(executionId: string) {
         if (pendingThrottledUpdates[executionId]) return
         if (finalizedExecutions.has(executionId)) return
@@ -148,27 +168,66 @@ export function useChat() {
         }, THROTTLE_MS)
       }
       for await (const chunk of generator) {
-        if (chunk.type === 'token') {
+        if (chunk.type === 'iteration_start') {
+          iterationAware = true
+          // Retroactive tokenUsage fix: assign iteration_start tokenUsage to last thinking step without tokenUsage
+          if (chunk.tokenUsage && !currentThinkingStep) {
+            for (let i = steps.length - 1; i >= 0; i--) {
+              if (steps[i].type === 'thinking' && !steps[i].tokenUsage) {
+                steps[i].tokenUsage = chunk.tokenUsage
+                break
+              }
+            }
+          }
+          // Finalize previous thinking step
+          finalizeCurrentThinkingStep(chunk.tokenUsage)
+          // Create new thinking step
+          currentThinkingStep = { type: 'thinking', content: '' }
+          steps.push(currentThinkingStep)
+          await updateStepsToDB()
+        } else if (chunk.type === 'token') {
           if (chunk.content) {
             fullContent += chunk.content
           }
           if (chunk.reasoningContent) {
             fullReasoning += chunk.reasoningContent
             hadReasoning = true
+            if (iterationAware && currentThinkingStep) {
+              currentThinkingStep.content += chunk.reasoningContent
+            }
           }
-          // Detect reasoning→content transition: reasoning was present, now content starts flowing
-          if (hadReasoning && !reasoningDoneFired && fullContent && !chunk.reasoningContent) {
-            reasoningDoneFired = true
-            await messageService.update(assistantMsg.id, {
-              content: fullContent,
-              reasoningContent: fullReasoning || undefined,
-              metadata: { ...assistantMsg.metadata, reasoningDone: true },
-            })
+          if (iterationAware) {
+            // Detect reasoning→content transition
+            if (hadReasoning && !reasoningDoneFired && fullContent && !chunk.reasoningContent) {
+              reasoningDoneFired = true
+              await messageService.update(assistantMsg.id, {
+                content: fullContent,
+                reasoningContent: fullReasoning || undefined,
+                steps: [...steps],
+                metadata: { ...assistantMsg.metadata, reasoningDone: true },
+              })
+            } else {
+              await messageService.update(assistantMsg.id, {
+                content: fullContent,
+                reasoningContent: fullReasoning || undefined,
+                steps: [...steps],
+              })
+            }
           } else {
-            await messageService.update(assistantMsg.id, {
-              content: fullContent,
-              reasoningContent: fullReasoning || undefined,
-            })
+            // Legacy path (no iteration_start received)
+            if (hadReasoning && !reasoningDoneFired && fullContent && !chunk.reasoningContent) {
+              reasoningDoneFired = true
+              await messageService.update(assistantMsg.id, {
+                content: fullContent,
+                reasoningContent: fullReasoning || undefined,
+                metadata: { ...assistantMsg.metadata, reasoningDone: true },
+              })
+            } else {
+              await messageService.update(assistantMsg.id, {
+                content: fullContent,
+                reasoningContent: fullReasoning || undefined,
+              })
+            }
           }
         } else if (chunk.type === 'error') {
           fullContent += `\n\n⚠️ Error: ${chunk.error}`
@@ -176,16 +235,40 @@ export function useChat() {
             content: fullContent,
             reasoningContent: fullReasoning || undefined,
             isStreaming: false,
+            steps: iterationAware ? [...steps] : undefined,
             ...(hadReasoning && !reasoningDoneFired ? { metadata: { ...assistantMsg.metadata, reasoningDone: true } } : {}),
           })
           break
         } else if (chunk.type === 'done') {
-          tokenUsage = chunk.tokenUsage
+          // Finalize last thinking step with tokenUsage
+          if (iterationAware) {
+            finalizeCurrentThinkingStep(chunk.tokenUsage)
+          }
+          if (iterationAware && steps.length > 0) {
+            // Accumulate token usage across ALL steps
+            const accumulatedTokenUsage: TokenUsage = { promptTokens: 0, completionTokens: 0, totalTokens: 0 }
+            for (const s of steps) {
+              if ((s.type === 'thinking' || s.type === 'sub_agent') && s.tokenUsage) {
+                accumulatedTokenUsage.promptTokens += s.tokenUsage.promptTokens
+                accumulatedTokenUsage.completionTokens += s.tokenUsage.completionTokens
+                accumulatedTokenUsage.totalTokens += s.tokenUsage.totalTokens
+              }
+            }
+            if (chunk.tokenUsage) {
+              accumulatedTokenUsage.promptTokens += chunk.tokenUsage.promptTokens
+              accumulatedTokenUsage.completionTokens += chunk.tokenUsage.completionTokens
+              accumulatedTokenUsage.totalTokens += chunk.tokenUsage.totalTokens
+            }
+            tokenUsage = accumulatedTokenUsage
+          } else {
+            tokenUsage = chunk.tokenUsage
+          }
           await messageService.update(assistantMsg.id, {
             content: fullContent,
             reasoningContent: fullReasoning || undefined,
             isStreaming: false,
             tokenUsage,
+            steps: iterationAware ? [...steps] : undefined,
             ...(hadReasoning && !reasoningDoneFired ? { metadata: { ...assistantMsg.metadata, reasoningDone: true } } : {}),
           })
         } else if (chunk.type === 'sub_agent_start') {
@@ -196,8 +279,24 @@ export function useChat() {
             assistantMsg.metadata.subAgentCalls = []
           }
           ;(assistantMsg.metadata.subAgentCalls as SubAgentCallInfo[]).push(chunk.subAgent!)
+          // Steps: finalize thinking step, push SubAgentStep
+          if (iterationAware) {
+            finalizeCurrentThinkingStep()
+            steps.push({
+              type: 'sub_agent',
+              executionId: chunk.subAgent!.executionId,
+              agentId: chunk.subAgent!.agentId,
+              agentName: chunk.subAgent!.agentName,
+              task: chunk.subAgent!.task,
+              status: 'running',
+              startTime: chunk.subAgent!.startTime,
+              endTime: null,
+              depth: chunk.subAgent!.depth,
+            })
+          }
           await messageService.update(assistantMsg.id, {
             metadata: { ...assistantMsg.metadata },
+            steps: iterationAware ? [...steps] : undefined,
           })
           // Create SubAgentExecution record in DB so the log dialog can load it
           if (chunk.subAgent) {
@@ -247,8 +346,24 @@ export function useChat() {
               calls[idx] = { ...calls[idx], status: chunk.subAgent.status, endTime: chunk.subAgent.endTime }
             }
           }
+          // Steps: update SubAgentStep in steps
+          if (iterationAware && chunk.subAgent) {
+            const stepIdx = steps.findIndex(
+              s => s.type === 'sub_agent' && s.executionId === chunk.subAgent!.executionId,
+            )
+            if (stepIdx >= 0) {
+              const step = steps[stepIdx]
+              steps[stepIdx] = {
+                ...step,
+                status: chunk.subAgent.status,
+                endTime: chunk.subAgent.endTime,
+                ...(chunk.tokenUsage && { tokenUsage: chunk.tokenUsage }),
+              } as typeof step
+            }
+          }
           await messageService.update(assistantMsg.id, {
             metadata: { ...assistantMsg.metadata },
+            steps: iterationAware ? [...steps] : undefined,
           })
           if (chunk.subAgent) {
             const execId = chunk.subAgent.executionId
@@ -269,6 +384,7 @@ export function useChat() {
                 logs: bufferedLogs,
                 output,
                 reasoningContent,
+                ...(chunk.tokenUsage && { tokenUsage: chunk.tokenUsage }),
               })
             } catch (e) {
               console.warn('[useChat] failed to update SubAgentExecution record:', e)

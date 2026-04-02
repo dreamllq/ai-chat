@@ -35,10 +35,14 @@ export class LangChainRunner implements AgentRunner {
 
     let currentMessages: BaseMessage[] = [...lcMessages]
     let iteration = 0
+    let previousIterationTokenUsage: TokenUsage | undefined
 
     try {
       while (iteration < MAX_TOOL_ITERATIONS) {
         if (options?.signal?.aborted) return
+
+        yield { type: 'iteration_start' as const, iteration, ...(previousIterationTokenUsage && { tokenUsage: previousIterationTokenUsage }) }
+        previousIterationTokenUsage = undefined
 
         const stream = await llm.stream(currentMessages)
 
@@ -76,6 +80,7 @@ export class LangChainRunner implements AgentRunner {
           return
         }
 
+        previousIterationTokenUsage = extractTokenUsage(accUsageMetadata)
         iteration++
         if (iteration >= MAX_TOOL_ITERATIONS) {
           yield { type: 'token' as const, content: '\n\n⚠️ Reached maximum tool calling iterations.' }
@@ -122,5 +127,7 @@ function extractTokenUsage(metadata?: Record<string, unknown>): TokenUsage | und
   const completionTokens = (metadata.output_tokens as number) ?? 0
   const totalTokens = (metadata.total_tokens as number) ?? 0
   if (!promptTokens && !completionTokens && !totalTokens) return undefined
-  return { promptTokens, completionTokens, totalTokens }
+  const details = metadata.completion_tokens_details as Record<string, unknown> | undefined
+  const reasoningTokens = (details?.reasoning_tokens as number) || undefined
+  return { promptTokens, completionTokens, totalTokens, reasoningTokens }
 }
