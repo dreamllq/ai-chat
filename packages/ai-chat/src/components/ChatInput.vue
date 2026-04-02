@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, nextTick, watch } from 'vue'
+import { ref, computed, nextTick, watch, onMounted } from 'vue'
 import { ElSelect, ElOption, ElTag, ElButton, ElIcon, ElMessage } from 'element-plus'
 import { Promotion, CircleClose, UploadFilled, Setting } from '@element-plus/icons-vue'
 import { useLocale } from '../composables/useLocale'
@@ -50,15 +50,21 @@ function getAgentName(agent: { name: string; nameKey?: string }): string {
   return agent.nameKey ? t(agent.nameKey) : agent.name
 }
 
+const MIN_TEXTAREA_HEIGHT = 44
+
 function autoResize() {
   const el = textareaRef.value
   if (!el) return
-  el.style.height = 'auto'
+  // Temporarily collapse to measure true content height.
+  // All synchronous — browser won't paint the intermediate state.
+  el.style.height = '0px'
   const lineHeight = parseInt(getComputedStyle(el).lineHeight) || 22
   const maxHeight = lineHeight * 8
-  el.style.height = Math.min(el.scrollHeight, maxHeight) + 'px'
+  const newHeight = Math.max(el.scrollHeight, MIN_TEXTAREA_HEIGHT)
+  el.style.height = Math.min(newHeight, maxHeight) + 'px'
 }
 
+onMounted(() => autoResize())
 watch(inputText, () => nextTick(autoResize))
 
 function handleSend() {
@@ -81,7 +87,7 @@ function handleSend() {
 }
 
 function handleKeydown(event: KeyboardEvent) {
-  if (event.key === 'Enter' && !event.shiftKey) {
+  if (event.key === 'Enter' && !event.shiftKey && !event.isComposing) {
     event.preventDefault()
     handleSend()
   }
