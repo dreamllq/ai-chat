@@ -297,18 +297,17 @@ onUpdated(() => {
           </div>
           <!-- SubAgentStep -->
           <div v-else class="chat-message__sub-agent-card" :class="`chat-message__sub-agent-card--${step.status}`" @click="openSubAgentLog(step)">
-            <div class="chat-message__sub-agent-card__header">
-              <span class="chat-message__sub-agent-card__name">{{ step.agentName }}</span>
-              <span class="chat-message__sub-agent-card__status" :class="`--${step.status}`">
-                {{ getSubAgentStatusLabel(step.status) }}
-              </span>
-            </div>
-            <div class="chat-message__sub-agent-card__task">{{ step.task }}</div>
-            <div v-if="step.status !== 'running' && step.endTime" class="chat-message__sub-agent-card__duration">
+            <span class="chat-message__sub-agent-card__status-icon" :class="`--${step.status}`">
+              <span v-if="step.status === 'running'" class="chat-message__sub-agent-card__spinner"></span>
+              <span v-else-if="step.status === 'completed'">✓</span>
+              <span v-else>✕</span>
+            </span>
+            <span class="chat-message__sub-agent-card__name">{{ step.agentName }}</span>
+            <span v-if="step.tokenUsage" class="chat-message__sub-agent-card__tokens">{{ t('chat.stepTokens', { n: formatNumber(step.tokenUsage.totalTokens) }) }}</span>
+            <span class="chat-message__sub-agent-card__task">{{ step.task }}</span>
+            <span v-if="step.status !== 'running' && step.endTime" class="chat-message__sub-agent-card__duration">
               {{ formatDuration(step.startTime, step.endTime) }}
-            </div>
-            <span v-if="step.tokenUsage" class="chat-message__reasoning-tokens">{{ t('chat.stepTokens', { n: formatNumber(step.tokenUsage.totalTokens) }) }}</span>
-            <div v-if="step.status === 'running'" class="chat-message__sub-agent-card__spinner" />
+            </span>
           </div>
         </div>
         <!-- eslint-disable-next-line vue/no-v-html -->
@@ -396,17 +395,16 @@ onUpdated(() => {
             :class="`chat-message__sub-agent-card--${call.status}`"
             @click="openSubAgentLog(call)"
           >
-            <div class="chat-message__sub-agent-card__header">
-              <span class="chat-message__sub-agent-card__name">{{ call.agentName }}</span>
-              <span class="chat-message__sub-agent-card__status" :class="`--${call.status}`">
-                {{ getSubAgentStatusLabel(call.status) }}
-              </span>
-            </div>
-            <div class="chat-message__sub-agent-card__task">{{ call.task }}</div>
-            <div v-if="call.status !== 'running'" class="chat-message__sub-agent-card__duration">
+            <span class="chat-message__sub-agent-card__status-icon" :class="`--${call.status}`">
+              <span v-if="call.status === 'running'" class="chat-message__sub-agent-card__spinner"></span>
+              <span v-else-if="call.status === 'completed'">✓</span>
+              <span v-else>✕</span>
+            </span>
+            <span class="chat-message__sub-agent-card__name">{{ call.agentName }}</span>
+            <span class="chat-message__sub-agent-card__task">{{ call.task }}</span>
+            <span v-if="call.status !== 'running'" class="chat-message__sub-agent-card__duration">
               {{ formatDuration(call.startTime, call.endTime!) }}
-            </div>
-            <div v-if="call.status === 'running'" class="chat-message__sub-agent-card__spinner" />
+            </span>
           </div>
         </div>
       </div>
@@ -844,11 +842,15 @@ onUpdated(() => {
 }
 
 .chat-message__sub-agent-card {
-  padding: 8px 12px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
   border: 1px solid #e0e0e0;
   border-radius: 6px;
   cursor: pointer;
   transition: border-color 0.2s, box-shadow 0.2s;
+  margin-bottom: 8px;
 }
 
 .chat-message__sub-agent-card:hover {
@@ -868,56 +870,63 @@ onUpdated(() => {
   border-left: 3px solid var(--el-color-danger, #f56c6c);
 }
 
-.chat-message__sub-agent-card__header {
+.chat-message__sub-agent-card__status-icon {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
   display: flex;
-  justify-content: space-between;
   align-items: center;
-}
-
-.chat-message__sub-agent-card__name {
-  font-weight: 500;
-}
-
-.chat-message__sub-agent-card__status {
+  justify-content: center;
   font-size: 12px;
-  padding: 2px 6px;
-  border-radius: 4px;
+  font-weight: 700;
+  line-height: 1;
 }
 
-.chat-message__sub-agent-card__status--running {
-  background: #ecf5ff;
+.chat-message__sub-agent-card__status-icon--running {
   color: var(--el-color-primary, #409eff);
 }
 
-.chat-message__sub-agent-card__status--completed {
-  background: #f0f2ff;
+.chat-message__sub-agent-card__status-icon--completed {
   color: var(--el-color-success, #67c23a);
 }
 
-.chat-message__sub-agent-card__status--failed {
-  background: #fef0f0;
+.chat-message__sub-agent-card__status-icon--failed {
   color: var(--el-color-danger, #f56c6c);
 }
 
+.chat-message__sub-agent-card__spinner {
+  display: block;
+  width: 10px;
+  height: 10px;
+  border: 2px solid rgba(64, 158, 255, 0.25);
+  border-top-color: var(--el-color-primary, #409eff);
+  border-radius: 50%;
+  animation: chat-sub-agent-spin 0.8s linear infinite;
+}
+
+.chat-message__sub-agent-card__tokens {
+  font-size: 11px;
+  color: var(--el-text-color-secondary, #909399);
+  background: var(--el-fill-color, #f0f2f5);
+  padding: 1px 6px;
+  border-radius: 10px;
+  flex-shrink: 0;
+}
+
 .chat-message__sub-agent-card__task {
+  flex: 1;
   font-size: 13px;
   color: var(--el-text-color-regular, #606266);
-  margin-top: 4px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
 }
 
 .chat-message__sub-agent-card__duration {
-  font-size: 12px;
+  flex-shrink: 0;
+  font-size: 11px;
   color: var(--el-text-color-secondary, #909399);
-}
-
-.chat-message__sub-agent-card__spinner {
-  width: 14px;
-  height: 14px;
-  border: 2px solid var(--el-color-primary, #409eff);
-  border-top: 2px solid transparent;
-  border-radius: 50%;
-  animation: chat-sub-agent-spin 1s linear infinite;
-  margin-left: auto;
 }
 
 @keyframes chat-sub-agent-spin {
