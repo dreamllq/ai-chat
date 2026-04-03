@@ -49,8 +49,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
-    "type-check": "vue-tsc --noEmit",
-    "postversion": "git push && git push --tags && npm run build"
+    "type-check": "vue-tsc --noEmit"
   },
   "dependencies": {
     "@langchain/core": "^1.1.38",
