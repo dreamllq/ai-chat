@@ -11,11 +11,13 @@ import type { S3StorageConfig } from '@ai-chat/storage-s3'
 import { llmToolAgentDef } from './agents/llm-tool-agent'
 import { formSchemaAgentDef } from './agents/form-schema-agent'
 import { skillAgentDef } from './agents/skill-agent'
+import { mcpAgentDef } from './agents/mcp-agent'
 
 // 在模块顶层同步注册（先于组件渲染），确保下拉框能立即列出
 registerAgent(llmToolAgentDef)
 registerAgent(formSchemaAgentDef)
 registerAgent(skillAgentDef)
+registerAgent(mcpAgentDef)
 
 // ---------------------------------------------------------------------------
 // Locale state
