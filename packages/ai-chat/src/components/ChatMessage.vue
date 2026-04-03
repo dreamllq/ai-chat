@@ -491,7 +491,9 @@ onUpdated(() => {
 .chat-message__body {
   display: flex;
   flex-direction: column;
-  max-width: 70%;
+  width: 70%;
+  min-width: 0;
+  box-sizing: border-box;
 }
 
 .chat-message--user .chat-message__body {
@@ -504,7 +506,7 @@ onUpdated(() => {
 
 .chat-message--system .chat-message__body {
   align-items: center;
-  max-width: 90%;
+  width: 90%;
 }
 
 .chat-message__time {
@@ -538,7 +540,11 @@ onUpdated(() => {
   line-height: 1.5;
   font-size: 14px;
   word-break: break-word;
+  overflow-wrap: anywhere;
   position: relative;
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
 }
 
 .chat-message--user .chat-message__bubble {
@@ -560,6 +566,43 @@ onUpdated(() => {
   font-size: 13px;
 }
 
+.chat-message__content {
+  min-width: 0;
+  overflow: hidden;
+}
+
+.chat-message__content :deep(img) {
+  max-width: 100%;
+  height: auto;
+}
+
+.chat-message__content :deep(table) {
+  max-width: 100%;
+  overflow-x: auto;
+  display: block;
+}
+
+.chat-message__content :deep(ul),
+.chat-message__content :deep(ol) {
+  padding-left: 20px;
+  margin: 0 0 8px;
+  overflow-wrap: anywhere;
+}
+
+.chat-message__content :deep(a) {
+  overflow-wrap: anywhere;
+  word-break: break-all;
+}
+
+.chat-message__content :deep(blockquote) {
+  margin: 8px 0;
+  padding: 4px 12px;
+  border-left: 3px solid var(--el-border-color, #dcdfe6);
+  color: var(--el-text-color-secondary, #909399);
+  max-width: 100%;
+  overflow: hidden;
+}
+
 .chat-message__content :deep(p) {
   margin: 0 0 8px;
 }
@@ -576,6 +619,7 @@ onUpdated(() => {
   font-size: 13px;
   line-height: 1.6;
   position: relative;
+  max-width: 100%;
 }
 
 .chat-message__content :deep(pre code) {
@@ -822,6 +866,8 @@ onUpdated(() => {
 /* Sub-Agent Calls */
 .chat-message__sub-agents {
   margin: 8px 0;
+  min-width: 0;
+  overflow: hidden;
 }
 
 .chat-message__sub-agents-header {
@@ -839,6 +885,7 @@ onUpdated(() => {
   display: flex;
   flex-direction: column;
   gap: 4px;
+  min-width: 0;
 }
 
 .chat-message__sub-agent-card {
@@ -851,6 +898,8 @@ onUpdated(() => {
   cursor: pointer;
   transition: border-color 0.2s, box-shadow 0.2s;
   margin-bottom: 8px;
+  min-width: 0;
+  max-width: 100%;
 }
 
 .chat-message__sub-agent-card:hover {
