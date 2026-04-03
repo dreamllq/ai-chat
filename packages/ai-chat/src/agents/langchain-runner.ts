@@ -1,8 +1,9 @@
-import type { AgentRunner, ChatMessage, ModelConfig, ChatOptions, ChatChunk, TokenUsage, ToolDefinition, SkillDefinition } from '../types'
+import type { AgentRunner, ChatMessage, ModelConfig, ChatOptions, ChatChunk, TokenUsage, ToolDefinition, SkillDefinition, MCPServerConfig } from '../types'
 import { convertMessages } from './message-converter'
 import { createLLM } from './llm-init'
 import { convertTools } from './tool-converter'
 import { convertSkillsToTools } from './skill-converter'
+import { MCPClient } from './mcp-client'
 import { ToolMessage, type BaseMessage } from '@langchain/core/messages'
 
 const MAX_TOOL_ITERATIONS = 5
@@ -11,11 +12,15 @@ export class LangChainRunner implements AgentRunner {
   private tools: ToolDefinition[]
   private skills: SkillDefinition[]
   private systemPrompt?: string
+  private mcpClient: MCPClient | null
 
-  constructor(agentDef: { tools?: ToolDefinition[]; skills?: SkillDefinition[]; systemPrompt?: string }) {
+  constructor(agentDef: { tools?: ToolDefinition[]; skills?: SkillDefinition[]; systemPrompt?: string; mcpServers?: MCPServerConfig[] }) {
     this.tools = agentDef.tools ?? []
     this.skills = agentDef.skills ?? []
     this.systemPrompt = agentDef.systemPrompt
+    this.mcpClient = agentDef.mcpServers && agentDef.mcpServers.length > 0
+      ? new MCPClient(agentDef.mcpServers)
+      : null
   }
 
   async *chat(
@@ -26,7 +31,8 @@ export class LangChainRunner implements AgentRunner {
     if (options?.signal?.aborted) return
 
     const skillTools = convertSkillsToTools(this.skills)
-    const allTools = [...this.tools, ...skillTools]
+    const mcpTools = this.mcpClient ? await this.mcpClient.getTools() : []
+    const allTools = [...this.tools, ...skillTools, ...mcpTools]
     const lcTools = allTools.length > 0 ? convertTools(allTools) : undefined
 
     const systemPrompt = options?.systemPrompt ?? this.systemPrompt
