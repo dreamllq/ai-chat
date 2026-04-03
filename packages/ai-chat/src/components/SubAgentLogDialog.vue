@@ -181,7 +181,6 @@ const statusLabel = computed(() => {
 
       <!-- Chat Bubble: Reasoning + Output (streaming display) -->
       <div v-if="execution.output || execution.reasoningContent" class="sub-agent-log__bubble">
-        <div class="sub-agent-log__bubble-avatar">AI</div>
         <div class="sub-agent-log__bubble-body">
           <div v-if="execution.reasoningContent" class="sub-agent-log__reasoning">
             <div class="sub-agent-log__reasoning-header" @click="isReasoningExpanded = !isReasoningExpanded">
@@ -197,13 +196,13 @@ const statusLabel = computed(() => {
               </div>
             </div>
           </div>
+          <!-- eslint-disable-next-line vue/no-v-html -->
+          <div v-if="execution.output" class="sub-agent-log__bubble-content" v-html="renderedOutput" />
           <div v-if="execution.tokenUsage" class="sub-agent-log__token-usage">
             <span class="sub-agent-log__token-usage-item">{{ t('chat.promptTokens') }} {{ formatNumber(execution.tokenUsage!.promptTokens) }}</span>
             <span class="sub-agent-log__token-usage-item">{{ t('chat.completionTokens') }} {{ formatNumber(execution.tokenUsage!.completionTokens) }}</span>
             <span class="sub-agent-log__token-usage-item">{{ t('chat.totalTokens') }} {{ formatNumber(execution.tokenUsage!.totalTokens) }}</span>
           </div>
-          <!-- eslint-disable-next-line vue/no-v-html -->
-          <div v-if="execution.output" class="sub-agent-log__bubble-content" v-html="renderedOutput" />
         </div>
       </div>
 
@@ -409,27 +408,10 @@ const statusLabel = computed(() => {
 
 /* Chat Bubble */
 .sub-agent-log__bubble {
-  display: flex;
-  align-items: flex-start;
-  gap: 10px;
   padding: 10px 14px;
   background: var(--el-fill-color-light, #f5f7fa);
   border-radius: 12px;
   border-top-left-radius: 4px;
-}
-
-.sub-agent-log__bubble-avatar {
-  flex-shrink: 0;
-  width: 28px;
-  height: 28px;
-  border-radius: 50%;
-  background: var(--el-color-primary-light-5, #409eff);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: #fff;
-  font-size: 11px;
-  font-weight: 600;
 }
 
 .sub-agent-log__bubble-body {
