@@ -17,12 +17,29 @@ import type { FileUploadService, Conversation, MessageAttachment } from '../type
 const props = withDefaults(defineProps<{
   locale?: AiChatLocale | LocaleName
   fileUploadService?: FileUploadService | null
+  defaultSidebarCollapsed?: boolean
+  sidebarCollapsed?: boolean
 }>(), {
   locale: 'en',
   fileUploadService: null,
+  defaultSidebarCollapsed: false,
+  sidebarCollapsed: undefined,
 })
 
-const sidebarCollapsed = ref(false)
+const emit = defineEmits<{
+  'update:sidebarCollapsed': [value: boolean]
+}>()
+
+const internalSidebarCollapsed = ref(props.defaultSidebarCollapsed)
+
+function handleSidebarCollapsedUpdate(value: boolean) {
+  internalSidebarCollapsed.value = value
+  emit('update:sidebarCollapsed', value)
+}
+
+const sidebarCollapsed = computed(() =>
+  props.sidebarCollapsed !== undefined ? props.sidebarCollapsed : internalSidebarCollapsed.value
+)
 
 const { isStreaming, sendMessage, stopStreaming } = useChat()
 const { currentConversation, currentConversationId, createConversation } = useSession()
@@ -117,7 +134,7 @@ async function handleSend(payload: { content: string; attachments?: MessageAttac
 <template>
   <AiChatProvider :locale="props.locale">
     <div class="ai-chat">
-      <LayoutShell v-model:sidebar-collapsed="sidebarCollapsed">
+      <LayoutShell :sidebar-collapsed="sidebarCollapsed" @update:sidebar-collapsed="handleSidebarCollapsedUpdate">
         <template #sidebar>
           <Sidebar :agent-id="currentAgentId" :model-id="modelIdForSidebar" />
         </template>
