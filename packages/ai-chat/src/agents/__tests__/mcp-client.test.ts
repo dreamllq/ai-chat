@@ -1,22 +1,36 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import type { MCPServerConfig, ToolDefinition, StructuredToolDefinition } from '../../types'
+import type { MCPServerConfig } from '../../types'
 
-// Module-level mocks — accessible in both vi.mock and tests
-const mockGetTools = vi.fn()
-const mockClose = vi.fn()
-const mockInitializeConnections = vi.fn()
+// ─── Module-level mocks ───────────────────────────────────────────────
+// Each MCPClient instance creates its own Client + Transport per server.
+// We track per-instance state via call-site inspection.
 
-const MockMultiServerMCPClient = vi.fn().mockImplementation(() => ({
-  getTools: mockGetTools,
-  close: mockClose,
-  initializeConnections: mockInitializeConnections,
+const mockClientConnect = vi.fn()
+const mockClientListTools = vi.fn()
+const mockClientCallTool = vi.fn()
+const mockClientClose = vi.fn()
+
+const MockClient = vi.fn().mockImplementation(() => ({
+  connect: mockClientConnect,
+  listTools: mockClientListTools,
+  callTool: mockClientCallTool,
+  close: mockClientClose,
 }))
 
-vi.mock('@langchain/mcp-adapters', () => ({
-  MultiServerMCPClient: MockMultiServerMCPClient,
+const MockTransport = vi.fn().mockImplementation(() => ({}))
+
+vi.mock('@modelcontextprotocol/sdk/client/index.js', () => ({
+  Client: MockClient,
 }))
 
+vi.mock('@modelcontextprotocol/sdk/client/streamableHttp.js', () => ({
+  StreamableHTTPClientTransport: MockTransport,
+}))
+
+// Import after mocks are set up
 import { MCPClient } from '../mcp-client'
+
+// ─── Helpers ──────────────────────────────────────────────────────────
 
 function makeStdioConfig(overrides: Partial<MCPServerConfig> = {}): MCPServerConfig {
   return {
@@ -37,182 +51,387 @@ function makeHttpConfig(overrides: Partial<MCPServerConfig> = {}): MCPServerConf
   }
 }
 
+function makeSseConfig(overrides: Partial<MCPServerConfig> = {}): MCPServerConfig {
+  return {
+    name: 'sse-server',
+    transport: 'sse',
+    url: 'https://sse.example.com/mcp',
+    ...overrides,
+  }
+}
+
+// MCP tool shape returned by client.listTools()
+interface McpTool {
+  name: string
+  description?: string
+  inputSchema?: Record<string, unknown>
+}
+
+function makeMcpTool(overrides: Partial<McpTool> = {}): McpTool {
+  return {
+    name: 'test-tool',
+    description: 'A test tool',
+    ...overrides,
+  }
+}
+
 describe('MCPClient', () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    mockGetTools.mockResolvedValue([])
-    mockClose.mockResolvedValue(undefined)
-    mockInitializeConnections.mockResolvedValue({})
+    mockClientConnect.mockResolvedValue(undefined)
+    mockClientListTools.mockResolvedValue({ tools: [] })
+    mockClientCallTool.mockResolvedValue({ content: [] })
+    mockClientClose.mockResolvedValue(undefined)
   })
 
-  // === Empty config ===
+  // ═══════════════════════════════════════════════════════════════════
+  // 1. Empty configs → empty array
+  // ═══════════════════════════════════════════════════════════════════
 
   it('should return empty tools array when no configs provided', async () => {
     const client = new MCPClient([])
     const tools = await client.getTools()
 
     expect(tools).toEqual([])
-    expect(MockMultiServerMCPClient).not.toHaveBeenCalled()
+    expect(MockClient).not.toHaveBeenCalled()
   })
 
-  // === Single server connection ===
+  // ═══════════════════════════════════════════════════════════════════
+  // 2. Single server connection and tool discovery
+  // ═══════════════════════════════════════════════════════════════════
 
-  it('should initialize and return tools from a single server', async () => {
-    const mockTool = {
-      name: 'add',
-      description: 'Add two numbers',
-      invoke: vi.fn().mockResolvedValue('3'),
-    }
-    mockGetTools.mockResolvedValue([mockTool])
+  it('should connect to a single server and discover tools', async () => {
+    mockClientListTools.mockResolvedValue({
+      tools: [
+        makeMcpTool({ name: 'add', description: 'Add numbers' }),
+        makeMcpTool({ name: 'subtract', description: 'Subtract numbers' }),
+      ],
+    })
 
-    const client = new MCPClient([makeStdioConfig()])
+    const client = new MCPClient([makeHttpConfig()])
     const tools = await client.getTools()
 
-    expect(tools).toHaveLength(1)
+    expect(tools).toHaveLength(2)
     expect(tools[0].name).toBe('add')
-    expect(tools[0].description).toBe('Add two numbers')
+    expect(tools[0].description).toBe('Add numbers')
+    expect(tools[1].name).toBe('subtract')
+    expect(tools[1].description).toBe('Subtract numbers')
+    expect(MockClient).toHaveBeenCalledTimes(1)
+    expect(mockClientConnect).toHaveBeenCalledTimes(1)
   })
 
-  // === Multiple servers ===
+  // ═══════════════════════════════════════════════════════════════════
+  // 3. Multiple servers with aggregated tools
+  // ═══════════════════════════════════════════════════════════════════
 
-  it('should handle multiple server configs', async () => {
-    const mockTool1 = { name: 'tool-a', description: 'Tool A', invoke: vi.fn() }
-    const mockTool2 = { name: 'tool-b', description: 'Tool B', invoke: vi.fn() }
-    mockGetTools.mockResolvedValue([mockTool1, mockTool2])
+  it('should aggregate tools from multiple servers', async () => {
+    // First server returns 2 tools, second returns 1 tool
+    mockClientListTools
+      .mockResolvedValueOnce({
+        tools: [
+          makeMcpTool({ name: 'tool-a', description: 'Tool A' }),
+          makeMcpTool({ name: 'tool-b', description: 'Tool B' }),
+        ],
+      })
+      .mockResolvedValueOnce({
+        tools: [makeMcpTool({ name: 'tool-c', description: 'Tool C' })],
+      })
 
     const configs = [
-      makeStdioConfig({ name: 'server-a' }),
-      makeHttpConfig({ name: 'server-b' }),
+      makeHttpConfig({ name: 'server-a' }),
+      makeHttpConfig({ name: 'server-b', url: 'https://other.example.com/mcp' }),
     ]
     const client = new MCPClient(configs)
     const tools = await client.getTools()
 
-    expect(tools).toHaveLength(2)
-    expect(tools.map(t => t.name)).toEqual(['tool-a', 'tool-b'])
+    expect(tools).toHaveLength(3)
+    expect(tools.map(t => t.name)).toEqual(['tool-a', 'tool-b', 'tool-c'])
+    // One Client per server
+    expect(MockClient).toHaveBeenCalledTimes(2)
   })
 
-  // === Connection failure (graceful degradation) ===
+  // ═══════════════════════════════════════════════════════════════════
+  // 4. Connection failure → graceful degradation (empty for failed server)
+  // ═══════════════════════════════════════════════════════════════════
 
-  it('should return empty array on connection failure', async () => {
-    mockGetTools.mockRejectedValue(new Error('Connection refused'))
+  it('should return empty array when all servers fail to connect', async () => {
+    mockClientConnect.mockRejectedValue(new Error('Connection refused'))
 
-    const client = new MCPClient([makeStdioConfig()])
+    const client = new MCPClient([makeHttpConfig()])
     const tools = await client.getTools()
 
     expect(tools).toEqual([])
   })
 
-  // === Tool conversion ===
+  // ═══════════════════════════════════════════════════════════════════
+  // 5. Partial server failure (server A succeeds, server B fails)
+  // ═══════════════════════════════════════════════════════════════════
 
-  it('should convert MCP tools to ToolDefinition with executable execute function', async () => {
-    const mockTool = {
-      name: 'search',
-      description: 'Search the web',
-      invoke: vi.fn().mockResolvedValue('result data'),
-    }
-    mockGetTools.mockResolvedValue([mockTool])
+  it('should return tools from successful server when another fails', async () => {
+    // First connect succeeds, second fails
+    mockClientConnect
+      .mockResolvedValueOnce(undefined)
+      .mockRejectedValueOnce(new Error('Server B down'))
+
+    mockClientListTools.mockResolvedValueOnce({
+      tools: [makeMcpTool({ name: 'tool-a', description: 'Tool A' })],
+    })
+
+    const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+
+    const client = new MCPClient([
+      makeHttpConfig({ name: 'server-a' }),
+      makeHttpConfig({ name: 'server-b', url: 'https://down.example.com/mcp' }),
+    ])
+    const tools = await client.getTools()
+
+    expect(tools).toHaveLength(1)
+    expect(tools[0].name).toBe('tool-a')
+    expect(consoleErrorSpy).toHaveBeenCalledWith(
+      expect.stringContaining('[MCPClient]'),
+      expect.any(Error),
+    )
+
+    consoleErrorSpy.mockRestore()
+  })
+
+  // ═══════════════════════════════════════════════════════════════════
+  // 6. Tool conversion: structured tool (with inputSchema via json-schema-to-zod)
+  // ═══════════════════════════════════════════════════════════════════
+
+  it('should create StructuredToolDefinition when tool has inputSchema with properties', async () => {
+    mockClientListTools.mockResolvedValue({
+      tools: [
+        makeMcpTool({
+          name: 'search',
+          description: 'Search the web',
+          inputSchema: {
+            type: 'object',
+            properties: {
+              query: { type: 'string', description: 'Search query' },
+            },
+            required: ['query'],
+          },
+        }),
+      ],
+    })
 
     const client = new MCPClient([makeHttpConfig()])
-    const tools: ToolDefinition[] = await client.getTools()
+    const tools = await client.getTools()
 
     expect(tools).toHaveLength(1)
     const tool = tools[0]
-    expect(tool.name).toBe('search')
-    expect(tool.description).toBe('Search the web')
-
-    // Execute should call the underlying MCP tool and return string
-    const result = await tool.execute('{"query": "test"}' as never)
-    expect(result).toBe('result data')
-    expect(mockTool.invoke).toHaveBeenCalledWith('{"query": "test"}')
+    expect('schema' in tool).toBe(true)
+    // Verify the execute function works
+    mockClientCallTool.mockResolvedValue({
+      content: [{ type: 'text', text: 'search results' }],
+    })
+    const result = await tool.execute({ query: 'test' } as never)
+    expect(result).toBe('search results')
   })
 
-  it('should preserve schema when MCP tool has one (StructuredToolDefinition)', async () => {
-    const fakeSchema = { _def: { typeName: 'ZodObject' } }
-    const mockStructuredTool = {
-      name: 'structured_search',
-      description: 'Search with schema',
-      schema: fakeSchema,
-      invoke: vi.fn().mockResolvedValue('structured result'),
-    }
-    mockGetTools.mockResolvedValue([mockStructuredTool])
+  // ═══════════════════════════════════════════════════════════════════
+  // 7. Tool conversion: simple tool (no inputSchema)
+  // ═══════════════════════════════════════════════════════════════════
 
-    const client = new MCPClient([makeStdioConfig()])
+  it('should create SimpleToolDefinition when tool has no inputSchema', async () => {
+    mockClientListTools.mockResolvedValue({
+      tools: [
+        makeMcpTool({
+          name: 'ping',
+          description: 'Ping the server',
+          // no inputSchema
+        }),
+      ],
+    })
+
+    const client = new MCPClient([makeHttpConfig()])
     const tools = await client.getTools()
 
     expect(tools).toHaveLength(1)
-    const tool = tools[0] as StructuredToolDefinition
-    expect(tool.name).toBe('structured_search')
-    expect(tool.schema).toBe(fakeSchema)
-    expect(tool.execute).toBeTypeOf('function')
+    const tool = tools[0]
+    expect('schema' in tool).toBe(false)
+    expect(tool.name).toBe('ping')
+    expect(tool.description).toBe('Ping the server')
   })
 
-  // === close() cleanup ===
+  // ═══════════════════════════════════════════════════════════════════
+  // 8. Tool execute calls client.callTool() and returns text content
+  // ═══════════════════════════════════════════════════════════════════
 
-  it('should close client and reset state', async () => {
-    mockGetTools.mockResolvedValue([
-      { name: 'tool', description: 'desc', invoke: vi.fn() },
+  it('should call client.callTool() on execute and return text content', async () => {
+    mockClientListTools.mockResolvedValue({
+      tools: [makeMcpTool({ name: 'echo', description: 'Echo input' })],
+    })
+    mockClientCallTool.mockResolvedValue({
+      content: [{ type: 'text', text: 'hello world' }],
+    })
+
+    const client = new MCPClient([makeHttpConfig()])
+    const tools = await client.getTools()
+
+    const result = await tools[0].execute('test-input' as never)
+    expect(result).toBe('hello world')
+    expect(mockClientCallTool).toHaveBeenCalledWith({
+      name: 'echo',
+      arguments: { input: 'test-input' },
+    })
+  })
+
+  // ═══════════════════════════════════════════════════════════════════
+  // 9. Tool execute handles isError: true (returns error string, NOT throw)
+  // ═══════════════════════════════════════════════════════════════════
+
+  it('should return error string when callTool returns isError: true', async () => {
+    mockClientListTools.mockResolvedValue({
+      tools: [makeMcpTool({ name: 'fail-tool', description: 'Fails' })],
+    })
+    mockClientCallTool.mockResolvedValue({
+      content: [{ type: 'text', text: 'Something went wrong' }],
+      isError: true,
+    })
+
+    const client = new MCPClient([makeHttpConfig()])
+    const tools = await client.getTools()
+
+    const result = await tools[0].execute('input' as never)
+    expect(result).toBe('Error: Something went wrong')
+    // Must NOT throw
+    expect(result).toBeTypeOf('string')
+  })
+
+  // ═══════════════════════════════════════════════════════════════════
+  // 10. Tool execute handles non-text content (image/resource blocks)
+  // ═══════════════════════════════════════════════════════════════════
+
+  it('should handle non-text content blocks gracefully', async () => {
+    mockClientListTools.mockResolvedValue({
+      tools: [makeMcpTool({ name: 'multi-content', description: 'Returns mixed' })],
+    })
+    mockClientCallTool.mockResolvedValue({
+      content: [
+        { type: 'text', text: 'description' },
+        { type: 'image', data: 'base64...', mimeType: 'image/png' },
+        { type: 'resource', resource: { uri: 'file:///test.txt', mimeType: 'text/plain', text: 'file content' } },
+      ],
+    })
+
+    const client = new MCPClient([makeHttpConfig()])
+    const tools = await client.getTools()
+
+    const result = await tools[0].execute('input' as never)
+    // Should extract text content, skip non-text
+    expect(result).toContain('description')
+  })
+
+  // ═══════════════════════════════════════════════════════════════════
+  // 11. Tool execute handles empty content array
+  // ═══════════════════════════════════════════════════════════════════
+
+  it('should return empty string when callTool returns empty content', async () => {
+    mockClientListTools.mockResolvedValue({
+      tools: [makeMcpTool({ name: 'empty-tool', description: 'Returns nothing' })],
+    })
+    mockClientCallTool.mockResolvedValue({
+      content: [],
+    })
+
+    const client = new MCPClient([makeHttpConfig()])
+    const tools = await client.getTools()
+
+    const result = await tools[0].execute('input' as never)
+    expect(result).toBe('')
+  })
+
+  // ═══════════════════════════════════════════════════════════════════
+  // 12. Tool name collisions (two servers with same tool name — both included)
+  // ═══════════════════════════════════════════════════════════════════
+
+  it('should include both tools when two servers have same tool name', async () => {
+    mockClientListTools
+      .mockResolvedValueOnce({
+        tools: [makeMcpTool({ name: 'search', description: 'Server A search' })],
+      })
+      .mockResolvedValueOnce({
+        tools: [makeMcpTool({ name: 'search', description: 'Server B search' })],
+      })
+
+    const client = new MCPClient([
+      makeHttpConfig({ name: 'server-a' }),
+      makeHttpConfig({ name: 'server-b', url: 'https://other.example.com/mcp' }),
     ])
+    const tools = await client.getTools()
 
-    const client = new MCPClient([makeStdioConfig()])
-    await client.getTools() // triggers initialization
+    expect(tools).toHaveLength(2)
+    expect(tools[0].name).toBe('search')
+    expect(tools[1].name).toBe('search')
+    // Different descriptions prove they come from different servers
+    expect(tools[0].description).toBe('Server A search')
+    expect(tools[1].description).toBe('Server B search')
+  })
+
+  // ═══════════════════════════════════════════════════════════════════
+  // 13. close() resets state so getTools() re-initializes
+  // ═══════════════════════════════════════════════════════════════════
+
+  it('should reset state on close() so getTools() re-initializes', async () => {
+    mockClientListTools.mockResolvedValue({
+      tools: [makeMcpTool({ name: 'tool1', description: 'First run' })],
+    })
+
+    const client = new MCPClient([makeHttpConfig()])
+    const tools1 = await client.getTools()
+    expect(tools1).toHaveLength(1)
+
     await client.close()
+    expect(mockClientClose).toHaveBeenCalled()
 
-    expect(mockClose).toHaveBeenCalledOnce()
+    // Re-initialize with new tools
+    mockClientListTools.mockResolvedValue({
+      tools: [makeMcpTool({ name: 'tool2', description: 'Second run' })],
+    })
 
-    // After close, getTools should re-initialize
-    mockGetTools.mockResolvedValue([
-      { name: 'tool2', description: 'desc2', invoke: vi.fn() },
-    ])
-    const tools = await client.getTools()
-    expect(tools).toHaveLength(1)
-    expect(tools[0].name).toBe('tool2')
-    // Should have created a new client instance
-    expect(MockMultiServerMCPClient).toHaveBeenCalledTimes(2)
+    const tools2 = await client.getTools()
+    expect(tools2).toHaveLength(1)
+    expect(tools2[0].name).toBe('tool2')
+    // Client should have been created twice (first init + re-init after close)
+    expect(MockClient).toHaveBeenCalledTimes(2)
   })
 
-  // === close() when not initialized ===
+  // ═══════════════════════════════════════════════════════════════════
+  // 14. close() when not initialized
+  // ═══════════════════════════════════════════════════════════════════
 
   it('should handle close() when not initialized without error', async () => {
     const client = new MCPClient([])
-
-    // Should not throw
     await expect(client.close()).resolves.toBeUndefined()
-    expect(mockClose).not.toHaveBeenCalled()
+    expect(mockClientClose).not.toHaveBeenCalled()
   })
 
-  // === Config translation: stdio ===
+  // ═══════════════════════════════════════════════════════════════════
+  // 15. stdio config skipped with console.warn
+  // ═══════════════════════════════════════════════════════════════════
 
-  it('should build stdio connection config correctly', async () => {
-    mockGetTools.mockResolvedValue([])
+  it('should skip stdio config with console.warn', async () => {
+    const consoleWarnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
 
-    const config = makeStdioConfig({
-      name: 'math',
-      command: 'node',
-      args: ['server.js'],
-      env: { KEY: 'val' },
-    })
+    const client = new MCPClient([makeStdioConfig()])
+    const tools = await client.getTools()
 
-    const client = new MCPClient([config])
-    await client.getTools()
-
-    expect(MockMultiServerMCPClient).toHaveBeenCalledWith(
-      expect.objectContaining({
-        mcpServers: expect.objectContaining({
-          math: expect.objectContaining({
-            transport: 'stdio',
-            command: 'node',
-            args: ['server.js'],
-            env: { KEY: 'val' },
-          }),
-        }),
-      }),
+    expect(tools).toEqual([])
+    expect(consoleWarnSpy).toHaveBeenCalledWith(
+      expect.stringContaining('[MCPClient]'),
     )
+
+    consoleWarnSpy.mockRestore()
   })
 
-  // === Config translation: http ===
+  // ═══════════════════════════════════════════════════════════════════
+  // 16. http config mapped to StreamableHTTPClientTransport with URL and headers
+  // ═══════════════════════════════════════════════════════════════════
 
-  it('should build http connection config correctly', async () => {
-    mockGetTools.mockResolvedValue([])
+  it('should map http config to StreamableHTTPClientTransport with URL and headers', async () => {
+    mockClientListTools.mockResolvedValue({ tools: [] })
 
     const config = makeHttpConfig({
       name: 'weather',
@@ -223,42 +442,222 @@ describe('MCPClient', () => {
     const client = new MCPClient([config])
     await client.getTools()
 
-    expect(MockMultiServerMCPClient).toHaveBeenCalledWith(
+    expect(MockTransport).toHaveBeenCalledTimes(1)
+    expect(MockTransport).toHaveBeenCalledWith(
+      expect.any(URL),
       expect.objectContaining({
-        mcpServers: expect.objectContaining({
-          weather: expect.objectContaining({
-            transport: 'http',
-            url: 'https://weather.example.com/mcp',
-            headers: { Authorization: 'Bearer token123' },
-          }),
+        requestInit: expect.objectContaining({
+          headers: { Authorization: 'Bearer token123' },
+        }),
+      }),
+    )
+    // Verify URL was passed correctly
+    const transportCall = MockTransport.mock.calls[0]
+    expect(transportCall[0]).toBeInstanceOf(URL)
+    expect(transportCall[0].toString()).toBe('https://weather.example.com/mcp')
+  })
+
+  // ═══════════════════════════════════════════════════════════════════
+  // 17. sse config also mapped to StreamableHTTPClientTransport
+  // ═══════════════════════════════════════════════════════════════════
+
+  it('should map sse config to StreamableHTTPClientTransport', async () => {
+    mockClientListTools.mockResolvedValue({ tools: [] })
+
+    const config = makeSseConfig({
+      name: 'legacy-sse',
+      url: 'https://sse.example.com/mcp',
+      headers: { 'X-Custom': 'value' },
+    })
+
+    const client = new MCPClient([config])
+    await client.getTools()
+
+    expect(MockTransport).toHaveBeenCalledTimes(1)
+    expect(MockTransport).toHaveBeenCalledWith(
+      expect.any(URL),
+      expect.objectContaining({
+        requestInit: expect.objectContaining({
+          headers: { 'X-Custom': 'value' },
         }),
       }),
     )
   })
 
-  // === Config translation: sse ===
+  // ═══════════════════════════════════════════════════════════════════
+  // 18. listTools pagination (nextCursor loop)
+  // ═══════════════════════════════════════════════════════════════════
 
-  it('should build sse connection config correctly', async () => {
-    mockGetTools.mockResolvedValue([])
+  it('should handle listTools pagination via nextCursor', async () => {
+    mockClientListTools
+      .mockResolvedValueOnce({
+        tools: [makeMcpTool({ name: 'page1-tool' })],
+        nextCursor: 'cursor-abc',
+      })
+      .mockResolvedValueOnce({
+        tools: [makeMcpTool({ name: 'page2-tool' })],
+        nextCursor: 'cursor-def',
+      })
+      .mockResolvedValueOnce({
+        tools: [makeMcpTool({ name: 'page3-tool' })],
+        // no nextCursor → end pagination
+      })
+
+    const client = new MCPClient([makeHttpConfig()])
+    const tools = await client.getTools()
+
+    expect(tools).toHaveLength(3)
+    expect(tools.map(t => t.name)).toEqual(['page1-tool', 'page2-tool', 'page3-tool'])
+    expect(mockClientListTools).toHaveBeenCalledTimes(3)
+    // Verify cursor was passed in subsequent calls
+    expect(mockClientListTools).toHaveBeenNthCalledWith(2, { cursor: 'cursor-abc' })
+    expect(mockClientListTools).toHaveBeenNthCalledWith(3, { cursor: 'cursor-def' })
+  })
+
+  // ═══════════════════════════════════════════════════════════════════
+  // Additional: Tool execute with structured tool passes object arguments
+  // ═══════════════════════════════════════════════════════════════════
+
+  it('should pass object arguments for structured tool execute', async () => {
+    mockClientListTools.mockResolvedValue({
+      tools: [
+        makeMcpTool({
+          name: 'search',
+          description: 'Search',
+          inputSchema: {
+            type: 'object',
+            properties: { query: { type: 'string' } },
+            required: ['query'],
+          },
+        }),
+      ],
+    })
+    mockClientCallTool.mockResolvedValue({
+      content: [{ type: 'text', text: 'results' }],
+    })
+
+    const client = new MCPClient([makeHttpConfig()])
+    const tools = await client.getTools()
+
+    const tool = tools[0]
+    expect('schema' in tool).toBe(true)
+    await tool.execute({ query: 'hello' } as never)
+
+    expect(mockClientCallTool).toHaveBeenCalledWith({
+      name: 'search',
+      arguments: { query: 'hello' },
+    })
+  })
+
+  // ═══════════════════════════════════════════════════════════════════
+  // Additional: http config without headers still works
+  // ═══════════════════════════════════════════════════════════════════
+
+  it('should handle http config without headers', async () => {
+    mockClientListTools.mockResolvedValue({ tools: [] })
 
     const config: MCPServerConfig = {
-      name: 'legacy-sse',
-      transport: 'sse',
-      url: 'https://sse.example.com/mcp',
+      name: 'no-headers',
+      transport: 'http',
+      url: 'https://api.example.com/mcp',
     }
 
     const client = new MCPClient([config])
     await client.getTools()
 
-    expect(MockMultiServerMCPClient).toHaveBeenCalledWith(
+    expect(MockTransport).toHaveBeenCalledWith(
+      expect.any(URL),
       expect.objectContaining({
-        mcpServers: expect.objectContaining({
-          'legacy-sse': expect.objectContaining({
-            transport: 'sse',
-            url: 'https://sse.example.com/mcp',
-          }),
+        requestInit: expect.objectContaining({
+          headers: {},
         }),
       }),
     )
+  })
+
+  // ═══════════════════════════════════════════════════════════════════
+  // Additional: Mix of stdio and http configs (stdio skipped, http works)
+  // ═══════════════════════════════════════════════════════════════════
+
+  it('should skip stdio configs and process http configs in mixed setup', async () => {
+    mockClientListTools.mockResolvedValue({
+      tools: [makeMcpTool({ name: 'http-tool', description: 'HTTP tool' })],
+    })
+
+    const consoleWarnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+
+    const client = new MCPClient([
+      makeStdioConfig({ name: 'local-server' }),
+      makeHttpConfig({ name: 'remote-server' }),
+    ])
+    const tools = await client.getTools()
+
+    expect(tools).toHaveLength(1)
+    expect(tools[0].name).toBe('http-tool')
+    expect(consoleWarnSpy).toHaveBeenCalled()
+
+    consoleWarnSpy.mockRestore()
+  })
+
+  // ═══════════════════════════════════════════════════════════════════
+  // Additional: Empty inputSchema (empty object) treated as simple tool
+  // ═══════════════════════════════════════════════════════════════════
+
+  it('should treat tool with empty inputSchema as simple tool', async () => {
+    mockClientListTools.mockResolvedValue({
+      tools: [
+        makeMcpTool({
+          name: 'no-args-tool',
+          description: 'No args',
+          inputSchema: {},
+        }),
+      ],
+    })
+
+    const client = new MCPClient([makeHttpConfig()])
+    const tools = await client.getTools()
+
+    expect(tools).toHaveLength(1)
+    expect('schema' in tools[0]).toBe(false)
+  })
+
+  // ═══════════════════════════════════════════════════════════════════
+  // Additional: Tool with undefined description defaults to empty string
+  // ═══════════════════════════════════════════════════════════════════
+
+  it('should default to empty string for undefined description', async () => {
+    mockClientListTools.mockResolvedValue({
+      tools: [
+        { name: 'no-desc' },
+      ],
+    })
+
+    const client = new MCPClient([makeHttpConfig()])
+    const tools = await client.getTools()
+
+    expect(tools[0].description).toBe('')
+  })
+
+  // ═══════════════════════════════════════════════════════════════════
+  // Additional: Multiple text content blocks joined with newline
+  // ═══════════════════════════════════════════════════════════════════
+
+  it('should join multiple text content blocks with newline', async () => {
+    mockClientListTools.mockResolvedValue({
+      tools: [makeMcpTool({ name: 'multi-text', description: 'Multi' })],
+    })
+    mockClientCallTool.mockResolvedValue({
+      content: [
+        { type: 'text', text: 'line1' },
+        { type: 'text', text: 'line2' },
+        { type: 'text', text: 'line3' },
+      ],
+    })
+
+    const client = new MCPClient([makeHttpConfig()])
+    const tools = await client.getTools()
+
+    const result = await tools[0].execute('input' as never)
+    expect(result).toBe('line1\nline2\nline3')
   })
 })

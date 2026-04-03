@@ -1,25 +1,30 @@
 import type { MCPServerConfig, ToolDefinition } from '../types'
+import { jsonSchemaToZod } from './json-schema-to-zod'
 
-/**
- * MCP client wrapper that connects to MCP servers via @langchain/mcp-adapters
- * and converts tools to framework-agnostic ToolDefinition format.
- *
- * Uses lazy dynamic import to avoid hard dependency at module load time.
- * Gracefully degrades — returns empty tools on connection failure.
- */
+type SdkClient = InstanceType<typeof import('@modelcontextprotocol/sdk/client/index.js').Client>
+
+interface McpToolShape {
+  name: string
+  description?: string
+  inputSchema?: Record<string, unknown>
+}
+
+function extractContentText(content: Array<{ type: string; text?: string }>): string {
+  return content
+    .filter(block => block.type === 'text' && block.text != null)
+    .map(block => block.text!)
+    .join('\n')
+}
+
 export class MCPClient {
   private configs: MCPServerConfig[]
-  private client: InstanceType<typeof import('@langchain/mcp-adapters').MultiServerMCPClient> | null = null
+  private clients: SdkClient[] = []
   private initialized = false
 
   constructor(configs: MCPServerConfig[]) {
     this.configs = configs
   }
 
-  /**
-   * Get tools from all configured MCP servers.
-   * Returns empty array if no configs or on connection failure.
-   */
   async getTools(): Promise<ToolDefinition[]> {
     if (this.configs.length === 0) return []
 
@@ -27,92 +32,116 @@ export class MCPClient {
       await this.initialize()
     }
 
-    if (!this.client) return []
-
-    try {
-      const mcpTools = await this.client.getTools()
-      return mcpTools.map(tool => {
-        // Check if MCP tool exposes a schema (StructuredTool)
-        const schema = (tool as unknown as { schema?: unknown }).schema
-        if (schema && typeof schema === 'object') {
-          return {
-            name: tool.name,
-            description: tool.description ?? '',
-            schema,
-            execute: async (input: unknown) => {
-              const result = await tool.invoke(input as string)
-              return String(result)
-            },
-          }
-        }
-        // Simple tool — string input only
-        return {
-          name: tool.name,
-          description: tool.description ?? '',
-          execute: async (input: string) => {
-            const result = await tool.invoke(input)
-            return String(result)
-          },
-        }
-      })
-    } catch (error) {
-      console.error('[MCPClient] Failed to get tools:', error)
-      return []
+    const allTools: ToolDefinition[] = []
+    for (const client of this.clients) {
+      try {
+        const tools = await this.discoverTools(client)
+        allTools.push(...tools)
+      } catch (error) {
+        console.error('[MCPClient] Failed to get tools from server:', error)
+      }
     }
+
+    return allTools
   }
 
-  /**
-   * Close all MCP server connections and reset state.
-   */
   async close(): Promise<void> {
-    if (this.client) {
-      await this.client.close()
-      this.client = null
-      this.initialized = false
+    for (const client of this.clients) {
+      await client.close()
     }
+    this.clients = []
+    this.initialized = false
   }
 
-  /**
-   * Lazily initialize the MultiServerMCPClient.
-   * Uses dynamic import to avoid top-level dependency.
-   */
   private async initialize(): Promise<void> {
-    const { MultiServerMCPClient } = await import('@langchain/mcp-adapters')
+    const { Client } = await import('@modelcontextprotocol/sdk/client/index.js')
+    const { StreamableHTTPClientTransport } = await import('@modelcontextprotocol/sdk/client/streamableHttp.js')
 
-    // Build connection configs for each MCP server
-    const mcpServers: Record<string, Record<string, unknown>> = {}
     for (const config of this.configs) {
-      mcpServers[config.name] = this.buildConnectionConfig(config)
+      if (config.transport === 'stdio') {
+        console.warn(
+          `[MCPClient] stdio transport is not supported in browser environment for server "${config.name}". Skipping.`,
+        )
+        continue
+      }
+
+      try {
+        const client = new Client({
+          name: 'ai-chat',
+          version: '1.0.0',
+        })
+
+        const transport = new StreamableHTTPClientTransport(
+          new URL(config.url!),
+          {
+            requestInit: {
+              headers: config.headers ?? {},
+            },
+          },
+        )
+
+        await client.connect(transport)
+        this.clients.push(client)
+      } catch (error) {
+        console.error(`[MCPClient] Failed to connect to server "${config.name}":`, error)
+      }
     }
 
-    try {
-      this.client = new MultiServerMCPClient({
-        mcpServers: mcpServers as Record<string, import('@langchain/mcp-adapters').Connection>,
-        onConnectionError: 'ignore',
-      })
-      this.initialized = true
-    } catch (error) {
-      console.error('[MCPClient] Failed to initialize:', error)
-      this.client = null
-    }
+    this.initialized = true
   }
 
-  /**
-   * Convert MCPServerConfig to @langchain/mcp-adapters connection config format.
-   */
-  private buildConnectionConfig(config: MCPServerConfig): Record<string, unknown> {
-    const result: Record<string, unknown> = { transport: config.transport }
+  private async discoverTools(client: SdkClient): Promise<ToolDefinition[]> {
+    const mcpTools: McpToolShape[] = []
+    let cursor: string | undefined
 
-    if (config.transport === 'stdio') {
-      if (config.command !== undefined) result.command = config.command
-      if (config.args !== undefined) result.args = config.args
-      if (config.env !== undefined) result.env = config.env
-    } else {
-      // http or sse
-      if (config.url !== undefined) result.url = config.url
-      if (config.headers !== undefined) result.headers = config.headers
+    do {
+      const raw = await client.listTools(cursor ? { cursor } : undefined)
+      const result = raw as unknown as { tools: McpToolShape[]; nextCursor?: string }
+      mcpTools.push(...result.tools)
+      cursor = result.nextCursor
+    } while (cursor)
+
+    return mcpTools.map(tool => {
+      const hasSchema = tool.inputSchema != null
+        && typeof tool.inputSchema === 'object'
+        && Object.keys(tool.inputSchema).length > 0
+
+      const capturedName = tool.name
+
+      if (hasSchema) {
+        const schema = jsonSchemaToZod(tool.inputSchema)
+        return {
+          name: capturedName,
+          description: tool.description ?? '',
+          schema,
+          execute: async (input: unknown) => {
+            const rawResult = await client.callTool({ name: capturedName, arguments: input as Record<string, unknown> })
+            return this.extractToolResult(rawResult)
+          },
+        } satisfies ToolDefinition
+      }
+
+      return {
+        name: capturedName,
+        description: tool.description ?? '',
+        execute: async (input: string) => {
+          const rawResult = await client.callTool({ name: capturedName, arguments: { input } })
+          return this.extractToolResult(rawResult)
+        },
+      } satisfies ToolDefinition
+    })
+  }
+
+  private extractToolResult(rawResult: unknown): string {
+    const result = rawResult as Record<string, unknown>
+    const content = (result.content ?? []) as Array<{ type: string; text?: string }>
+    const isError = result.isError === true
+    const text = extractContentText(content)
+
+    if (isError) {
+      return `Error: ${text}`
     }
 
-    return result
+    return text
   }
 }
