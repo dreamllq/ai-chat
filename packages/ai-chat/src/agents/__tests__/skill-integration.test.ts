@@ -97,7 +97,6 @@ describe('Skill system integration', () => {
     const def: AgentDefinition = {
       id: 'builtin-sim',
       name: 'Builtin Sim',
-      isBuiltin: true,
     }
     registerAgent(def)
 

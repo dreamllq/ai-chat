@@ -180,7 +180,6 @@ describe('AgentDefinition', () => {
       description: 'A basic agent',
       avatar: '🤖',
       systemPrompt: 'You are a helpful assistant.',
-      isBuiltin: true,
     }
     expect(agent.id).toBe('basic-agent')
     expect(agent.tools).toBeUndefined()
@@ -194,7 +193,6 @@ describe('AgentDefinition', () => {
       description: 'An agent with everything',
       avatar: '🧠',
       systemPrompt: 'You are an advanced assistant.',
-      isBuiltin: false,
       tools: [
         {
           name: 'search',
@@ -212,7 +210,6 @@ describe('AgentDefinition', () => {
     }
     expect(agent.tools).toHaveLength(1)
     expect(agent.mcpServers).toHaveLength(1)
-    expect(agent.isBuiltin).toBe(false)
   })
 })
 

@@ -311,15 +311,6 @@ describe('AgentService', () => {
     expect(found).toBeUndefined()
   })
 
-  it('should NOT delete a builtin agent', async () => {
-    const builtin = await agentService.create({ name: 'Builtin', isBuiltin: true })
-
-    await expect(agentService.delete(builtin.id)).rejects.toThrow('Cannot delete builtin agent')
-
-    const found = await agentService.getById(builtin.id)
-    expect(found).toBeDefined()
-  })
-
   it('should return empty array when no agents exist', async () => {
     const all = await agentService.getAll()
     expect(all).toEqual([])

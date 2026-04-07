@@ -85,7 +85,6 @@ describe('Core Types', () => {
     expectTypeOf(agent.description).toEqualTypeOf<string | undefined>()
     expectTypeOf(agent.avatar).toEqualTypeOf<string | undefined>()
     expectTypeOf(agent.systemPrompt).toEqualTypeOf<string | undefined>()
-    expectTypeOf(agent.isBuiltin).toEqualTypeOf<boolean | undefined>()
   })
 
   test('ChatChunk type covers token/done/error cases', () => {
