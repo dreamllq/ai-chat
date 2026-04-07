@@ -6,7 +6,7 @@ import { convertSkillsToTools } from './skill-converter'
 import { MCPClient } from './mcp-client'
 import { ToolMessage, type BaseMessage } from '@langchain/core/messages'
 
-const MAX_TOOL_ITERATIONS = 5
+const MAX_TOOL_ITERATIONS = 99
 
 export class LangChainRunner implements AgentRunner {
   private tools: ToolDefinition[]

@@ -7,8 +7,8 @@ import { agentRegistry } from '../services/agent'
 import { ToolMessage, type BaseMessage } from '@langchain/core/messages'
 import { z } from 'zod'
 
-const DEFAULT_MAX_DEPTH = 5
-const DEFAULT_MAX_TOOL_ITERATIONS = 15
+const DEFAULT_MAX_DEPTH = 99
+const DEFAULT_MAX_TOOL_ITERATIONS = 99
 const MAX_OUTPUT_LENGTH = 10000
 
 export class DeepAgentRunner implements AgentRunner {
