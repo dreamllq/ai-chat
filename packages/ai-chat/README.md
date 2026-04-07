@@ -655,16 +655,22 @@ interface AgentDefinition {
   name: string
   /** 描述，用于智能体选择下拉框 */
   description?: string
+  /** 国际化 key — 存在时覆盖 name 用于显示 */
+  nameKey?: string
+  /** 国际化 key — 存在时覆盖 description 用于显示 */
+  descriptionKey?: string
   /** 头像 URL */
   avatar?: string
   /** 系统提示词，注入到对话的 system message 中 */
   systemPrompt?: string
-  /** 是否为内置智能体（内置智能体不可删除） */
-  isBuiltin?: boolean
   /** 工具列表，LLM 可在对话中调用 */
   tools?: ToolDefinition[]
   /** MCP 服务器列表，连接后自动发现并注册远程工具 */
   mcpServers?: MCPServerConfig[]
+  /** 技能列表（需安装 deepagents） */
+  skills?: SkillDefinition[]
+  /** 可调用的子 Agent ID 列表。未设置时使用所有已注册的 Agent（仅 DeepAgentRunner 有效） */
+  allowedAgents?: string[]
 }
 ```
 
