@@ -671,6 +671,8 @@ interface AgentDefinition {
   skills?: SkillDefinition[]
   /** 可调用的子 Agent ID 列表。未设置时使用所有已注册的 Agent（仅 DeepAgentRunner 有效） */
   allowedAgents?: string[]
+  /** 是否在切换 Agent 列表中隐藏。隐藏后仍可正常使用，仅不显示在 UI 选择列表中 */
+  hidden?: boolean
 }
 ```
 

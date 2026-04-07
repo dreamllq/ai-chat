@@ -43,7 +43,7 @@ const canSend = computed(() =>
 const agents = computed(() => {
   // Depend on version so registry changes trigger re-computation
   void agentRegistry.version.value
-  return agentRegistry.getAllDefinitions()
+  return agentRegistry.getAllDefinitions().filter(a => !a.hidden)
 })
 
 function getAgentName(agent: { name: string; nameKey?: string }): string {
