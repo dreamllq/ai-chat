@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, nextTick, watch, onMounted } from 'vue'
-import { ElSelect, ElOption, ElTag, ElButton, ElIcon, ElMessage } from 'element-plus'
+import { ElSelect, ElOption, ElButton, ElIcon, ElMessage } from 'element-plus'
 import { Promotion, CircleClose, UploadFilled, Setting } from '@element-plus/icons-vue'
 import { useLocale } from '../composables/useLocale'
 import { useModel } from '../composables/useModel'
@@ -192,9 +192,6 @@ function handleModelChange(id: string) {
             >
               <div class="chat-input__agent-option">
                 <span>{{ getAgentName(agent) }}</span>
-                <ElTag v-if="agent.isBuiltin" size="small" type="info">
-                  {{ t('agent.builtin') }}
-                </ElTag>
               </div>
             </ElOption>
           </ElSelect>

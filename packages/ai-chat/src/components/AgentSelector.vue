@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import { ElSelect, ElOption, ElTag } from 'element-plus'
+import { ElSelect, ElOption } from 'element-plus'
 import { agentRegistry } from '../services/agent'
 import { useLocale } from '../composables/useLocale'
 
@@ -56,9 +56,7 @@ function handleChange(value: string) {
             {{ getAgentDesc(agent) }}
           </span>
         </div>
-        <ElTag v-if="agent.isBuiltin" size="small" type="info">
-          {{ t('agent.builtin') }}
-        </ElTag>
+
       </div>
     </ElOption>
   </ElSelect>
