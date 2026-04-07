@@ -17,8 +17,6 @@ vi.mock('../../services/agent', () => ({
 const mockT = vi.fn((path: string) => {
   const map: Record<string, string> = {
     'agent.select': 'Select Agent',
-    'agent.builtin': 'Built-in',
-    'agent.custom': 'Custom',
   }
   return map[path] ?? path
 })
@@ -49,12 +47,6 @@ const ElOptionStub = {
   props: ['value', 'label'],
 }
 
-const ElTagStub = {
-  name: 'ElTag',
-  template: '<span class="el-tag"><slot /></span>',
-  props: ['type', 'size'],
-}
-
 function mountAgentSelector(props: Record<string, unknown> = {}) {
   return mount(AgentSelector, {
     props: {
@@ -64,7 +56,6 @@ function mountAgentSelector(props: Record<string, unknown> = {}) {
       stubs: {
         ElSelect: ElSelectStub,
         ElOption: ElOptionStub,
-        ElTag: ElTagStub,
       },
     },
   })
@@ -74,14 +65,12 @@ const builtinAgent: AgentDefinition = {
   id: 'builtin-chat',
   name: 'Chat Agent',
   description: 'A built-in chat agent',
-  isBuiltin: true,
 }
 
 const customAgent: AgentDefinition = {
   id: 'custom-agent',
   name: 'Custom Agent',
   description: 'A custom agent',
-  isBuiltin: false,
 }
 
 const agentNoDesc: AgentDefinition = {
@@ -116,27 +105,6 @@ describe('AgentSelector', () => {
     // Check that description text appears in the option content
     expect(option.text()).toContain('Chat Agent')
     expect(option.text()).toContain('A built-in chat agent')
-  })
-
-  it('shows built-in badge for built-in agents', () => {
-    mockGetAllDefinitions.mockReturnValue([builtinAgent])
-
-    const wrapper = mountAgentSelector()
-    const tags = wrapper.findAllComponents({ name: 'ElTag' })
-
-    expect(tags.length).toBeGreaterThanOrEqual(1)
-    expect(tags[0].text()).toBe('Built-in')
-  })
-
-  it('does not show built-in badge for custom agents', () => {
-    mockGetAllDefinitions.mockReturnValue([customAgent])
-
-    const wrapper = mountAgentSelector()
-    const tags = wrapper.findAllComponents({ name: 'ElTag' })
-
-    // Custom agent should not have a Built-in tag
-    const builtinTags = tags.filter(t => t.text() === 'Built-in')
-    expect(builtinTags).toHaveLength(0)
   })
 
   it('emits update:modelValue when selection changes', async () => {
