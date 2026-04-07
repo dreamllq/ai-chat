@@ -110,9 +110,6 @@ export class AgentService {
   }
 
   async delete(id: string): Promise<void> {
-    // Do not allow deleting builtin agents
-    const agent = await db.agents.get(id)
-    if (agent?.isBuiltin) throw new Error('Cannot delete builtin agent')
     await db.agents.delete(id)
   }
 }

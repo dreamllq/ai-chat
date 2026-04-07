@@ -2,6 +2,9 @@ import { ref } from 'vue'
 import type { AgentDefinition, AgentRunner } from '../types'
 import { LangChainRunner } from '../agents/langchain-runner'
 
+/** Default chat agent ID — auto-registered when no agents exist */
+export const DEFAULT_AGENT_ID = '__default_chat__'
+
 class AgentRegistry {
   private definitions: Map<string, AgentDefinition> = new Map()
   private runners: Map<string, AgentRunner> = new Map()
@@ -44,4 +47,20 @@ export const agentRegistry = new AgentRegistry()
 /** Convenience function for registering agents (runner is optional) */
 export function registerAgent(agentDef: AgentDefinition, runner?: AgentRunner): void {
   agentRegistry.register(agentDef, runner)
+}
+
+/**
+ * Ensure at least one agent exists. If no agents have been registered,
+ * auto-register a default chat agent so the user always has something usable.
+ */
+export function ensureDefaultAgent(): void {
+  if (agentRegistry.getAllDefinitions().length === 0) {
+    agentRegistry.register({
+      id: DEFAULT_AGENT_ID,
+      name: 'Chat',
+      nameKey: 'agent.defaultChatName',
+      description: 'Default chat agent',
+      descriptionKey: 'agent.defaultChatDesc',
+    })
+  }
 }
