@@ -49,12 +49,8 @@ export const zhCn: AiChatLocale = {
   agent: {
     title: '智能体',
     select: '选择智能体',
-    builtin: '内置',
-    custom: '自定义',
-    builtinChatName: '聊天',
-    builtinChatDesc: '基于 LangChain.js 的内置对话智能体',
-    builtinDeepChatName: '深度对话',
-    builtinDeepChatDesc: '内置深度对话智能体，支持子智能体调用能力',
+    defaultChatName: '聊天',
+    defaultChatDesc: '默认聊天智能体',
   },
   skill: {
     title: '技能',

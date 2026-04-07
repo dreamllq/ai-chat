@@ -47,12 +47,8 @@ export interface AiChatLocale {
   agent: {
     title: string
     select: string
-    builtin: string
-    custom: string
-    builtinChatName: string
-    builtinChatDesc: string
-    builtinDeepChatName: string
-    builtinDeepChatDesc: string
+    defaultChatName: string
+    defaultChatDesc: string
   }
   skill: {
     title: string
@@ -171,12 +167,8 @@ export const en: AiChatLocale = {
   agent: {
     title: 'Agent',
     select: 'Select Agent',
-    builtin: 'Built-in',
-    custom: 'Custom',
-    builtinChatName: 'Chat',
-    builtinChatDesc: 'Built-in chat agent powered by LangChain.js',
-    builtinDeepChatName: 'Deep Chat',
-    builtinDeepChatDesc: 'Built-in deep chat agent with sub-agent calling capability',
+    defaultChatName: 'Chat',
+    defaultChatDesc: 'Default chat agent',
   },
   skill: {
     title: 'Skills',

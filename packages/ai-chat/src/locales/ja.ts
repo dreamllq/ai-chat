@@ -49,12 +49,8 @@ export const ja: AiChatLocale = {
   agent: {
     title: 'エージェント',
     select: 'エージェントを選択',
-    builtin: '内蔵',
-    custom: 'カスタム',
-    builtinChatName: 'チャット',
-    builtinChatDesc: 'LangChain.js搭載の内蔵チャットエージェント',
-    builtinDeepChatName: 'ディープチャット',
-    builtinDeepChatDesc: 'サブエージェント呼び出し機能を備えた内蔵ディープチャットエージェント',
+    defaultChatName: 'チャット',
+    defaultChatDesc: 'デフォルトチャットエージェント',
   },
   skill: {
     title: 'スキル',
