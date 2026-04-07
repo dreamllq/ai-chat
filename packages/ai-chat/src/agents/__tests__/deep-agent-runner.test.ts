@@ -665,4 +665,102 @@ describe('DeepAgentRunner', () => {
     // No assertion needed — just verifying constructor doesn't throw with defaults
     expect(true).toBe(true)
   })
+
+  // 19. allowedAgents filters which agents appear in call_agent tool
+  it('should only include allowedAgents in call_agent description', async () => {
+    const workerADef: AgentDefinition = { id: 'worker-a', name: 'Worker A', description: 'Does A' }
+    const workerBDef: AgentDefinition = { id: 'worker-b', name: 'Worker B', description: 'Does B' }
+
+    mockGetAllDefinitions.mockReturnValue([makeAgentDef(), workerADef, workerBDef])
+    mockStreamYield([{ content: 'ok' }])
+
+    const runner = new DeepAgentRunner(makeAgentDef({ allowedAgents: ['worker-a'] }))
+    for await (const _ of runner.chat([makeMessage()], makeModel())) {
+      void _
+    }
+
+    // call_agent description should contain worker-a but NOT worker-b
+    expect(createLLM).toHaveBeenCalledWith(
+      expect.any(Object),
+      undefined,
+      expect.arrayContaining([
+        expect.objectContaining({
+          name: 'call_agent',
+          description: expect.stringContaining('worker-a'),
+        }),
+      ]),
+    )
+    expect(createLLM).toHaveBeenCalledWith(
+      expect.any(Object),
+      undefined,
+      expect.arrayContaining([
+        expect.objectContaining({
+          name: 'call_agent',
+          description: expect.not.stringContaining('worker-b'),
+        }),
+      ]),
+    )
+  })
+
+  // 20. allowedAgents blocks call to non-allowed agent
+  it('should return error when calling an agent not in allowedAgents', async () => {
+    const workerADef: AgentDefinition = { id: 'worker-a', name: 'Worker A' }
+    const workerBDef: AgentDefinition = { id: 'worker-b', name: 'Worker B' }
+
+    mockGetAllDefinitions.mockReturnValue([makeAgentDef(), workerADef, workerBDef])
+
+    mockStreamToolResponses([
+      { tool_calls: [{ name: 'call_agent', args: { agentId: 'worker-b', task: 'Blocked' }, id: 'tc-1' }] },
+      { content: 'After blocked' },
+    ])
+
+    const runner = new DeepAgentRunner(makeAgentDef({ allowedAgents: ['worker-a'] }))
+    const chunks: unknown[] = []
+    for await (const chunk of runner.chat([makeMessage()], makeModel())) {
+      chunks.push(chunk)
+    }
+
+    // No sub-agent chunks since worker-b is not allowed
+    const subChunks = chunks.filter((c): c is { type: string } =>
+      typeof c === 'object' && c !== null && 'type' in c && (c as { type: string }).type.startsWith('sub_agent'))
+    expect(subChunks).toHaveLength(0)
+
+    expect(chunks).toContainEqual({ type: 'token', content: 'After blocked' })
+    expect(chunks).toContainEqual({ type: 'done' })
+  })
+
+  // 21. allowedAgents undefined falls back to all agents
+  it('should include all registered agents when allowedAgents is not set', async () => {
+    const workerADef: AgentDefinition = { id: 'worker-a', name: 'Worker A' }
+    const workerBDef: AgentDefinition = { id: 'worker-b', name: 'Worker B' }
+
+    mockGetAllDefinitions.mockReturnValue([makeAgentDef(), workerADef, workerBDef])
+    mockStreamYield([{ content: 'ok' }])
+
+    const runner = new DeepAgentRunner(makeAgentDef())
+    for await (const _ of runner.chat([makeMessage()], makeModel())) {
+      void _
+    }
+
+    expect(createLLM).toHaveBeenCalledWith(
+      expect.any(Object),
+      undefined,
+      expect.arrayContaining([
+        expect.objectContaining({
+          name: 'call_agent',
+          description: expect.stringContaining('worker-a'),
+        }),
+      ]),
+    )
+    expect(createLLM).toHaveBeenCalledWith(
+      expect.any(Object),
+      undefined,
+      expect.arrayContaining([
+        expect.objectContaining({
+          name: 'call_agent',
+          description: expect.stringContaining('worker-b'),
+        }),
+      ]),
+    )
+  })
 })

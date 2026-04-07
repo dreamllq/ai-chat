@@ -171,6 +171,8 @@ export interface AgentDefinition {
   mcpServers?: MCPServerConfig[]
   /** 技能列表（需安装 deepagents） */
   skills?: SkillDefinition[]
+  /** 可调用的子 Agent ID 列表。未设置时使用所有已注册的 Agent（仅 DeepAgentRunner 有效） */
+  allowedAgents?: string[]
 }
 
 /** @internal 智能体运行器接口 — 内部使用，用户不再需要实现此接口 */

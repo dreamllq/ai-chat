@@ -30,7 +30,11 @@ export class DeepAgentRunner implements AgentRunner {
   ): AsyncGenerator<ChatChunk, void, unknown> {
     if (options?.signal?.aborted) return
 
-    const callAgentTool = this.buildCallAgentTool(agentRegistry.getAllDefinitions())
+    const allAgentDefs = agentRegistry.getAllDefinitions()
+    const allowedDefs = this.agentDef.allowedAgents
+      ? allAgentDefs.filter(a => this.agentDef.allowedAgents!.includes(a.id))
+      : allAgentDefs
+    const callAgentTool = this.buildCallAgentTool(allowedDefs)
 
     const skillTools = convertSkillsToTools(this.agentDef.skills ?? [])
     const allTools: ToolDefinition[] = [...(this.agentDef.tools ?? []), ...skillTools, callAgentTool]
@@ -146,6 +150,10 @@ export class DeepAgentRunner implements AgentRunner {
   }
 
   private validateCallAgent(agentId: string, callStack: string[], currentDepth: number): string | null {
+    if (this.agentDef.allowedAgents && !this.agentDef.allowedAgents.includes(agentId)) {
+      return `Error: Agent "${agentId}" is not in the allowed agents list.`
+    }
+
     if (agentId === this.agentDef.id) {
       return `Error: Agent "${agentId}" cannot call itself.`
     }
