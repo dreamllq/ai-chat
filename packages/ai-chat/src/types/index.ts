@@ -165,8 +165,6 @@ export interface AgentDefinition {
   avatar?: string
   /** 系统提示词 */
   systemPrompt?: string
-  /** 是否为内置智能体 */
-  isBuiltin?: boolean
   /** 工具列表 */
   tools?: ToolDefinition[]
   /** MCP 服务器列表 */

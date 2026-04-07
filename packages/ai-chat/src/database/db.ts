@@ -13,7 +13,7 @@ db.version(1).stores({
   conversations: 'id, agentId, modelId, createdAt, updatedAt',
   messages: 'id, conversationId, role, timestamp, [conversationId+timestamp]',
   models: 'id, provider, createdAt',
-  agents: 'id, isBuiltin',
+  agents: 'id',
 })
 
 db.version(2).stores({
