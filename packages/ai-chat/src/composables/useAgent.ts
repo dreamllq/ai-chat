@@ -1,13 +1,13 @@
 import { ref, computed, watch } from 'vue'
 import { useObservable } from './useObservable'
 import { AgentService } from '../services/database'
-import { agentRegistry } from '../services/agent'
+import { agentRegistry, ensureDefaultAgent, DEFAULT_AGENT_ID } from '../services/agent'
 import type { AgentDefinition } from '../types'
 
 const STORAGE_KEY = 'ai-chat:selected-agent-id'
 
 // Module-level singleton — shared across all useAgent() callers
-const currentAgentId = ref<string>('langchain-chat')
+const currentAgentId = ref<string>(DEFAULT_AGENT_ID)
 
 // Restore persisted selection on module load
 try {
@@ -17,7 +17,7 @@ try {
 
 /** Reset singleton state (for testing) */
 export function _resetAgentState() {
-  currentAgentId.value = 'langchain-chat'
+  currentAgentId.value = DEFAULT_AGENT_ID
   try {
     localStorage.removeItem(STORAGE_KEY)
   } catch {}
@@ -31,6 +31,9 @@ export function useAgent() {
   const allAgents = computed(() => {
     // Depend on version so runtime register/unregister triggers re-computation
     void agentRegistry.version.value
+
+    ensureDefaultAgent()
+
     const registryDefs = agentRegistry.getAllDefinitions()
     const dbAgents = agents.value ?? []
     const dbIds = new Set(dbAgents.map((a) => a.id))

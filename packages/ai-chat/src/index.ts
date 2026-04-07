@@ -48,36 +48,12 @@ export { useAgent } from './composables/useAgent'
 export { useObservable } from './composables/useObservable'
 
 // === Agents ===
-// Built-in agent — config-based registration (LangChainRunner created internally by registry)
-import { agentRegistry, registerAgent } from './services/agent'
-import { DeepAgentRunner } from './agents/deep-agent-runner'
-
-agentRegistry.register({
-  id: 'langchain-chat',
-  name: 'Chat',
-  nameKey: 'agent.builtinChatName',
-  description: 'Built-in chat agent powered by LangChain.js',
-  descriptionKey: 'agent.builtinChatDesc',
-  isBuiltin: true,
-})
-
-agentRegistry.register({
-  id: 'deep-agent-chat',
-  name: 'Deep Chat',
-  nameKey: 'agent.builtinDeepChatName',
-  description: 'Built-in deep chat agent with sub-agent calling capability',
-  descriptionKey: 'agent.builtinDeepChatDesc',
-  isBuiltin: true,
-}, new DeepAgentRunner({
-  id: 'deep-agent-chat',
-  name: 'Deep Chat',
-  isBuiltin: true,
-}))
+import { agentRegistry, registerAgent, ensureDefaultAgent } from './services/agent'
 
 export type { ToolDefinition, SkillDefinition, MCPServerConfig, MCPTransportType } from './types'
 export { TitleGenerator } from './agents/title-generator'
 export { DeepAgentRunner } from './agents/deep-agent-runner'
-export { agentRegistry, registerAgent }
+export { agentRegistry, registerAgent, ensureDefaultAgent }
 
 // === Locales ===
 export { zhCn, en, ja } from './locales'
