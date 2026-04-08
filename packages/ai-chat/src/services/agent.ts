@@ -1,6 +1,7 @@
 import { ref } from 'vue'
 import type { AgentDefinition, AgentRunner } from '../types'
 import { LangChainRunner } from '../agents/langchain-runner'
+import { DeepAgentRunner } from '../agents/deep-agent-runner'
 
 /** Default chat agent ID — auto-registered when no agents exist */
 export const DEFAULT_AGENT_ID = '__default_chat__'
@@ -16,6 +17,8 @@ class AgentRegistry {
 
     if (runner) {
       this.runners.set(agentDef.id, runner)
+    } else if (agentDef.skills && agentDef.skills.length > 0) {
+      this.runners.set(agentDef.id, new DeepAgentRunner(agentDef))
     } else {
       this.runners.set(agentDef.id, new LangChainRunner(agentDef))
     }

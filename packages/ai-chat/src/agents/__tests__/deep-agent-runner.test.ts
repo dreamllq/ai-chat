@@ -759,4 +759,210 @@ describe('DeepAgentRunner', () => {
       ]),
     )
   })
+
+  // === Skills tests ===
+
+  // 22. use_skill tool is registered when skills are present
+  it('should register use_skill tool when agent has skills', async () => {
+    mockStreamYield([{ content: 'ok' }])
+    mockGetAllDefinitions.mockReturnValue([makeAgentDef()])
+
+    const skills = [
+      { name: 'code-review', description: 'Review code', instructions: '## Code Review\n\nSteps...' },
+    ]
+    const runner = new DeepAgentRunner(makeAgentDef({ skills }))
+    for await (const _ of runner.chat([makeMessage()], makeModel())) {
+      void _
+    }
+
+    expect(createLLM).toHaveBeenCalledWith(
+      expect.any(Object),
+      undefined,
+      expect.arrayContaining([
+        expect.objectContaining({ name: 'use_skill' }),
+      ]),
+    )
+  })
+
+  // 23. use_skill tool is NOT registered when no skills
+  it('should not register use_skill tool when agent has no skills', async () => {
+    mockStreamYield([{ content: 'ok' }])
+    mockGetAllDefinitions.mockReturnValue([makeAgentDef()])
+
+    const runner = new DeepAgentRunner(makeAgentDef())
+    for await (const _ of runner.chat([makeMessage()], makeModel())) {
+      void _
+    }
+
+    const createLLMCall = (createLLM as ReturnType<typeof vi.fn>).mock.calls[0]
+    const tools = createLLMCall[2] as Array<{ name: string }>
+    const toolNames = tools.map(t => t.name)
+    expect(toolNames).not.toContain('use_skill')
+  })
+
+  // 24. use_skill returns instructions when called with valid skill name
+  it('should return skill instructions when use_skill is called with valid name', async () => {
+    const instructions = '## Code Review\n\n1. Read code\n2. Check correctness'
+    const skills = [
+      { name: 'code-review', description: 'Review code', instructions },
+    ]
+
+    mockGetAllDefinitions.mockReturnValue([makeAgentDef()])
+    mockStreamToolResponses([
+      { tool_calls: [{ name: 'use_skill', args: { skill_name: 'code-review' }, id: 'tc-1' }] },
+      { content: 'Reviewing code...' },
+    ])
+
+    const runner = new DeepAgentRunner(makeAgentDef({ skills }))
+    const chunks: unknown[] = []
+    for await (const chunk of runner.chat([makeMessage()], makeModel())) {
+      chunks.push(chunk)
+    }
+
+    expect(chunks).toContainEqual({ type: 'token', content: 'Reviewing code...' })
+    expect(chunks).toContainEqual({ type: 'done' })
+  })
+
+  // 25. use_skill returns error for unknown skill name
+  it('should return error when use_skill is called with unknown skill name', async () => {
+    const skills = [
+      { name: 'code-review', description: 'Review code', instructions: 'Steps...' },
+    ]
+
+    mockGetAllDefinitions.mockReturnValue([makeAgentDef()])
+    mockStreamToolResponses([
+      { tool_calls: [{ name: 'use_skill', args: { skill_name: 'nonexistent' }, id: 'tc-1' }] },
+      { content: 'Handled missing skill' },
+    ])
+
+    const runner = new DeepAgentRunner(makeAgentDef({ skills }))
+    const chunks: unknown[] = []
+    for await (const chunk of runner.chat([makeMessage()], makeModel())) {
+      chunks.push(chunk)
+    }
+
+    expect(chunks).toContainEqual({ type: 'token', content: 'Handled missing skill' })
+    expect(chunks).toContainEqual({ type: 'done' })
+  })
+
+  // 26. Skills system prompt is injected
+  it('should inject skills list into system prompt', async () => {
+    const skills = [
+      { name: 'code-review', description: 'Review code quality', instructions: 'Steps...' },
+      { name: 'translator', description: 'Translate text', instructions: 'Rules...' },
+    ]
+
+    mockStreamYield([{ content: 'ok' }])
+    mockGetAllDefinitions.mockReturnValue([makeAgentDef()])
+
+    const runner = new DeepAgentRunner(makeAgentDef({ systemPrompt: 'You are helpful.', skills }))
+    for await (const _ of runner.chat([makeMessage()], makeModel())) {
+      void _
+    }
+
+    expect(convertMessages).toHaveBeenCalledWith(
+      expect.any(Array),
+      expect.stringContaining('Available Skills'),
+    )
+    expect(convertMessages).toHaveBeenCalledWith(
+      expect.any(Array),
+      expect.stringContaining('code-review'),
+    )
+    expect(convertMessages).toHaveBeenCalledWith(
+      expect.any(Array),
+      expect.stringContaining('translator'),
+    )
+  })
+
+  // 27. Skills system prompt appended to base system prompt
+  it('should append skills section after base system prompt', async () => {
+    const skills = [
+      { name: 'code-review', description: 'Review code', instructions: 'Steps...' },
+    ]
+
+    mockStreamYield([{ content: 'ok' }])
+    mockGetAllDefinitions.mockReturnValue([makeAgentDef()])
+
+    const runner = new DeepAgentRunner(makeAgentDef({ systemPrompt: 'Base prompt.', skills }))
+    for await (const _ of runner.chat([makeMessage()], makeModel())) {
+      void _
+    }
+
+    const promptArg = (convertMessages as ReturnType<typeof vi.fn>).mock.calls[0][1] as string
+    expect(promptArg).toMatch(/^Base prompt\.\n\n## Available Skills/)
+  })
+
+  // 28. Multiple skills all listed in use_skill description
+  it('should list all skill names in use_skill tool description', async () => {
+    const skills = [
+      { name: 'code-review', description: 'Review code', instructions: 'Steps...' },
+      { name: 'translator', description: 'Translate', instructions: 'Rules...' },
+    ]
+
+    mockStreamYield([{ content: 'ok' }])
+    mockGetAllDefinitions.mockReturnValue([makeAgentDef()])
+
+    const runner = new DeepAgentRunner(makeAgentDef({ skills }))
+    for await (const _ of runner.chat([makeMessage()], makeModel())) {
+      void _
+    }
+
+    expect(createLLM).toHaveBeenCalledWith(
+      expect.any(Object),
+      undefined,
+      expect.arrayContaining([
+        expect.objectContaining({
+          name: 'use_skill',
+          description: expect.stringContaining('code-review'),
+        }),
+      ]),
+    )
+    expect(createLLM).toHaveBeenCalledWith(
+      expect.any(Object),
+      undefined,
+      expect.arrayContaining([
+        expect.objectContaining({
+          name: 'use_skill',
+          description: expect.stringContaining('translator'),
+        }),
+      ]),
+    )
+  })
+
+  // 29. use_skill works alongside call_agent
+  it('should handle use_skill and call_agent in same iteration', async () => {
+    const skills = [
+      { name: 'code-review', description: 'Review code', instructions: 'Review steps...' },
+    ]
+    const workerDef: AgentDefinition = { id: 'worker', name: 'Worker' }
+    const subRunner = { chat: createMockSubAgentStream([
+      { type: 'token', content: 'Sub result' },
+      { type: 'done' },
+    ]) }
+
+    mockGetRunner.mockReturnValue(subRunner)
+    mockGetDefinition.mockReturnValue(workerDef)
+    mockGetAllDefinitions.mockReturnValue([makeAgentDef(), workerDef])
+
+    mockStreamToolResponses([
+      { tool_calls: [
+        { name: 'use_skill', args: { skill_name: 'code-review' }, id: 'tc-1' },
+        { name: 'call_agent', args: { agentId: 'worker', task: 'Do work' }, id: 'tc-2' },
+      ] },
+      { content: 'Both done' },
+    ])
+
+    const runner = new DeepAgentRunner(makeAgentDef({ skills }))
+    const chunks: unknown[] = []
+    for await (const chunk of runner.chat([makeMessage()], makeModel())) {
+      chunks.push(chunk)
+    }
+
+    expect(chunks).toContainEqual({ type: 'token', content: 'Both done' })
+    expect(chunks).toContainEqual({ type: 'done' })
+
+    const starts = chunks.filter((c): c is { type: string } =>
+      typeof c === 'object' && c !== null && 'type' in c && (c as { type: string }).type === 'sub_agent_start')
+    expect(starts).toHaveLength(1)
+  })
 })

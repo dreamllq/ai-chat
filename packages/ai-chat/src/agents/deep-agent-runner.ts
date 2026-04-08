@@ -1,4 +1,4 @@
-import type { AgentRunner, AgentDefinition, ChatMessage, ModelConfig, ChatOptions, ChatChunk, TokenUsage, ToolDefinition, SubAgentCallInfo, SubAgentLogEntry, StructuredToolDefinition } from '../types'
+import type { AgentRunner, AgentDefinition, ChatMessage, ModelConfig, ChatOptions, ChatChunk, TokenUsage, ToolDefinition, SubAgentCallInfo, SubAgentLogEntry, StructuredToolDefinition, SkillDefinition } from '../types'
 import { convertMessages } from './message-converter'
 import { createLLM } from './llm-init'
 import { convertTools } from './tool-converter'
@@ -36,11 +36,15 @@ export class DeepAgentRunner implements AgentRunner {
     const callAgentTool = this.buildCallAgentTool(allowedDefs)
 
     const allTools: ToolDefinition[] = [...(this.agentDef.tools ?? []), callAgentTool]
+    if (this.agentDef.skills && this.agentDef.skills.length > 0) {
+      allTools.push(this.buildUseSkillTool(this.agentDef.skills))
+    }
     const lcTools = convertTools(allTools)
 
     const systemPrompt = options?.systemPrompt ?? this.agentDef.systemPrompt
+    const enhancedPrompt = this.buildSkillsSystemPrompt(systemPrompt)
     const llm = createLLM(model, options, lcTools)
-    const lcMessages = convertMessages(messages, systemPrompt)
+    const lcMessages = convertMessages(messages, enhancedPrompt)
 
     const callStack = (options as ChatOptions & { _callStack?: string[] } | undefined)?._callStack ?? []
     const currentDepth = callStack.length
@@ -116,6 +120,9 @@ export class DeepAgentRunner implements AgentRunner {
               result = yield* this.runSubAgent(agentId, task, callStack, currentDepth, options, model)
               subAgentTokenUsage = this._lastSubAgentTokenUsage
             }
+          } else if (tc.name === 'use_skill') {
+            const skillName = tc.args.skill_name as string
+            result = this.resolveSkill(skillName)
           } else {
             const tool = allTools.find(t => t.name === tc.name)
             if (!tool) {
@@ -275,6 +282,42 @@ export class DeepAgentRunner implements AgentRunner {
     }
 
     return output
+  }
+
+  private buildSkillsSystemPrompt(basePrompt?: string): string | undefined {
+    const skills = this.agentDef.skills
+    if (!skills || skills.length === 0) return basePrompt
+
+    const skillLines = skills
+      .map(s => `- **${s.name}**: ${s.description}`)
+      .join('\n')
+
+    const skillsSection = `\n\n## Available Skills\n\nYou have access to the following skills:\n\n${skillLines}\n\nTo use a skill, call the \`use_skill\` tool with the skill name. The tool will return detailed instructions that you should follow.`
+
+    return basePrompt ? basePrompt + skillsSection : skillsSection.trim()
+  }
+
+  private buildUseSkillTool(skills: SkillDefinition[]): StructuredToolDefinition {
+    const skillNames = skills.map(s => s.name)
+    const description = `Load the full instructions for a skill by name. Use this when the user's task matches a skill's description.\n\nAvailable skills: ${skillNames.join(', ')}`
+
+    return {
+      name: 'use_skill',
+      description,
+      schema: z.object({
+        skill_name: z.string().describe('The name of the skill to load'),
+      }),
+      execute: async () => '',
+    }
+  }
+
+  private resolveSkill(skillName: string): string {
+    const skill = this.agentDef.skills?.find(s => s.name === skillName)
+    if (!skill) {
+      const available = this.agentDef.skills?.map(s => s.name).join(', ') ?? ''
+      return `Error: Skill "${skillName}" not found. Available skills: ${available}`
+    }
+    return skill.instructions
   }
 
   private buildCallAgentTool(allAgentDefs: AgentDefinition[]): StructuredToolDefinition {
