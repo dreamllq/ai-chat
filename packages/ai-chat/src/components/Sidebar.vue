@@ -10,10 +10,14 @@ const props = defineProps<{
   modelId?: string
 }>()
 
-const { conversations, currentConversationId, createConversation, deleteConversation, clearAllConversations, renameConversation, switchConversation } = useSession()
+const { conversations, currentConversationId, currentMessages, createConversation, deleteConversation, clearAllConversations, renameConversation, switchConversation } = useSession()
 const { t } = useLocale()
 
 const conversationList = computed(() => conversations.value ?? [])
+
+const isNewChatDisabled = computed(() =>
+  currentConversationId.value !== null && currentMessages.value.length === 0
+)
 
 const editingId = ref<string | null>(null)
 const editingTitle = ref('')
@@ -61,7 +65,7 @@ function formatTokenCount(tokens: number): string {
 <template>
   <div class="ai-chat-sidebar">
     <div class="ai-chat-sidebar__header">
-      <ElButton class="ai-chat-sidebar__new-chat" type="primary" @click="handleNewChat">
+      <ElButton class="ai-chat-sidebar__new-chat" type="primary" :disabled="isNewChatDisabled" @click="handleNewChat">
         <ElIcon><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg></ElIcon>
         {{ t('conversation.newChat') }}
       </ElButton>
@@ -84,7 +88,7 @@ function formatTokenCount(tokens: number): string {
 
     <div v-if="conversationList.length === 0" class="ai-chat-sidebar__empty">
       <p>{{ t('conversation.empty') }}</p>
-      <ElButton class="ai-chat-sidebar__new-chat" type="primary" @click="handleNewChat">
+      <ElButton class="ai-chat-sidebar__new-chat" type="primary" :disabled="isNewChatDisabled" @click="handleNewChat">
         {{ t('conversation.newChat') }}
       </ElButton>
     </div>
