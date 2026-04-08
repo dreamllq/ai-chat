@@ -1,8 +1,7 @@
-import type { AgentRunner, AgentDefinition, ChatMessage, ModelConfig, ChatOptions, ChatChunk, TokenUsage, ToolDefinition, SkillDefinition, SubAgentCallInfo, SubAgentLogEntry, StructuredToolDefinition } from '../types'
+import type { AgentRunner, AgentDefinition, ChatMessage, ModelConfig, ChatOptions, ChatChunk, TokenUsage, ToolDefinition, SubAgentCallInfo, SubAgentLogEntry, StructuredToolDefinition } from '../types'
 import { convertMessages } from './message-converter'
 import { createLLM } from './llm-init'
 import { convertTools } from './tool-converter'
-import { convertSkillsToTools } from './skill-converter'
 import { agentRegistry } from '../services/agent'
 import { ToolMessage, type BaseMessage } from '@langchain/core/messages'
 import { z } from 'zod'
@@ -36,8 +35,7 @@ export class DeepAgentRunner implements AgentRunner {
       : allAgentDefs
     const callAgentTool = this.buildCallAgentTool(allowedDefs)
 
-    const skillTools = convertSkillsToTools(this.agentDef.skills ?? [])
-    const allTools: ToolDefinition[] = [...(this.agentDef.tools ?? []), ...skillTools, callAgentTool]
+    const allTools: ToolDefinition[] = [...(this.agentDef.tools ?? []), callAgentTool]
     const lcTools = convertTools(allTools)
 
     const systemPrompt = options?.systemPrompt ?? this.agentDef.systemPrompt
