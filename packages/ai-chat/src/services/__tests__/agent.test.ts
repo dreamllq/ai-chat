@@ -239,15 +239,7 @@ describe('AgentRegistry singleton — config-based registration', () => {
     )
   })
 
-  it('should create LangChainRunner when skills field is present', () => {
-    const def = makeDefinition({ id: 'skills-agent', skills: [{ name: 'code-review', description: 'Reviews code', instructions: 'Review the code' }] })
-    agentRegistry.register(def)
-
-    expect(MockLangChainRunner).toHaveBeenCalledWith(def)
-    expect(agentRegistry.getRunner(def.id)).toBeDefined()
-  })
-
-  it('should create LangChainRunner when tools present but no skills', () => {
+  it('should create LangChainRunner when tools present but no other fields', () => {
     const tool = {
       name: 'test-tool',
       description: 'A test tool',
@@ -259,41 +251,10 @@ describe('AgentRegistry singleton — config-based registration', () => {
     expect(MockLangChainRunner).toHaveBeenCalledWith(def)
   })
 
-  it('should create LangChainRunner when both tools and skills are present', () => {
-    const tool = {
-      name: 'test-tool',
-      description: 'A test tool',
-      execute: async () => 'result',
-    }
-    const def = makeDefinition({
-      id: 'both-agent',
-      tools: [tool],
-      skills: [{ name: 'code-review', description: 'Reviews code', instructions: 'Review the code' }],
-    })
+  it('should create LangChainRunner when no tools present', () => {
+    const def = makeDefinition({ id: 'no-tools' })
     agentRegistry.register(def)
 
     expect(MockLangChainRunner).toHaveBeenCalledWith(def)
-  })
-
-  it('should create LangChainRunner when skills is empty array', () => {
-    const def = makeDefinition({ id: 'empty-skills-agent', skills: [] })
-    agentRegistry.register(def)
-
-    expect(MockLangChainRunner).toHaveBeenCalledWith(def)
-  })
-
-  it('should create LangChainRunner when neither skills nor tools present', () => {
-    const def = makeDefinition({ id: 'no-skills-no-tools' })
-    agentRegistry.register(def)
-
-    expect(MockLangChainRunner).toHaveBeenCalledWith(def)
-  })
-
-  it('should use explicit runner even when skills field is present', () => {
-    const def = makeDefinition({ id: 'explicit-override', skills: [{ name: 'code-review', description: 'Reviews code', instructions: 'Review the code' }] })
-    agentRegistry.register(def, stubRunner)
-
-    expect(MockLangChainRunner).not.toHaveBeenCalled()
-    expect(agentRegistry.getRunner(def.id)).toBe(stubRunner)
   })
 })

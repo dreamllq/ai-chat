@@ -18,10 +18,6 @@ vi.mock('../message-converter', () => ({
   convertMessages: vi.fn().mockReturnValue([]),
 }))
 
-vi.mock('../skill-converter', () => ({
-  convertSkillsToTools: vi.fn().mockReturnValue([]),
-}))
-
 vi.mock('../tool-converter', () => ({
   convertTools: vi.fn().mockImplementation((tools: unknown[]) => tools),
 }))

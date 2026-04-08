@@ -50,7 +50,7 @@ export { useObservable } from './composables/useObservable'
 // === Agents ===
 import { agentRegistry, registerAgent, ensureDefaultAgent } from './services/agent'
 
-export type { ToolDefinition, SkillDefinition, MCPServerConfig, MCPTransportType } from './types'
+export type { ToolDefinition, MCPServerConfig, MCPTransportType } from './types'
 export { TitleGenerator } from './agents/title-generator'
 export { DeepAgentRunner } from './agents/deep-agent-runner'
 export { agentRegistry, registerAgent, ensureDefaultAgent }
