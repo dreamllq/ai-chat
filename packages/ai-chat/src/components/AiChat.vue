@@ -42,13 +42,21 @@ const sidebarCollapsed = computed(() =>
 )
 
 const { isStreaming, sendMessage, stopStreaming } = useChat()
-const { currentConversation, currentConversationId, createConversation } = useSession()
+const { currentConversation, currentConversationId, currentMessages, createConversation } = useSession()
 const { models, currentModelId, selectModel, initDefault } = useModel()
 const { agents, currentAgentId, selectAgent, initDefault: initDefaultAgent } = useAgent()
 
 const conversationService = new ConversationService()
 
 const modelIdForSidebar = computed(() => currentModelId.value ?? undefined)
+
+const isNewChatDisabled = computed(() =>
+  currentConversationId.value !== null && currentMessages.value.length === 0
+)
+
+function handleNewChat() {
+  createConversation(currentAgentId.value ?? '', currentModelId.value ?? '')
+}
 
 /** Switch agent — persist the current conversation's agentId to DB */
 async function handleAgentChange(agentId: string) {
@@ -134,7 +142,7 @@ async function handleSend(payload: { content: string; attachments?: MessageAttac
 <template>
   <AiChatProvider :locale="props.locale">
     <div class="ai-chat">
-      <LayoutShell :sidebar-collapsed="sidebarCollapsed" @update:sidebar-collapsed="handleSidebarCollapsedUpdate">
+      <LayoutShell :sidebar-collapsed="sidebarCollapsed" :new-chat-disabled="isNewChatDisabled" @update:sidebar-collapsed="handleSidebarCollapsedUpdate" @new-chat="handleNewChat">
         <template #sidebar>
           <Sidebar :agent-id="currentAgentId" :model-id="modelIdForSidebar" />
         </template>

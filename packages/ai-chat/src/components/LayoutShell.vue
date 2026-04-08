@@ -4,12 +4,15 @@ import { ElButton, ElIcon } from 'element-plus'
 
 const props = withDefaults(defineProps<{
   sidebarCollapsed?: boolean
+  newChatDisabled?: boolean
 }>(), {
   sidebarCollapsed: false,
+  newChatDisabled: false,
 })
 
 const emit = defineEmits<{
   'update:sidebarCollapsed': [value: boolean]
+  'newChat': []
 }>()
 
 const sidebarWidth = computed(() =>
@@ -50,6 +53,19 @@ function toggleSidebar() {
               <rect x="3" y="3" width="18" height="18" rx="2" />
               <line x1="9" y1="3" x2="9" y2="21" />
               <polyline points="14 9 17 12 14 15" />
+            </svg>
+          </ElIcon>
+        </ElButton>
+        <ElButton
+          v-if="sidebarCollapsed && !newChatDisabled"
+          class="ai-chat-sidebar-new-chat-collapsed"
+          text
+          @click="emit('newChat')"
+        >
+          <ElIcon :size="20">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="23 4 23 10 17 10" />
+              <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10" />
             </svg>
           </ElIcon>
         </ElButton>
@@ -124,6 +140,11 @@ function toggleSidebar() {
 }
 
 .ai-chat-sidebar-toggle {
+  flex-shrink: 0;
+  cursor: pointer;
+}
+
+.ai-chat-sidebar-new-chat-collapsed {
   flex-shrink: 0;
   cursor: pointer;
 }
