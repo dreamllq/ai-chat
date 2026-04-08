@@ -10,7 +10,7 @@ const props = defineProps<{
   modelId?: string
 }>()
 
-const { conversations, currentConversationId, createConversation, deleteConversation, renameConversation, switchConversation } = useSession()
+const { conversations, currentConversationId, createConversation, deleteConversation, clearAllConversations, renameConversation, switchConversation } = useSession()
 const { t } = useLocale()
 
 const conversationList = computed(() => conversations.value ?? [])
@@ -65,6 +65,21 @@ function formatTokenCount(tokens: number): string {
         <ElIcon><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg></ElIcon>
         {{ t('conversation.newChat') }}
       </ElButton>
+      <ElPopconfirm
+        :title="t('conversation.clearAllConfirm')"
+        @confirm="clearAllConversations"
+      >
+        <template #reference>
+          <ElButton
+            class="ai-chat-sidebar__clear-all"
+            text
+            size="small"
+            :disabled="conversationList.length === 0"
+          >
+            <ElIcon :size="16"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6" /><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" /></svg></ElIcon>
+          </ElButton>
+        </template>
+      </ElPopconfirm>
     </div>
 
     <div v-if="conversationList.length === 0" class="ai-chat-sidebar__empty">
@@ -132,13 +147,18 @@ function formatTokenCount(tokens: number): string {
   flex-shrink: 0;
   display: flex;
   align-items: center;
+  gap: 4px;
   height: var(--ai-chat-header-height, 44px);
   padding: 0 12px;
   border-bottom: 1px solid var(--ai-chat-border-color, #e5e5e5);
 }
 
-.ai-chat-sidebar__new-chat {
-  width: 100%;
+.ai-chat-sidebar__header .ai-chat-sidebar__new-chat {
+  flex: 1;
+}
+
+.ai-chat-sidebar__clear-all {
+  flex-shrink: 0;
 }
 
 .ai-chat-sidebar__empty {

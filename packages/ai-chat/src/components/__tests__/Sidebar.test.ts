@@ -11,6 +11,7 @@ const mockCreateConversation = vi.fn()
 const mockDeleteConversation = vi.fn()
 const mockRenameConversation = vi.fn()
 const mockSwitchConversation = vi.fn()
+const mockClearAllConversations = vi.fn()
 
 vi.mock('../../composables/useSession', () => ({
   useSession: () => ({
@@ -18,6 +19,7 @@ vi.mock('../../composables/useSession', () => ({
     currentConversationId: mockCurrentConversationId,
     createConversation: mockCreateConversation,
     deleteConversation: mockDeleteConversation,
+    clearAllConversations: mockClearAllConversations,
     renameConversation: mockRenameConversation,
     switchConversation: mockSwitchConversation,
   }),
@@ -28,6 +30,8 @@ const mockT = vi.fn((path: string) => {
   const map: Record<string, string> = {
     'conversation.newChat': 'New Chat',
     'conversation.deleteConfirm': 'Are you sure you want to delete this conversation?',
+    'conversation.clearAll': 'Clear All',
+    'conversation.clearAllConfirm': 'Are you sure you want to clear all conversations? This action cannot be undone.',
     'conversation.rename': 'Rename',
     'conversation.empty': 'No conversations yet',
   }
@@ -105,6 +109,7 @@ describe('Sidebar', () => {
     mockCurrentConversationId.value = null
     mockCreateConversation.mockReset()
     mockDeleteConversation.mockReset()
+    mockClearAllConversations.mockReset()
     mockRenameConversation.mockReset()
     mockSwitchConversation.mockReset()
     mockT.mockClear()
@@ -159,7 +164,7 @@ describe('Sidebar', () => {
     mockConversations.value = [conv]
 
     const wrapper = mountSidebar()
-    const popconfirm = wrapper.findComponent({ name: 'ElPopconfirm' })
+    const popconfirm = wrapper.find('.ai-chat-sidebar__item-actions').findComponent({ name: 'ElPopconfirm' })
     popconfirm.vm.$emit('confirm')
     await nextTick()
 
@@ -232,6 +237,28 @@ describe('Sidebar', () => {
 
     expect(mockT).toHaveBeenCalledWith('conversation.newChat')
     expect(mockT).toHaveBeenCalledWith('conversation.empty')
+  })
+
+  it('clear all button triggers clearAllConversations via popconfirm', async () => {
+    const conv = makeConversation({ id: 'c1', title: 'Chat' })
+    mockConversations.value = [conv]
+
+    const wrapper = mountSidebar()
+    const clearPopconfirm = wrapper.find('.ai-chat-sidebar__header').findComponent({ name: 'ElPopconfirm' })
+    clearPopconfirm.vm.$emit('confirm')
+    await nextTick()
+
+    expect(mockClearAllConversations).toHaveBeenCalled()
+  })
+
+  it('clear all button is disabled when conversation list is empty', () => {
+    mockConversations.value = []
+
+    const wrapper = mountSidebar()
+    const clearBtn = wrapper.find('.ai-chat-sidebar__clear-all')
+
+    expect(clearBtn.exists()).toBe(true)
+    expect(clearBtn.attributes('disabled')).toBeDefined()
   })
 
   it('handles undefined conversations gracefully (initial liveQuery state)', () => {

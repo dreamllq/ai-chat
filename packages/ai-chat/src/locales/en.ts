@@ -2,6 +2,8 @@ export interface AiChatLocale {
   conversation: {
     newChat: string
     deleteConfirm: string
+    clearAll: string
+    clearAllConfirm: string
     rename: string
     empty: string
   }
@@ -111,6 +113,8 @@ export const en: AiChatLocale = {
   conversation: {
     newChat: 'New Chat',
     deleteConfirm: 'Are you sure you want to delete this conversation?',
+    clearAll: 'Clear All',
+    clearAllConfirm: 'Are you sure you want to clear all conversations? This action cannot be undone.',
     rename: 'Rename',
     empty: 'No conversations yet',
   },

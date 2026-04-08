@@ -103,6 +103,14 @@ export function useSession() {
     }
   }
 
+  async function clearAllConversations(): Promise<void> {
+    await conversationService.deleteAll()
+    currentConversationId.value = null
+    try {
+      localStorage.removeItem(STORAGE_KEY)
+    } catch {}
+  }
+
   async function renameConversation(id: string, title: string): Promise<void> {
     await conversationService.update(id, { title })
   }
@@ -121,6 +129,7 @@ export function useSession() {
     currentMessages,
     createConversation,
     deleteConversation,
+    clearAllConversations,
     renameConversation,
     switchConversation,
   }

@@ -4,6 +4,8 @@ export const ja: AiChatLocale = {
   conversation: {
     newChat: '新しいチャット',
     deleteConfirm: 'この会話を削除してもよろしいですか？',
+    clearAll: 'すべて削除',
+    clearAllConfirm: 'すべての会話を削除してもよろしいですか？この操作は元に戻せません。',
     rename: '名前の変更',
     empty: '会話がありません',
   },

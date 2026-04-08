@@ -29,6 +29,13 @@ export class ConversationService {
     await db.messages.where('conversationId').equals(id).delete()
     await db.conversations.delete(id)
   }
+
+  async deleteAll(): Promise<void> {
+    // Cascade delete all messages and sub-agent executions first
+    await db.messages.clear()
+    await db.subAgentExecutions.clear()
+    await db.conversations.clear()
+  }
 }
 
 // === Message Service ===

@@ -4,6 +4,8 @@ export const zhCn: AiChatLocale = {
   conversation: {
     newChat: '新对话',
     deleteConfirm: '确定要删除这个对话吗？',
+    clearAll: '清空',
+    clearAllConfirm: '确定要清空所有对话吗？此操作不可撤销。',
     rename: '重命名',
     empty: '暂无对话',
   },
