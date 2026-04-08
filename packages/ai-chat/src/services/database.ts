@@ -25,8 +25,9 @@ export class ConversationService {
   }
 
   async delete(id: string): Promise<void> {
-    // Cascade delete messages
+    // Cascade delete messages and sub-agent executions
     await db.messages.where('conversationId').equals(id).delete()
+    await db.subAgentExecutions.where('conversationId').equals(id).delete()
     await db.conversations.delete(id)
   }
 
