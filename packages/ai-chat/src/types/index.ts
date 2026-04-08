@@ -133,6 +133,18 @@ export interface MCPServerConfig {
   env?: Record<string, string>
 }
 
+// === Skill ===
+
+/** 技能定义 — 传入 markdown 文档字符串，LLM 按需加载完整指令 */
+export interface SkillDefinition {
+  /** 技能名称（唯一标识，用于 LLM 调用 use_skill 时指定） */
+  name: string
+  /** 技能描述（LLM 根据此描述判断是否需要使用该技能） */
+  description: string
+  /** 技能完整指令（markdown 格式），LLM 调用 use_skill 后获取 */
+  instructions: string
+}
+
 // === Agent ===
 
 /** 智能体定义 */
@@ -155,6 +167,8 @@ export interface AgentDefinition {
   tools?: ToolDefinition[]
   /** MCP 服务器列表 */
   mcpServers?: MCPServerConfig[]
+  /** 技能列表 — 传入 markdown 文档字符串，LLM 通过 use_skill 工具按需加载（仅 DeepAgentRunner 有效） */
+  skills?: SkillDefinition[]
   /** 可调用的子 Agent ID 列表。未设置时使用所有已注册的 Agent（仅 DeepAgentRunner 有效） */
   allowedAgents?: string[]
   /** 是否在切换 Agent 列表中隐藏。隐藏后仍可正常使用，仅不显示在 UI 选择列表中 */

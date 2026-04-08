@@ -31,6 +31,7 @@ export type {
   AttachmentType,
   MessageAttachment,
   ChatEventType,
+  SkillDefinition,
 } from './types'
 
 export {
