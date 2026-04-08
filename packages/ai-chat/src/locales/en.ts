@@ -50,17 +50,6 @@ export interface AiChatLocale {
     defaultChatName: string
     defaultChatDesc: string
   }
-  skill: {
-    title: string
-    addSkill: string
-    removeSkill: string
-    name: string
-    description: string
-    instructions: string
-    namePlaceholder: string
-    descriptionPlaceholder: string
-    instructionsPlaceholder: string
-  }
   upload: {
     button: string
     dragHere: string
@@ -169,17 +158,6 @@ export const en: AiChatLocale = {
     select: 'Select Agent',
     defaultChatName: 'Chat',
     defaultChatDesc: 'Default chat agent',
-  },
-  skill: {
-    title: 'Skills',
-    addSkill: 'Add Skill',
-    removeSkill: 'Remove Skill',
-    name: 'Name',
-    description: 'Description',
-    instructions: 'Instructions',
-    namePlaceholder: 'Enter skill name',
-    descriptionPlaceholder: 'Describe when this skill should be used',
-    instructionsPlaceholder: 'Detailed instructions for the agent...',
   },
   upload: {
     button: 'Upload File',
