@@ -111,7 +111,17 @@ const fileUploadService = s3Config.region
 
     <!-- ── Chat area ───────────────────────────────────────────────── -->
     <main class="demo-main">
-      <AiChat :locale="currentLocale" :file-upload-service="fileUploadService" />
+      <AiChat :locale="currentLocale" :file-upload-service="fileUploadService">
+        <template #empty>
+          <div class="empty-state">
+            <svg class="empty-state__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+            </svg>
+            <h2 class="empty-state__title">Start a conversation</h2>
+            <p class="empty-state__desc">Type a message below to begin chatting with AI</p>
+          </div>
+        </template>
+      </AiChat>
     </main>
   </div>
 </template>
@@ -251,5 +261,37 @@ body,
 .demo-main {
   flex: 1;
   overflow: hidden;
+}
+
+/* ── Empty state ──────────────────────────────────────────────────── */
+.empty-state {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  color: #999;
+  user-select: none;
+}
+
+.empty-state__icon {
+  width: 48px;
+  height: 48px;
+  color: #c5c5cc;
+}
+
+.empty-state__title {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+  color: #666;
+}
+
+.empty-state__desc {
+  margin: 0;
+  font-size: 14px;
+  color: #999;
 }
 </style>
