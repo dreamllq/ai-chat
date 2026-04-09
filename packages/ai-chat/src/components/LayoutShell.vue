@@ -44,7 +44,7 @@ function toggleSidebar() {
           text
           @click="toggleSidebar"
         >
-          <ElIcon :size="20">
+          <ElIcon :size="18">
             <svg v-if="!sidebarCollapsed" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <rect x="3" y="3" width="18" height="18" rx="2" />
               <line x1="9" y1="3" x2="9" y2="21" />
@@ -62,10 +62,12 @@ function toggleSidebar() {
           text
           @click="emit('newChat')"
         >
-          <ElIcon :size="20">
+          <ElIcon :size="18">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <polyline points="23 4 23 10 17 10" />
-              <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10" />
+              <path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
+              <path d="M3 3v5h5" />
+              <path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16" />
+              <path d="M16 16h5v5" />
             </svg>
           </ElIcon>
         </ElButton>
@@ -131,21 +133,25 @@ function toggleSidebar() {
 .ai-chat-header {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 4px;
   height: var(--ai-chat-header-height);
   min-height: var(--ai-chat-header-height);
-  padding: 0 16px;
+  padding: 0 12px;
   border-bottom: 1px solid var(--ai-chat-border-color);
   background-color: var(--ai-chat-bg);
 }
 
 .ai-chat-sidebar-toggle {
   flex-shrink: 0;
+  padding: 4px;
+  margin-left: 0;
   cursor: pointer;
 }
 
 .ai-chat-sidebar-new-chat-collapsed {
   flex-shrink: 0;
+  padding: 4px;
+  margin-left: 0;
   cursor: pointer;
 }
 
