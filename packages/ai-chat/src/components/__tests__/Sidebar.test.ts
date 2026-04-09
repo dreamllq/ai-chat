@@ -7,6 +7,7 @@ import Sidebar from '../Sidebar.vue'
 // --- Mock useSession ---
 const mockConversations = ref<Conversation[] | undefined>(undefined)
 const mockCurrentConversationId = ref<string | null>(null)
+const mockCurrentMessages = ref([])
 const mockCreateConversation = vi.fn()
 const mockDeleteConversation = vi.fn()
 const mockRenameConversation = vi.fn()
@@ -17,6 +18,7 @@ vi.mock('../../composables/useSession', () => ({
   useSession: () => ({
     conversations: mockConversations,
     currentConversationId: mockCurrentConversationId,
+    currentMessages: mockCurrentMessages,
     createConversation: mockCreateConversation,
     deleteConversation: mockDeleteConversation,
     clearAllConversations: mockClearAllConversations,
@@ -266,7 +268,41 @@ describe('Sidebar', () => {
 
     const wrapper = mountSidebar()
 
-    // Should show empty state without crashing
     expect(wrapper.find('.ai-chat-sidebar__empty').exists()).toBe(true)
+  })
+
+  it('New Chat button is disabled when current conversation has no messages', () => {
+    const conv1 = makeConversation({ id: 'c1', messageCount: 2 })
+    const conv2 = makeConversation({ id: 'c2' })
+    mockConversations.value = [conv1, conv2]
+    mockCurrentConversationId.value = 'c2'
+
+    const wrapper = mountSidebar()
+    const newChatBtn = wrapper.find('.ai-chat-sidebar__new-chat')
+
+    expect(newChatBtn.attributes('disabled')).toBeDefined()
+  })
+
+  it('New Chat button is enabled when current conversation has messages', () => {
+    const conv1 = makeConversation({ id: 'c1', messageCount: 2 })
+    const conv2 = makeConversation({ id: 'c2' })
+    mockConversations.value = [conv1, conv2]
+    mockCurrentConversationId.value = 'c1'
+
+    const wrapper = mountSidebar()
+    const newChatBtn = wrapper.find('.ai-chat-sidebar__new-chat')
+
+    expect(newChatBtn.attributes('disabled')).toBeUndefined()
+  })
+
+  it('New Chat button is enabled when no conversation is selected', () => {
+    const conv1 = makeConversation({ id: 'c1', messageCount: 2 })
+    mockConversations.value = [conv1]
+    mockCurrentConversationId.value = null
+
+    const wrapper = mountSidebar()
+    const newChatBtn = wrapper.find('.ai-chat-sidebar__new-chat')
+
+    expect(newChatBtn.attributes('disabled')).toBeUndefined()
   })
 })

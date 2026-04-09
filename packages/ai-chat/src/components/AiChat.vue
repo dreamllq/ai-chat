@@ -50,9 +50,10 @@ const conversationService = new ConversationService()
 
 const modelIdForSidebar = computed(() => currentModelId.value ?? undefined)
 
-const isNewChatDisabled = computed(() =>
-  currentConversationId.value !== null && currentMessages.value.length === 0
-)
+const isNewChatDisabled = computed(() => {
+  if (!currentConversationId.value) return false
+  return currentConversation.value ? !currentConversation.value.messageCount : false
+})
 
 function handleNewChat() {
   createConversation(currentAgentId.value ?? '', currentModelId.value ?? '')

@@ -72,6 +72,8 @@ describe('useSession', () => {
   it('switchConversation changes currentConversationId', async () => {
     const conv1 = await session.createConversation('agent-1', 'model-1')
     await flushLiveQuery()
+    await messageService.create({ conversationId: conv1.id, role: 'user', content: 'hi' })
+    await flushLiveQuery()
     const conv2 = await session.createConversation('agent-2', 'model-2')
     await flushLiveQuery()
 
@@ -104,7 +106,6 @@ describe('useSession', () => {
     })
     await flushLiveQuery()
 
-    // Create a second conversation with its own messages
     const conv2 = await session.createConversation('agent-2', 'model-2')
     await flushLiveQuery()
     await messageService.create({
@@ -171,6 +172,12 @@ describe('useSession', () => {
   it('deleteConversation removes it and auto-switches to adjacent', async () => {
     const conv1 = await session.createConversation('agent-1', 'model-1')
     await flushLiveQuery()
+    await messageService.create({
+      conversationId: conv1.id,
+      role: 'user',
+      content: 'Conv1 message',
+    })
+    await flushLiveQuery()
     const conv2 = await session.createConversation('agent-2', 'model-2')
     await flushLiveQuery()
     // Add messages to conv2
@@ -210,5 +217,54 @@ describe('useSession', () => {
   it('empty state — currentMessages returns empty when no conversation selected', () => {
     expect(session.currentMessages.value ?? []).toEqual([])
     expect(session.currentConversation.value).toBeUndefined()
+  })
+
+  it('messageCount is incremented when a message is created', async () => {
+    const conv = await session.createConversation('agent-1', 'model-1')
+    await flushLiveQuery()
+    expect(conv.messageCount).toBeUndefined()
+
+    await messageService.create({ conversationId: conv.id, role: 'user', content: 'hello' })
+    await flushLiveQuery()
+
+    const updated = session.conversations.value!.find(c => c.id === conv.id)
+    expect(updated?.messageCount).toBe(1)
+
+    await messageService.create({ conversationId: conv.id, role: 'assistant', content: 'hi' })
+    await flushLiveQuery()
+
+    const updated2 = session.conversations.value!.find(c => c.id === conv.id)
+    expect(updated2?.messageCount).toBe(2)
+  })
+
+  it('createConversation reuses existing empty conversation instead of creating new', async () => {
+    const conv1 = await session.createConversation('agent-1', 'model-1')
+    await flushLiveQuery()
+    await messageService.create({ conversationId: conv1.id, role: 'user', content: 'hi' })
+    await flushLiveQuery()
+
+    const conv2 = await session.createConversation('agent-2', 'model-2')
+    await flushLiveQuery()
+    expect(conv2.id).not.toBe(conv1.id)
+
+    const result = await session.createConversation('agent-3', 'model-3')
+    await flushLiveQuery()
+
+    expect(result.id).toBe(conv2.id)
+    expect(session.conversations.value).toHaveLength(2)
+  })
+
+  it('createConversation creates new when all conversations have messages', async () => {
+    const conv1 = await session.createConversation('agent-1', 'model-1')
+    await flushLiveQuery()
+    await messageService.create({ conversationId: conv1.id, role: 'user', content: 'hi' })
+    await flushLiveQuery()
+
+    const conv2 = await session.createConversation('agent-2', 'model-2')
+    await flushLiveQuery()
+
+    expect(conv2.id).not.toBe(conv1.id)
+    expect(session.conversations.value).toHaveLength(2)
+    expect(session.currentConversationId.value).toBe(conv2.id)
   })
 })

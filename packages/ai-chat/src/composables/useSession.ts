@@ -78,9 +78,14 @@ export function useSession() {
   ensureSubscription(messageService)
 
   async function createConversation(agentId: string, modelId: string): Promise<Conversation> {
-    // If current conversation exists but has no messages, switch to it instead of creating a new one
-    if (currentConversationId.value && currentMessages.value.length === 0) {
-      return currentConversation.value!
+    const list = conversations.value ?? []
+    const emptyConv = list.find(c => !c.messageCount)
+    if (emptyConv) {
+      currentConversationId.value = emptyConv.id
+      try {
+        localStorage.setItem(STORAGE_KEY, emptyConv.id)
+      } catch {}
+      return emptyConv
     }
 
     const conv = await conversationService.create({

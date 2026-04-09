@@ -45,6 +45,9 @@ export class MessageService {
     const id = crypto.randomUUID()
     const message: ChatMessage = { ...data, id, timestamp: Date.now() }
     await db.messages.add(message)
+    await db.conversations.where('id').equals(data.conversationId).modify(conv => {
+      conv.messageCount = (conv.messageCount ?? 0) + 1
+    })
     return message
   }
 

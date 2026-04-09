@@ -55,6 +55,8 @@ export interface Conversation {
   updatedAt: number
   /** 累计 Token 用量 */
   totalTokens?: number
+  /** 消息数量（冗余计数，创建消息时递增） */
+  messageCount?: number
 }
 
 // === 模型配置 ===

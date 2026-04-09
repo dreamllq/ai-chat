@@ -15,9 +15,11 @@ const { t } = useLocale()
 
 const conversationList = computed(() => conversations.value ?? [])
 
-const isNewChatDisabled = computed(() =>
-  currentConversationId.value !== null && currentMessages.value.length === 0
-)
+const isNewChatDisabled = computed(() => {
+  if (!currentConversationId.value) return false
+  const current = conversationList.value.find(c => c.id === currentConversationId.value)
+  return !!current && !current.messageCount
+})
 
 const editingId = ref<string | null>(null)
 const editingTitle = ref('')
