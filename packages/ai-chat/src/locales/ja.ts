@@ -47,6 +47,7 @@ export const ja: AiChatLocale = {
     cancel: 'キャンセル',
     providerOther: 'その他',
     fetchModelsFailed: 'モデルリストの取得に失敗しました',
+    propModelReadOnly: 'このモデルはpropsから提供されており、編集できません。',
   },
   agent: {
     title: 'エージェント',

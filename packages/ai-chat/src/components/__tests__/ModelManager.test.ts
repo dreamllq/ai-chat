@@ -33,6 +33,7 @@ vi.mock('../../composables/useModel', () => ({
     updateModel: updateModelMock,
     deleteModel: deleteModelMock,
     initDefault: vi.fn(),
+    isPropModel: (id: string) => id === 'prop-model',
   }),
 }))
 
@@ -90,7 +91,7 @@ const stubs = {
   },
   ElInput: {
     name: 'ElInput',
-    props: ['modelValue', 'type', 'showPassword', 'placeholder'],
+    props: ['modelValue', 'type', 'showPassword', 'placeholder', 'disabled'],
     emits: ['update:modelValue'],
     template: `
       <input
@@ -104,7 +105,7 @@ const stubs = {
   },
   ElInputNumber: {
     name: 'ElInputNumber',
-    props: ['modelValue', 'min', 'max', 'step'],
+    props: ['modelValue', 'min', 'max', 'step', 'disabled'],
     emits: ['update:modelValue'],
     template: `
       <input
@@ -117,7 +118,7 @@ const stubs = {
   },
   ElSelect: {
     name: 'ElSelect',
-    props: ['modelValue'],
+    props: ['modelValue', 'disabled'],
     emits: ['update:modelValue'],
     template: `
       <select :value="modelValue" data-testid="el-select" @change="$emit('update:modelValue', $event.target.value)">
@@ -132,7 +133,7 @@ const stubs = {
   },
   ElSlider: {
     name: 'ElSlider',
-    props: ['modelValue', 'min', 'max', 'step'],
+    props: ['modelValue', 'min', 'max', 'step', 'disabled'],
     emits: ['update:modelValue'],
     template: `
       <input

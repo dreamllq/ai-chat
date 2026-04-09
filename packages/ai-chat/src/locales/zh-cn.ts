@@ -47,6 +47,7 @@ export const zhCn: AiChatLocale = {
     cancel: '取消',
     providerOther: '其他',
     fetchModelsFailed: '获取模型列表失败',
+    propModelReadOnly: '此模型通过 props 传入，不可编辑。',
   },
   agent: {
     title: '智能体',

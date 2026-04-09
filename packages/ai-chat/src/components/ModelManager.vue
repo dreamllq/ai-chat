@@ -28,7 +28,7 @@ const emit = defineEmits<{
 }>()
 
 const { models, createModel, updateModel,
-  deleteModel } = useModel()
+  deleteModel, isPropModel } = useModel()
 const { t } = useLocale()
 
 const dialogVisible = computed({
@@ -39,6 +39,9 @@ const dialogVisible = computed({
 const selectedModelId = ref<string | null>(null)
 const editingModel = ref<ModelConfig | null>(null)
 const isNewMode = ref(true)
+const isSelectedPropModel = computed(() =>
+  selectedModelId.value ? isPropModel(selectedModelId.value) : false,
+)
 
 const form = reactive({
   name: '',
@@ -150,7 +153,6 @@ function handleNewModel() {
 
 function selectModelItem(model: ModelConfig) {
   if (selectedModelId.value === model.id) return
-  // Select model — fill form with its data, enter edit mode
   selectedModelId.value = model.id
   editingModel.value = model
   isNewMode.value = false
@@ -238,6 +240,7 @@ async function handleDelete(id: string) {
               <span class="model-manager__item-meta">{{ model.provider }} / {{ model.modelName }}</span>
             </div>
             <ElPopconfirm
+              v-if="!isPropModel(model.id)"
               :title="t('model.deleteConfirm')"
               data-testid="el-popconfirm"
               @confirm="handleDelete(model.id)"
@@ -266,6 +269,9 @@ async function handleDelete(id: string) {
             <div class="model-manager__edit-header">
               <span class="model-manager__edit-title">{{ form.name }}</span>
             </div>
+            <div v-if="isSelectedPropModel" class="model-manager__readonly-notice">
+              {{ t('model.propModelReadOnly') }}
+            </div>
             <ElForm
               :model="form"
               label-width="120px"
@@ -277,12 +283,13 @@ async function handleDelete(id: string) {
                 <ElInput
                   v-model="form.name"
                   :placeholder="t('model.name')"
+                  :disabled="isSelectedPropModel"
                   data-testid="el-input"
                 />
               </ElFormItem>
 
               <ElFormItem :label="t('model.provider')">
-                <ElSelect v-model="form.provider" data-testid="el-select">
+                <ElSelect v-model="form.provider" :disabled="isSelectedPropModel" data-testid="el-select">
                   <ElOption
                     v-for="p in providers"
                     :key="p.value"
@@ -297,7 +304,7 @@ async function handleDelete(id: string) {
                 <ElInput
                   v-model="form.endpoint"
                   :placeholder="t('model.endpoint')"
-                  :disabled="form.provider !== 'other'"
+                  :disabled="isSelectedPropModel || form.provider !== 'other'"
                   data-testid="el-input"
                 />
               </ElFormItem>
@@ -308,6 +315,7 @@ async function handleDelete(id: string) {
                   type="password"
                   show-password
                   :placeholder="t('model.apiKeyPlaceholder')"
+                  :disabled="isSelectedPropModel"
                   data-testid="el-input"
                 />
               </ElFormItem>
@@ -320,6 +328,7 @@ async function handleDelete(id: string) {
                   allow-create
                   default-first-option
                   :loading="isLoadingModels"
+                  :disabled="isSelectedPropModel"
                   data-testid="el-select"
                 >
                   <ElOption
@@ -337,6 +346,7 @@ async function handleDelete(id: string) {
                   :min="0"
                   :max="2"
                   :step="0.1"
+                  :disabled="isSelectedPropModel"
                   data-testid="el-slider"
                 />
               </ElFormItem>
@@ -346,11 +356,12 @@ async function handleDelete(id: string) {
                   v-model="form.maxTokens"
                   :min="1"
                   :max="100000"
+                  :disabled="isSelectedPropModel"
                   data-testid="el-input-number"
                 />
               </ElFormItem>
 
-              <ElFormItem>
+              <ElFormItem v-if="!isSelectedPropModel">
                 <ElButton type="primary" data-testid="el-button" @click="handleUpdate">
                   {{ t('model.save') }}
                 </ElButton>
@@ -610,5 +621,15 @@ async function handleDelete(id: string) {
 
 .model-manager__form :deep(.el-slider) {
   padding-right: 20px;
+}
+
+.model-manager__readonly-notice {
+  margin: 0 24px 12px;
+  padding: 8px 12px;
+  background: var(--el-color-info-light-9);
+  border-radius: 4px;
+  font-size: 13px;
+  color: var(--el-text-color-secondary);
+  line-height: 1.5;
 }
 </style>

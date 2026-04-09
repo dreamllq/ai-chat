@@ -127,6 +127,11 @@ export function useModel() {
     resolveDefaultModel(models.value ?? [])
   }
 
+  /** Check whether a model originates from props (not stored in IndexedDB) */
+  function isPropModel(id: string): boolean {
+    return propModels.some((m) => m.id === id) && !(dbModels.value ?? []).some((m) => m.id === id)
+  }
+
   return {
     models,
     currentModelId,
@@ -136,5 +141,6 @@ export function useModel() {
     deleteModel,
     selectModel,
     initDefault,
+    isPropModel,
   }
 }
