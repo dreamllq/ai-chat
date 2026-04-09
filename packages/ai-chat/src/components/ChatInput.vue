@@ -16,6 +16,7 @@ const props = defineProps<{
   fileUploadService?: FileUploadService | null
   currentAgentId?: string
   showAgentSelector?: boolean
+  showModelSelector?: boolean
 }>()
 
 const emit = defineEmits<{
@@ -200,6 +201,7 @@ function handleModelChange(id: string) {
 
           <!-- Model selector -->
           <ElSelect
+            v-if="props.showModelSelector !== false"
             :model-value="currentModelId"
             :placeholder="t('model.selectModel')"
             size="small"

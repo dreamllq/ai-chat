@@ -12,7 +12,7 @@ import { useAgent } from '../composables/useAgent'
 import { ConversationService } from '../services/database'
 import { agentRegistry } from '../services/agent'
 import type { AiChatLocale, LocaleName } from '../locales'
-import type { FileUploadService, Conversation, MessageAttachment } from '../types'
+import type { FileUploadService, Conversation, MessageAttachment, ModelConfig } from '../types'
 
 const props = withDefaults(defineProps<{
   locale?: AiChatLocale | LocaleName
@@ -21,6 +21,9 @@ const props = withDefaults(defineProps<{
   sidebarCollapsed?: boolean
   showAgentSelector?: boolean
   defaultAgentId?: string
+  showModelSelector?: boolean
+  defaultModelId?: string
+  models?: ModelConfig[]
 }>(), {
   locale: 'en',
   fileUploadService: null,
@@ -28,6 +31,9 @@ const props = withDefaults(defineProps<{
   sidebarCollapsed: undefined,
   showAgentSelector: true,
   defaultAgentId: undefined,
+  showModelSelector: true,
+  defaultModelId: undefined,
+  models: undefined,
 })
 
 const emit = defineEmits<{
@@ -115,7 +121,11 @@ watch(currentConversation, async (conv: Conversation | undefined) => {
 })
 
 onMounted(() => {
-  initDefault()
+  initDefault({
+    defaultModelId: props.defaultModelId,
+    showModelSelector: props.showModelSelector,
+    models: props.models,
+  })
   initDefaultAgent({ defaultAgentId: props.defaultAgentId, showAgentSelector: props.showAgentSelector })
 })
 
@@ -163,6 +173,7 @@ async function handleSend(payload: { content: string; attachments?: MessageAttac
             :is-streaming="isStreaming"
             :file-upload-service="props.fileUploadService"
             :show-agent-selector="props.showAgentSelector"
+            :show-model-selector="props.showModelSelector"
             @update:current-agent-id="handleAgentChange"
             @update:current-model-id="handleModelChange"
             @send="handleSend"
