@@ -14,6 +14,7 @@ Vue 3 AI 聊天组件库。内置 LangChain.js 驱动的智能体引擎、Indexe
 - 💾 **本地持久化** — 基于 Dexie (IndexedDB)，会话和消息自动保存
 - 🌍 **多语言** — 内置中文、英文、日文，支持自定义 locale
 - 📎 **文件上传** — 通过 `FileUploadService` 接口对接任意存储后端
+- 🔄 **请求代理** — 通过 `requestInterceptor` 支持后端代理、动态 Token 刷新和自定义请求头
 
 ## 安装
 
@@ -526,6 +527,104 @@ pending → uploading → success
 - **取消上传**：用户在完成前移除文件，自动 `abort()` 取消进行中的请求
 - **全部就绪检查**：发送按钮仅在所有文件上传成功后才可用
 
+## 请求代理
+
+默认情况下，组件直接从前端请求 LLM API，需要用户在前端配置 `endpoint` 和 `apiKey`。但在很多场景下这不太适合：
+
+- **跨域问题**：浏览器直接请求第三方 API 受 CORS 限制
+- **密钥安全**：`apiKey` 存在前端 IndexedDB 中会被用户看到
+- **动态鉴权**：后端代理可能需要带动态刷新的 `access_token`，不能写死
+
+通过 `ModelConfig` 的 `requestInterceptor` 字段，可以在每次 LLM API 请求前拦截并修改请求参数。
+
+### 使用方式
+
+带 `requestInterceptor` 的模型需通过 `<AiChat>` 的 `:models` prop 注入（因为函数不可序列化，不能存入 IndexedDB）：
+
+```vue
+<script setup>
+import { AiChat } from '@ai-chat/vue'
+
+const models = [{
+  id: 'proxy-model',
+  name: '后端代理模型',
+  provider: 'proxy',
+  endpoint: 'https://api.openai.com/v1',
+  apiKey: '',
+  modelName: 'gpt-4',
+  createdAt: Date.now(),
+  requestInterceptor: async (ctx) => {
+    // 替换 URL 为自建代理地址
+    ctx.url = ctx.url.replace('https://api.openai.com/v1', '/api/llm')
+    // 动态获取最新 access_token
+    const token = await getAccessToken()
+    ctx.headers['Authorization'] = `Bearer ${token}`
+    return ctx
+  }
+}]
+</script>
+
+<template>
+  <AiChat :models="models" />
+</template>
+```
+
+### 拦截器上下文
+
+拦截器接收 `RequestContext` 对象，包含当前请求的完整信息：
+
+```ts
+interface RequestContext {
+  url: string                      // 完整请求 URL
+  method: string                   // 请求方法（通常为 POST）
+  headers: Record<string, string>  // 已构建好的 headers
+  body?: unknown                   // 请求 body
+}
+```
+
+你可以修改 `RequestContext` 的任何字段后返回，组件会用修改后的上下文发起请求。
+
+### 常见场景
+
+#### 后端代理转发
+
+将前端请求全部转发到自建后端，后端负责添加 API Key 后转发给 LLM：
+
+```ts
+requestInterceptor: (ctx) => {
+  ctx.url = '/api/llm' + new URL(ctx.url).pathname
+  delete ctx.headers['Authorization']
+  return ctx
+}
+```
+
+#### 动态 Token 刷新
+
+后端代理使用 OAuth 鉴权，`access_token` 会过期，需要每次请求前动态获取：
+
+```ts
+import { refreshTokenIfNeeded } from './auth'
+
+requestInterceptor: async (ctx) => {
+  ctx.url = '/api/llm'
+  const { accessToken } = await refreshTokenIfNeeded()
+  ctx.headers['Authorization'] = `Bearer ${accessToken}`
+  return ctx
+}
+```
+
+#### 多租户场景
+
+不同租户使用不同的后端端点，通过 header 传递租户信息：
+
+```ts
+requestInterceptor: (ctx) => {
+  ctx.url = `/api/tenant/${currentTenantId}/llm`
+  ctx.headers['X-Request-Id'] = crypto.randomUUID()
+  return ctx
+}
+```
+
 ## 国际化
 
 ### 使用内置语言
@@ -944,6 +1043,23 @@ type ChatEventType =
 ### Model（模型）
 
 ```ts
+/** 请求上下文 — 拦截器拿到的请求信息 */
+interface RequestContext {
+  /** 请求 URL */
+  url: string
+  /** 请求方法 */
+  method: string
+  /** 已构建好的 headers（包含 Authorization 等） */
+  headers: Record<string, string>
+  /** 请求 body */
+  body?: unknown
+}
+
+/** 请求拦截器 — 在每次 LLM API 请求前调用，可修改 URL、headers 等 */
+type RequestInterceptor = (
+  context: RequestContext,
+) => Promise<RequestContext> | RequestContext
+
 /** 模型配置 */
 interface ModelConfig {
   /** 模型配置唯一标识 */
@@ -964,6 +1080,8 @@ interface ModelConfig {
   maxTokens?: number
   /** 创建时间戳 */
   createdAt: number
+  /** 请求拦截器（函数类型，不可序列化，需通过 :models prop 注入） */
+  requestInterceptor?: RequestInterceptor
 }
 ```
 

@@ -70,6 +70,26 @@ const s3Config: S3StorageConfig = {
 const fileUploadService = s3Config.region
   ? new S3StorageService(s3Config)
   : null
+
+const models = [
+  {
+    id: 'proxy-model',
+    name: '后端代理模型',
+    provider: 'proxy',
+    endpoint: 'https://api.openai.com/v1',
+    apiKey: '',
+    modelName: 'gpt-4',
+    createdAt: Date.now(),
+    requestInterceptor: async (ctx) => {
+      // 替换 URL 为自建代理地址
+      ctx.url = ctx.url.replace('https://api.openai.com/v1', '/api/llm')
+      // 动态获取最新 access_token
+      const token = await getAccessToken()
+      ctx.headers['Authorization'] = `Bearer ${token}`
+      return ctx
+    }
+  }
+]
 </script>
 
 <template>
@@ -114,6 +134,7 @@ const fileUploadService = s3Config.region
       <AiChat 
         :locale="currentLocale"
         :file-upload-service="fileUploadService"
+        :models="models"
       >
         <template #empty>
           <div class="empty-state">
