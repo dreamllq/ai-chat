@@ -61,6 +61,23 @@ export interface Conversation {
 
 // === 模型配置 ===
 
+/** 请求上下文 — 拦截器拿到的请求信息 */
+export interface RequestContext {
+  /** 请求 URL */
+  url: string
+  /** 请求方法 */
+  method: string
+  /** 已构建好的 headers（包含 Authorization 等） */
+  headers: Record<string, string>
+  /** 请求 body */
+  body?: unknown
+}
+
+/** 请求拦截器 — 在每次 LLM API 请求前调用，可修改 URL、headers 等 */
+export type RequestInterceptor = (
+  context: RequestContext,
+) => Promise<RequestContext> | RequestContext
+
 /** 模型配置 */
 export interface ModelConfig {
   /** 模型配置唯一标识 */
@@ -81,6 +98,12 @@ export interface ModelConfig {
   maxTokens?: number
   /** 创建时间戳 */
   createdAt: number
+  /**
+   * 请求拦截器 — 在每次 LLM API 请求前调用。
+   * 可用于：替换 URL 为代理地址（解决跨域）、动态注入/替换 headers（解决 token 过期）等。
+   * 注意：函数类型不可序列化，带拦截器的模型需通过 AiChat 的 :models prop 注入，不能存入 IndexedDB。
+   */
+  requestInterceptor?: RequestInterceptor
 }
 
 // === 工具 ===

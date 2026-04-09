@@ -1,26 +1,69 @@
 import { ChatOpenAICompletions } from '@langchain/openai'
+import type { RequestInterceptor } from '../types'
 
-/**
- * Type helpers to extract parameter/return types from base class protected methods
- * without requiring a direct dependency on the `openai` package.
- */
 type DeltaChunkParams = Parameters<ChatOpenAICompletions['_convertCompletionsDeltaToBaseMessageChunk']>
 type DeltaChunkReturn = ReturnType<ChatOpenAICompletions['_convertCompletionsDeltaToBaseMessageChunk']>
 type MessageConvertParams = Parameters<ChatOpenAICompletions['_convertCompletionsMessageToBaseMessage']>
 type MessageConvertReturn = ReturnType<ChatOpenAICompletions['_convertCompletionsMessageToBaseMessage']>
 
-/**
- * Extended ChatOpenAICompletions that extracts `reasoning_content` from
- * OpenAI-compatible API streaming deltas and non-streaming messages.
- *
- * The base ChatOpenAICompletions only extracts `function_call`, `tool_calls`, and `audio`
- * from the SSE delta — it silently drops `reasoning_content` used by reasoning models
- * (e.g., Doubao seed, DeepSeek R1).
- *
- * This subclass overrides the two protected conversion methods to also extract
- * `reasoning_content` and include it in the resulting message's `additional_kwargs`.
- */
+export interface EnhancedChatModelFields {
+  requestInterceptor?: RequestInterceptor
+}
+
+function createInterceptedFetch(interceptor: RequestInterceptor): typeof globalThis.fetch {
+  return async (input: RequestInfo | URL, init?: RequestInit) => {
+    const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url
+    const method = init?.method ?? 'POST'
+
+    const headers: Record<string, string> = {}
+    if (init?.headers) {
+      const hdrs = init.headers instanceof Headers
+        ? Object.fromEntries(init.headers.entries())
+        : Array.isArray(init.headers)
+          ? Object.fromEntries(init.headers as [string, string][])
+          : (init.headers as Record<string, string>)
+      Object.assign(headers, hdrs)
+    }
+
+    let body: unknown
+    if (init?.body) {
+      try {
+        body = JSON.parse(init.body as string)
+      } catch {
+        body = String(init.body)
+      }
+    }
+
+    const ctx = await interceptor({ url, method, headers, body })
+
+    const newHeaders = new Headers(init?.headers)
+    for (const [k, v] of Object.entries(ctx.headers)) {
+      newHeaders.set(k, v)
+    }
+
+    return globalThis.fetch(ctx.url, { ...init, method: ctx.method, headers: newHeaders })
+  }
+}
+
 export class EnhancedChatModel extends ChatOpenAICompletions {
+  constructor(
+    fields: ConstructorParameters<typeof ChatOpenAICompletions>[0] & EnhancedChatModelFields,
+  ) {
+    const { requestInterceptor, ...chatFields } = fields
+
+    if (requestInterceptor) {
+      const config = (chatFields as Record<string, unknown>).configuration as
+        | Record<string, unknown>
+        | undefined
+      ;(chatFields as Record<string, unknown>).configuration = {
+        ...config,
+        fetch: createInterceptedFetch(requestInterceptor),
+      }
+    }
+
+    super(chatFields as ConstructorParameters<typeof ChatOpenAICompletions>[0])
+  }
+
   protected override _convertCompletionsDeltaToBaseMessageChunk(
     delta: DeltaChunkParams[0],
     rawResponse: DeltaChunkParams[1],

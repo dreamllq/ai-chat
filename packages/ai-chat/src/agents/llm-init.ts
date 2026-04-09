@@ -2,12 +2,6 @@ import { EnhancedChatModel } from './chat-model'
 import type { StructuredToolInterface } from '@langchain/core/tools'
 import type { ModelConfig, ChatOptions } from '../types'
 
-/**
- * Create a EnhancedChatModel instance from a ModelConfig, with optional overrides and tool binding.
- *
- * Temperature priority: options?.temperature ?? model.temperature ?? 0.7
- * MaxTokens priority:   options?.maxTokens ?? model.maxTokens
- */
 export function createLLM(
   model: ModelConfig,
   options?: ChatOptions,
@@ -20,6 +14,7 @@ export function createLLM(
     maxTokens: options?.maxTokens ?? model.maxTokens,
     streaming: true,
     streamUsage: true,
+    requestInterceptor: model.requestInterceptor,
   })
 
   if (tools && tools.length > 0) {
