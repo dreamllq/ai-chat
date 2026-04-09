@@ -114,8 +114,6 @@ const fileUploadService = s3Config.region
       <AiChat 
         :locale="currentLocale"
         :file-upload-service="fileUploadService"
-        :show-agent-selector="false"
-        default-agent-id="demo-form-schema"
       >
         <template #empty>
           <div class="empty-state">
