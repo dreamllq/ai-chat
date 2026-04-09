@@ -148,7 +148,10 @@ async function handleSend(payload: { content: string; attachments?: MessageAttac
           <Sidebar :agent-id="currentAgentId" :model-id="modelIdForSidebar" />
         </template>
         <template #messages>
-          <ChatMessageList />
+          <ChatMessageList v-if="currentMessages.length > 0" />
+          <div v-else class="ai-chat__empty">
+            <slot name="empty" />
+          </div>
         </template>
         <template #input>
           <ChatInput
@@ -168,6 +171,12 @@ async function handleSend(payload: { content: string; attachments?: MessageAttac
 
 <style scoped>
 .ai-chat {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+
+.ai-chat__empty {
   width: 100%;
   height: 100%;
   overflow: hidden;
