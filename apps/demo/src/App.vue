@@ -111,7 +111,12 @@ const fileUploadService = s3Config.region
 
     <!-- ── Chat area ───────────────────────────────────────────────── -->
     <main class="demo-main">
-      <AiChat :locale="currentLocale" :file-upload-service="fileUploadService">
+      <AiChat 
+        :locale="currentLocale"
+        :file-upload-service="fileUploadService"
+        :show-agent-selector="false"
+        default-agent-id="demo-form-schema"
+      >
         <template #empty>
           <div class="empty-state">
             <svg class="empty-state__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
