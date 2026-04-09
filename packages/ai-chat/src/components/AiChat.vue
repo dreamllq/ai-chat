@@ -19,11 +19,15 @@ const props = withDefaults(defineProps<{
   fileUploadService?: FileUploadService | null
   defaultSidebarCollapsed?: boolean
   sidebarCollapsed?: boolean
+  showAgentSelector?: boolean
+  defaultAgentId?: string
 }>(), {
   locale: 'en',
   fileUploadService: null,
   defaultSidebarCollapsed: false,
   sidebarCollapsed: undefined,
+  showAgentSelector: true,
+  defaultAgentId: undefined,
 })
 
 const emit = defineEmits<{
@@ -112,7 +116,7 @@ watch(currentConversation, async (conv: Conversation | undefined) => {
 
 onMounted(() => {
   initDefault()
-  initDefaultAgent()
+  initDefaultAgent({ defaultAgentId: props.defaultAgentId, showAgentSelector: props.showAgentSelector })
 })
 
 async function handleSend(payload: { content: string; attachments?: MessageAttachment[] }) {
@@ -158,6 +162,7 @@ async function handleSend(payload: { content: string; attachments?: MessageAttac
             :current-agent-id="currentAgentId"
             :is-streaming="isStreaming"
             :file-upload-service="props.fileUploadService"
+            :show-agent-selector="props.showAgentSelector"
             @update:current-agent-id="handleAgentChange"
             @update:current-model-id="handleModelChange"
             @send="handleSend"

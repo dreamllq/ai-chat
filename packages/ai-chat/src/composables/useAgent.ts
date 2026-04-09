@@ -6,18 +6,17 @@ import type { AgentDefinition } from '../types'
 
 const STORAGE_KEY = 'ai-chat:selected-agent-id'
 
-// Module-level singleton — shared across all useAgent() callers
 const currentAgentId = ref<string>(DEFAULT_AGENT_ID)
+let agentConfig: { defaultAgentId?: string; showAgentSelector: boolean } = { showAgentSelector: true }
 
-// Restore persisted selection on module load
 try {
   const saved = localStorage.getItem(STORAGE_KEY)
   if (saved) currentAgentId.value = saved
 } catch {}
 
-/** Reset singleton state (for testing) */
 export function _resetAgentState() {
   currentAgentId.value = DEFAULT_AGENT_ID
+  agentConfig = { showAgentSelector: true }
   try {
     localStorage.removeItem(STORAGE_KEY)
   } catch {}
@@ -49,19 +48,34 @@ export function useAgent() {
     allAgents.value.find((a) => a.id === currentAgentId.value),
   )
 
-  // Validate persisted selection against loaded agents
-  watch(allAgents, (loaded) => {
-    if (currentAgentId.value && loaded.length > 0) {
-      const exists = loaded.some((a) => a.id === currentAgentId.value)
-      if (!exists) {
-        // Saved agent no longer exists — fall back to first available
-        const firstId = loaded[0].id
-        currentAgentId.value = firstId
-        try {
-          localStorage.setItem(STORAGE_KEY, firstId)
-        } catch {}
-      }
+  function resolveDefaultAgent(loaded: AgentDefinition[]): void {
+    if (loaded.length === 0) return
+
+    if (!agentConfig.showAgentSelector) {
+      const targetId = agentConfig.defaultAgentId && loaded.some(a => a.id === agentConfig.defaultAgentId)
+        ? agentConfig.defaultAgentId
+        : loaded[0].id
+      currentAgentId.value = targetId
+      try { localStorage.setItem(STORAGE_KEY, targetId) } catch {}
+      return
     }
+
+    const exists = loaded.some(a => a.id === currentAgentId.value)
+    if (exists) return
+
+    if (agentConfig.defaultAgentId && loaded.some(a => a.id === agentConfig.defaultAgentId)) {
+      currentAgentId.value = agentConfig.defaultAgentId
+      try { localStorage.setItem(STORAGE_KEY, agentConfig.defaultAgentId) } catch {}
+      return
+    }
+
+    const firstId = loaded[0].id
+    currentAgentId.value = firstId
+    try { localStorage.setItem(STORAGE_KEY, firstId) } catch {}
+  }
+
+  watch(allAgents, (loaded) => {
+    resolveDefaultAgent(loaded)
   })
 
   function selectAgent(id: string): void {
@@ -71,19 +85,17 @@ export function useAgent() {
     } catch {}
   }
 
-  async function initDefault(): Promise<void> {
-    // Only set default if no valid selection exists
-    const loaded = allAgents.value
-    if (loaded.length > 0) {
-      const exists = loaded.some((a) => a.id === currentAgentId.value)
-      if (!exists) {
-        const firstId = loaded[0].id
-        currentAgentId.value = firstId
-        try {
-          localStorage.setItem(STORAGE_KEY, firstId)
-        } catch {}
+  async function initDefault(options?: {
+    defaultAgentId?: string
+    showAgentSelector?: boolean
+  }): Promise<void> {
+    if (options) {
+      agentConfig = {
+        defaultAgentId: options.defaultAgentId,
+        showAgentSelector: options.showAgentSelector ?? true,
       }
     }
+    resolveDefaultAgent(allAgents.value ?? [])
   }
 
   return {

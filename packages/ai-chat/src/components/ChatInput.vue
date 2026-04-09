@@ -15,6 +15,7 @@ const props = defineProps<{
   isStreaming?: boolean
   fileUploadService?: FileUploadService | null
   currentAgentId?: string
+  showAgentSelector?: boolean
 }>()
 
 const emit = defineEmits<{
@@ -177,6 +178,7 @@ function handleModelChange(id: string) {
         <div class="chat-input__toolbar-left">
           <!-- Agent selector -->
           <ElSelect
+            v-if="props.showAgentSelector !== false"
             :model-value="currentAgentId"
             :placeholder="t('agent.select')"
             size="small"
