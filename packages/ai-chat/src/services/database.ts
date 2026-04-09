@@ -77,7 +77,8 @@ export class MessageService {
 export class ModelService {
   async create(data: Omit<ModelConfig, 'id' | 'createdAt'>): Promise<ModelConfig> {
     const id = crypto.randomUUID()
-    const model: ModelConfig = { ...data, id, createdAt: Date.now() }
+    const { requestInterceptor, ...serializable } = data
+    const model: ModelConfig = { ...serializable, id, createdAt: Date.now() }
     await db.models.add(model)
     return model
   }
@@ -91,7 +92,8 @@ export class ModelService {
   }
 
   async update(id: string, data: Partial<ModelConfig>): Promise<void> {
-    await db.models.update(id, data)
+    const { requestInterceptor, ...serializable } = data
+    await db.models.update(id, serializable)
   }
 
   async delete(id: string): Promise<void> {
