@@ -55,7 +55,6 @@ export class MCPClient {
 
   private async initialize(): Promise<void> {
     const { Client } = await import('@modelcontextprotocol/sdk/client/index.js')
-    const { StreamableHTTPClientTransport } = await import('@modelcontextprotocol/sdk/client/streamableHttp.js')
 
     for (const config of this.configs) {
       if (config.transport === 'stdio') {
@@ -71,14 +70,7 @@ export class MCPClient {
           version: '1.0.0',
         })
 
-        const transport = new StreamableHTTPClientTransport(
-          new URL(config.url!),
-          {
-            requestInit: {
-              headers: config.headers ?? {},
-            },
-          },
-        )
+        const transport = await this.createTransport(config)
 
         await client.connect(transport)
         this.clients.push(client)
@@ -88,6 +80,23 @@ export class MCPClient {
     }
 
     this.initialized = true
+  }
+
+  private async createTransport(config: MCPServerConfig) {
+    const url = new URL(config.url!)
+    const headers = config.headers ?? {}
+
+    if (config.transport === 'sse') {
+      const { SSEClientTransport } = await import('@modelcontextprotocol/sdk/client/sse.js')
+      return new SSEClientTransport(url, {
+        requestInit: { headers },
+      })
+    }
+
+    const { StreamableHTTPClientTransport } = await import('@modelcontextprotocol/sdk/client/streamableHttp.js')
+    return new StreamableHTTPClientTransport(url, {
+      requestInit: { headers },
+    })
   }
 
   private async discoverTools(client: SdkClient): Promise<ToolDefinition[]> {

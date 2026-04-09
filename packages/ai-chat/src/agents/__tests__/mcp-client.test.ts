@@ -23,8 +23,14 @@ vi.mock('@modelcontextprotocol/sdk/client/index.js', () => ({
   Client: MockClient,
 }))
 
+const MockSseTransport = vi.fn().mockImplementation(() => ({}))
+
 vi.mock('@modelcontextprotocol/sdk/client/streamableHttp.js', () => ({
   StreamableHTTPClientTransport: MockTransport,
+}))
+
+vi.mock('@modelcontextprotocol/sdk/client/sse.js', () => ({
+  SSEClientTransport: MockSseTransport,
 }))
 
 // Import after mocks are set up
@@ -82,6 +88,8 @@ describe('MCPClient', () => {
     mockClientListTools.mockResolvedValue({ tools: [] })
     mockClientCallTool.mockResolvedValue({ content: [] })
     mockClientClose.mockResolvedValue(undefined)
+    MockTransport.mockImplementation(() => ({}))
+    MockSseTransport.mockImplementation(() => ({}))
   })
 
   // ═══════════════════════════════════════════════════════════════════
@@ -455,13 +463,15 @@ describe('MCPClient', () => {
     const transportCall = MockTransport.mock.calls[0]
     expect(transportCall[0]).toBeInstanceOf(URL)
     expect(transportCall[0].toString()).toBe('https://weather.example.com/mcp')
+    // SSE transport should NOT be used for http config
+    expect(MockSseTransport).not.toHaveBeenCalled()
   })
 
   // ═══════════════════════════════════════════════════════════════════
-  // 17. sse config also mapped to StreamableHTTPClientTransport
+  // 17. sse config mapped to SSEClientTransport
   // ═══════════════════════════════════════════════════════════════════
 
-  it('should map sse config to StreamableHTTPClientTransport', async () => {
+  it('should map sse config to SSEClientTransport', async () => {
     mockClientListTools.mockResolvedValue({ tools: [] })
 
     const config = makeSseConfig({
@@ -473,8 +483,8 @@ describe('MCPClient', () => {
     const client = new MCPClient([config])
     await client.getTools()
 
-    expect(MockTransport).toHaveBeenCalledTimes(1)
-    expect(MockTransport).toHaveBeenCalledWith(
+    expect(MockSseTransport).toHaveBeenCalledTimes(1)
+    expect(MockSseTransport).toHaveBeenCalledWith(
       expect.any(URL),
       expect.objectContaining({
         requestInit: expect.objectContaining({
@@ -482,6 +492,12 @@ describe('MCPClient', () => {
         }),
       }),
     )
+    // Verify URL was passed correctly
+    const sseCall = MockSseTransport.mock.calls[0]
+    expect(sseCall[0]).toBeInstanceOf(URL)
+    expect(sseCall[0].toString()).toBe('https://sse.example.com/mcp')
+    // StreamableHTTP transport should NOT be used for sse config
+    expect(MockTransport).not.toHaveBeenCalled()
   })
 
   // ═══════════════════════════════════════════════════════════════════
