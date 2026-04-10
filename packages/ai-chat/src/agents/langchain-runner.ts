@@ -3,6 +3,7 @@ import { convertMessages } from './message-converter'
 import { createLLM } from './llm-init'
 import { convertTools } from './tool-converter'
 import { MCPClient } from './mcp-client'
+import { getLocaleInstruction } from '../locales'
 import { ToolMessage, type BaseMessage } from '@langchain/core/messages'
 
 const MAX_TOOL_ITERATIONS = 99
@@ -31,7 +32,10 @@ export class LangChainRunner implements AgentRunner {
     const allTools = [...this.tools, ...mcpTools]
     const lcTools = allTools.length > 0 ? convertTools(allTools) : undefined
 
-    const systemPrompt = options?.systemPrompt ?? this.systemPrompt
+    const basePrompt = options?.systemPrompt ?? this.systemPrompt
+    const systemPrompt = options?.locale
+      ? appendLocaleInstruction(basePrompt, options.locale)
+      : basePrompt
     const llm = createLLM(model, options, lcTools)
     const lcMessages = convertMessages(messages, systemPrompt)
 
@@ -136,4 +140,9 @@ function extractTokenUsage(metadata?: Record<string, unknown>): TokenUsage | und
   const details = metadata.completion_tokens_details as Record<string, unknown> | undefined
   const reasoningTokens = (details?.reasoning_tokens as number) || undefined
   return { promptTokens, completionTokens, totalTokens, reasoningTokens }
+}
+
+function appendLocaleInstruction(basePrompt: string | undefined, locale: string): string {
+  const instruction = getLocaleInstruction(locale)
+  return basePrompt ? `${basePrompt}\n\n${instruction}` : instruction
 }
