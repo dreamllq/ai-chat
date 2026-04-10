@@ -1,11 +1,11 @@
 import { ref, onUnmounted } from 'vue'
 import { useSession } from './useSession'
 import { useModel } from './useModel'
-import { useLocale } from './useLocale'
 import { agentRegistry } from '../services/agent'
 import { MessageService, ConversationService, SubAgentExecutionService } from '../services/database'
 import { TitleGenerator } from '../agents/title-generator'
 import type { MessageAttachment, SubAgentCallInfo, SubAgentLogEntry, TokenUsage, MessageStep, ThinkingStep } from '../types'
+import type { AiChatLocale, LocaleName } from '../locales'
 
 // Module-level singleton state — shared across all useChat() callers
 const isStreaming = ref(false)
@@ -13,11 +13,14 @@ let abortController: AbortController | null = null
 
 const INITIAL_TITLE_MAX_LENGTH = 30
 
+function resolveLocaleName(locale: AiChatLocale | LocaleName): string {
+  return typeof locale === 'string' ? locale : 'en'
+}
+
 export function useChat() {
   const { currentConversation, currentConversationId, currentMessages } =
     useSession()
   const { models } = useModel()
-  const { currentLocaleName } = useLocale()
   const messageService = new MessageService()
   const conversationService = new ConversationService()
   const subAgentExecutionService = new SubAgentExecutionService()
@@ -25,6 +28,7 @@ export function useChat() {
   async function sendMessage(
     content: string,
     attachments?: MessageAttachment[],
+    options?: { locale?: AiChatLocale | LocaleName },
   ): Promise<void> {
     console.log('[useChat] sendMessage called', { content })
 
@@ -117,7 +121,7 @@ export function useChat() {
 
       const generator = runner.chat(messagesForAgent, model, {
         signal: abortController.signal,
-        locale: currentLocaleName.value,
+        locale: options?.locale ? resolveLocaleName(options.locale) : undefined,
       })
 
       let fullContent = ''

@@ -150,7 +150,7 @@ async function handleSend(payload: { content: string; attachments?: MessageAttac
     }
   }
 
-  sendMessage(payload.content, payload.attachments)
+  sendMessage(payload.content, payload.attachments, { locale: props.locale })
 }
 </script>
 
