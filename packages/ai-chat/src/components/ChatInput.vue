@@ -451,6 +451,7 @@ function handleModelChange(id: string) {
   min-height: 44px;
   max-height: 176px;
   overflow-y: auto;
+  box-sizing: border-box;
 }
 
 .chat-input__textarea::placeholder {
