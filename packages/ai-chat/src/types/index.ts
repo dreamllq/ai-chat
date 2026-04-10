@@ -222,6 +222,8 @@ export interface ChatOptions {
   signal?: AbortSignal
   /** token 回调 */
   onToken?: (token: string) => void
+  /** 当前界面语言，用于指示 LLM 用对应语言回复 */
+  locale?: string
 }
 
 // === 子 Agent ===
