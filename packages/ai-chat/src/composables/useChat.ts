@@ -106,6 +106,7 @@ export function useChat() {
     abortController = new AbortController()
 
     let tokenUsage: TokenUsage | undefined
+    let streamingFinalized = false
 
     try {
       const history = await messageService.getByConversationId(conversationId)
@@ -238,6 +239,8 @@ export function useChat() {
             steps: iterationAware ? [...steps] : undefined,
             ...(hadReasoning && !reasoningDoneFired ? { metadata: { ...assistantMsg.metadata, reasoningDone: true } } : {}),
           })
+          streamingFinalized = true
+          isStreaming.value = false
           break
         } else if (chunk.type === 'done') {
           // Finalize last thinking step with tokenUsage
@@ -271,6 +274,7 @@ export function useChat() {
             steps: iterationAware ? [...steps] : undefined,
             ...(hadReasoning && !reasoningDoneFired ? { metadata: { ...assistantMsg.metadata, reasoningDone: true } } : {}),
           })
+          streamingFinalized = true
         } else if (chunk.type === 'sub_agent_start') {
           if (!assistantMsg.metadata) {
             assistantMsg.metadata = {}
@@ -408,6 +412,13 @@ export function useChat() {
     } finally {
       isStreaming.value = false
       abortController = null
+      if (!streamingFinalized) {
+        try {
+          await messageService.update(assistantMsg.id, { isStreaming: false })
+        } catch {
+          // Message may already be finalized
+        }
+      }
     }
 
     // After streaming completes, update conversation's totalTokens

@@ -60,12 +60,14 @@ export class DeepAgentRunner implements AgentRunner {
         yield { type: 'iteration_start' as const, iteration, ...(previousIterationTokenUsage && { tokenUsage: previousIterationTokenUsage }) }
         previousIterationTokenUsage = undefined
 
-        const stream = await llm.stream(currentMessages)
+        const stream = await llm.stream(currentMessages, { signal: options?.signal })
 
         let accUsageMetadata: Record<string, unknown> | undefined
         let accumulated: BaseMessage | undefined
 
         for await (const chunk of stream) {
+          if (options?.signal?.aborted) return
+
           const ch = chunk as unknown as Record<string, unknown>
 
           if (ch.usage_metadata) {
@@ -147,6 +149,7 @@ export class DeepAgentRunner implements AgentRunner {
         }
       }
     } catch (err) {
+      if ((err as Error)?.name === 'AbortError') return
       yield {
         type: 'error' as const,
         error: err instanceof Error ? err.message : String(err),
