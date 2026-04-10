@@ -10,14 +10,14 @@ import type { AgentDefinition } from '@ai-chat/vue/types'
 export const mcpAgentDef: AgentDefinition = {
   id: 'demo-mcp-agent',
   name: 'MCP Agent',
-  description: '通过 MCP 协议连接外部工具服务（天气查询、数据库查询、文件读取）的智能体',
+  description: '文件操作',
   systemPrompt:
-    '你是一个可以调用外部工具的助手。你可以查询天气、执行数据库查询、读取文件。请根据用户需求使用相应工具，用中文回复。',
+    '进行文件操作',
   mcpServers: [
     {
-      name: 'simple-mcp-test',
+      name: 'fs-mcp',
       transport: 'http' as const,
-      url: 'http://127.0.0.1:3001/mcp',
+      url: 'http://127.0.0.1:3000/mcp',
     },
   ],
 }
