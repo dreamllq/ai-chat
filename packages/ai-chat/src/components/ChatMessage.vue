@@ -289,7 +289,6 @@ onUpdated(() => {
               <div class="chat-message__reasoning-header" @click="toggleThinkingStep(index)">
                 <span class="chat-message__reasoning-icon">💭</span>
                 <span class="chat-message__reasoning-title">{{ t('chat.stepThinking') }}</span>
-                <span v-if="step.tokenUsage" class="chat-message__reasoning-tokens">{{ t('chat.stepTokens', { n: formatNumber(step.tokenUsage.reasoningTokens ?? step.tokenUsage.totalTokens) }) }}</span>
                 <span class="chat-message__reasoning-toggle">{{ isThinkingExpanded(index) ? '▲' : '▼' }}</span>
               </div>
               <div class="chat-message__reasoning-collapse" :class="{ 'chat-message__reasoning-collapse--collapsed': !isThinkingExpanded(index) }">
@@ -301,6 +300,11 @@ onUpdated(() => {
             </div>
             <!-- eslint-disable-next-line vue/no-v-html -->
             <div v-if="step.resultContent" class="chat-message__content chat-message__content--step" v-html="renderStepMarkdown(step.resultContent)" />
+            <div v-if="step.tokenUsage" class="chat-message__step-usage">
+              <span class="chat-message__step-usage-item">{{ t('chat.promptTokens') }} {{ formatNumber(step.tokenUsage.promptTokens) }}</span>
+              <span class="chat-message__step-usage-item">{{ t('chat.completionTokens') }} {{ formatNumber(step.tokenUsage.completionTokens) }}</span>
+              <span class="chat-message__step-usage-item">{{ t('chat.totalTokens') }} {{ formatNumber(step.tokenUsage.totalTokens) }}</span>
+            </div>
           </template>
           <!-- SubAgentStep -->
           <div v-else class="chat-message__sub-agent-card" :class="`chat-message__sub-agent-card--${step.status}`" @click="openSubAgentLog(step)">
@@ -310,11 +314,15 @@ onUpdated(() => {
               <span v-else>✕</span>
             </span>
             <span class="chat-message__sub-agent-card__name">{{ step.agentName }}</span>
-            <span v-if="step.tokenUsage" class="chat-message__sub-agent-card__tokens">{{ t('chat.stepTokens', { n: formatNumber(step.tokenUsage.totalTokens) }) }}</span>
             <span class="chat-message__sub-agent-card__task">{{ step.task }}</span>
             <span v-if="step.status !== 'running' && step.endTime" class="chat-message__sub-agent-card__duration">
               {{ formatDuration(step.startTime, step.endTime) }}
             </span>
+          </div>
+          <div v-if="step.type === 'sub_agent' && step.tokenUsage" class="chat-message__step-usage">
+            <span class="chat-message__step-usage-item">{{ t('chat.promptTokens') }} {{ formatNumber(step.tokenUsage.promptTokens) }}</span>
+            <span class="chat-message__step-usage-item">{{ t('chat.completionTokens') }} {{ formatNumber(step.tokenUsage.completionTokens) }}</span>
+            <span class="chat-message__step-usage-item">{{ t('chat.totalTokens') }} {{ formatNumber(step.tokenUsage.totalTokens) }}</span>
           </div>
         </div>
         <!-- Main content: only rendered when steps lack distributed results (backward compat for old messages) -->
@@ -363,12 +371,6 @@ onUpdated(() => {
               <span class="chat-message__attachment-name">{{ file.name }}</span>
             </div>
           </div>
-        </div>
-        <div v-if="hasTokenUsage" class="chat-message__token-usage">
-          <span class="chat-message__token-usage-label">{{ t('chat.tokenUsage') }}:</span>
-          <span class="chat-message__token-usage-item">{{ t('chat.promptTokens') }} {{ formatNumber(message.tokenUsage!.promptTokens) }}</span>
-          <span class="chat-message__token-usage-item">{{ t('chat.completionTokens') }} {{ formatNumber(message.tokenUsage!.completionTokens) }}</span>
-          <span class="chat-message__token-usage-item">{{ t('chat.totalTokens') }} {{ formatNumber(message.tokenUsage!.totalTokens) }}</span>
         </div>
         <span v-if="showStreamingCursor" class="chat-message__cursor" />
       </template>
@@ -697,6 +699,17 @@ onUpdated(() => {
   align-items: center;
   gap: 6px;
   margin-top: 6px;
+  font-size: 11px;
+  color: var(--el-text-color-secondary, #909399);
+  user-select: none;
+}
+
+.chat-message__step-usage {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 4px;
+  margin-bottom: 8px;
   font-size: 11px;
   color: var(--el-text-color-secondary, #909399);
   user-select: none;
