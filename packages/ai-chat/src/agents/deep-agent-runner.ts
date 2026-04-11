@@ -263,6 +263,12 @@ export class DeepAgentRunner implements AgentRunner {
             logEntry: { timestamp: Date.now(), type: 'error', content: chunk.error ?? 'Unknown error' },
             subAgent: { ...subAgentInfo },
           }
+        } else if (chunk.type === 'iteration_start') {
+          yield {
+            type: 'sub_agent_log' as const,
+            logEntry: { timestamp: Date.now(), type: 'iteration_start', content: `Iteration ${(chunk.iteration ?? 0) + 1}` },
+            subAgent: { ...subAgentInfo },
+          }
         } else if (chunk.type === 'sub_agent_start' || chunk.type === 'sub_agent_log' || chunk.type === 'sub_agent_end') {
           yield chunk
         }

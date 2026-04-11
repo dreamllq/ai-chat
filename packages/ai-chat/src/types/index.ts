@@ -233,7 +233,7 @@ export interface SubAgentLogEntry {
   /** 时间戳 */
   timestamp: number
   /** 日志类型 */
-  type: 'start' | 'token' | 'reasoning' | 'tool_call' | 'tool_result' | 'done' | 'error'
+  type: 'start' | 'iteration_start' | 'token' | 'reasoning' | 'tool_call' | 'tool_result' | 'done' | 'error'
   /** 日志内容 */
   content: string
 }
