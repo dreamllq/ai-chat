@@ -126,6 +126,11 @@ function renderStepMarkdown(content: string): string {
   return md.render(content)
 }
 
+function getPreviewText(content: string): string {
+  const text = content.replace(/\n/g, ' ').replace(/\s+/g, ' ').trim()
+  return text.length > 100 ? text.slice(0, 100) + '…' : text
+}
+
 // Auto-expand reasoning when streaming starts (reasoning present but not yet done),
 // auto-collapse when reasoning is done (metadata.reasoningDone flips to true).
 watch(
@@ -289,6 +294,7 @@ onUpdated(() => {
               <div class="chat-message__reasoning-header" @click="toggleThinkingStep(index)">
                 <span class="chat-message__reasoning-icon">💭</span>
                 <span class="chat-message__reasoning-title">{{ t('chat.stepThinking') }}</span>
+                <span v-if="!isThinkingExpanded(index)" class="chat-message__reasoning-preview">{{ getPreviewText(step.content) }}</span>
                 <span class="chat-message__reasoning-toggle">{{ isThinkingExpanded(index) ? '▲' : '▼' }}</span>
               </div>
               <div class="chat-message__reasoning-collapse" :class="{ 'chat-message__reasoning-collapse--collapsed': !isThinkingExpanded(index) }">
@@ -381,6 +387,7 @@ onUpdated(() => {
         <div class="chat-message__reasoning-header" @click="isReasoningExpanded = !isReasoningExpanded">
           <span class="chat-message__reasoning-icon">💭</span>
           <span class="chat-message__reasoning-title">{{ t('chat.thinking') }}</span>
+          <span v-if="!isReasoningExpanded" class="chat-message__reasoning-preview">{{ getPreviewText(message.reasoningContent!) }}</span>
           <span v-if="hasTokenUsage && message.tokenUsage!.reasoningTokens" class="chat-message__reasoning-tokens">{{ message.tokenUsage!.reasoningTokens }} tokens</span>
           <span class="chat-message__reasoning-toggle">{{ isReasoningExpanded ? '▲' : '▼' }}</span>
         </div>
@@ -859,6 +866,16 @@ onUpdated(() => {
 .chat-message__reasoning-toggle {
   margin-left: auto;
   font-size: 10px;
+}
+
+.chat-message__reasoning-preview {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+  color: var(--el-text-color-placeholder, #a8abb2);
 }
 
 .chat-message__reasoning-collapse {
