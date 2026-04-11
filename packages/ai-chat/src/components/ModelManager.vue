@@ -13,6 +13,7 @@ import {
   ElPopconfirm,
   ElIcon,
   ElScrollbar,
+  ElMessage,
 } from 'element-plus'
 import { Delete, Plus } from '@element-plus/icons-vue'
 import { useModel } from '../composables/useModel'
@@ -37,11 +38,11 @@ const dialogVisible = computed({
 })
 
 const selectedModelId = ref<string | null>(null)
-const editingModel = ref<ModelConfig | null>(null)
 const isNewMode = ref(true)
 const isSelectedPropModel = computed(() =>
   selectedModelId.value ? isPropModel(selectedModelId.value) : false,
 )
+const isFieldDisabled = computed(() => !isNewMode.value && isSelectedPropModel.value)
 
 const form = reactive({
   name: '',
@@ -69,25 +70,46 @@ const PROVIDER_PRESETS: Record<string, { endpoint: string; modelName: string }> 
 const modelList = ref<string[]>([])
 const isLoadingModels = ref(false)
 
+let fetchAbortController: AbortController | null = null
+
 async function fetchModels() {
   if (form.provider === 'other' || !form.endpoint || !form.apiKey) {
     modelList.value = []
     return
   }
+  fetchAbortController?.abort()
+  const controller = new AbortController()
+  fetchAbortController = controller
+
   isLoadingModels.value = true
   try {
     const response = await fetch(`${form.endpoint}/models`, {
       headers: { 'Authorization': `Bearer ${form.apiKey}` },
+      signal: controller.signal,
     })
     if (!response.ok) throw new Error(`HTTP ${response.status}`)
     const data = await response.json()
-    modelList.value = (data.data || []).map((m: { id: string }) => m.id).sort()
-  } catch {
-    modelList.value = []
+    if (fetchAbortController === controller) {
+      modelList.value = (data.data || []).map((m: { id: string }) => m.id).sort()
+    }
+  } catch (e) {
+    if (controller.signal.aborted) return
+    if (fetchAbortController === controller) {
+      modelList.value = []
+    }
   } finally {
-    isLoadingModels.value = false
+    if (fetchAbortController === controller) {
+      isLoadingModels.value = false
+    }
   }
 }
+
+watch(models, (val) => {
+  if (selectedModelId.value) return
+  if (val && val.length > 0) {
+    selectModelItem(val[0])
+  }
+}, { immediate: true })
 
 watch(() => form.provider, (provider) => {
   const preset = PROVIDER_PRESETS[provider]
@@ -126,11 +148,6 @@ function fillForm(model: ModelConfig) {
   form.modelName = model.modelName
   form.temperature = model.temperature ?? 0.7
   form.maxTokens = model.maxTokens ?? 4096
-  if (model.provider !== 'other' && model.endpoint && model.apiKey) {
-    fetchModels()
-  } else {
-    modelList.value = []
-  }
 }
 
 function resetForm() {
@@ -146,7 +163,6 @@ function resetForm() {
 
 function handleNewModel() {
   selectedModelId.value = null
-  editingModel.value = null
   isNewMode.value = true
   resetForm()
 }
@@ -154,13 +170,12 @@ function handleNewModel() {
 function selectModelItem(model: ModelConfig) {
   if (selectedModelId.value === model.id) return
   selectedModelId.value = model.id
-  editingModel.value = model
   isNewMode.value = false
   fillForm(model)
 }
 
 async function handleCreate() {
-  await createModel({
+  const created = await createModel({
     name: form.name,
     provider: form.provider,
     endpoint: form.endpoint,
@@ -169,12 +184,15 @@ async function handleCreate() {
     temperature: form.temperature,
     maxTokens: form.maxTokens,
   })
-  handleNewModel()
+  selectedModelId.value = created.id
+  isNewMode.value = false
+  ElMessage.success(t('model.createSuccess'))
 }
 
 async function handleUpdate() {
-  if (!editingModel.value) return
-  const model = editingModel.value
+  if (!selectedModelId.value) return
+  const model = models.value?.find(m => m.id === selectedModelId.value)
+  if (!model) return
   await updateModel(model.id, {
     name: form.name,
     provider: form.provider,
@@ -184,16 +202,18 @@ async function handleUpdate() {
     temperature: form.temperature,
     maxTokens: form.maxTokens,
   })
-  editingModel.value = null
-  selectedModelId.value = null
-  isNewMode.value = true
-  resetForm()
+  ElMessage.success(t('model.updateSuccess'))
 }
 
 async function handleDelete(id: string) {
   await deleteModel(id)
   if (selectedModelId.value === id) {
-    handleNewModel()
+    const remaining = (models.value ?? []).filter(m => m.id !== id)
+    if (remaining.length > 0) {
+      selectModelItem(remaining[0])
+    } else {
+      handleNewModel()
+    }
   }
 }
 </script>
@@ -261,207 +281,114 @@ async function handleDelete(id: string) {
         </ElScrollbar>
       </div>
 
-      <!-- Right Panel: Create/Edit Form -->
+      <!-- Right Panel: Form -->
       <div class="model-manager__form-panel">
         <ElScrollbar>
-          <!-- Edit mode -->
-          <template v-if="!isNewMode && editingModel">
-            <div class="model-manager__edit-header">
-              <span class="model-manager__edit-title">{{ form.name }}</span>
-            </div>
-            <div v-if="isSelectedPropModel" class="model-manager__readonly-notice">
-              {{ t('model.propModelReadOnly') }}
-            </div>
-            <ElForm
-              :model="form"
-              label-width="120px"
-              label-position="right"
-              data-testid="el-form"
-              class="model-manager__form"
-            >
-              <ElFormItem :label="t('model.name')">
-                <ElInput
-                  v-model="form.name"
-                  :placeholder="t('model.name')"
-                  :disabled="isSelectedPropModel"
-                  data-testid="el-input"
+          <!-- Edit mode header -->
+          <div v-if="!isNewMode" class="model-manager__edit-header">
+            <span class="model-manager__edit-title">{{ form.name }}</span>
+          </div>
+          <!-- Prop model readonly notice -->
+          <div v-if="!isNewMode && isSelectedPropModel" class="model-manager__readonly-notice">
+            {{ t('model.propModelReadOnly') }}
+          </div>
+          <!-- Single unified form -->
+          <ElForm
+            :model="form"
+            label-width="120px"
+            label-position="right"
+            data-testid="el-form"
+            class="model-manager__form"
+          >
+            <ElFormItem :label="t('model.name')">
+              <ElInput
+                v-model="form.name"
+                :placeholder="t('model.name')"
+                :disabled="isFieldDisabled"
+                data-testid="el-input"
+              />
+            </ElFormItem>
+
+            <ElFormItem :label="t('model.provider')">
+              <ElSelect v-model="form.provider" :disabled="isFieldDisabled" data-testid="el-select">
+                <ElOption
+                  v-for="p in providers"
+                  :key="p.value"
+                  :value="p.value"
+                  :label="p.label"
+                  data-testid="el-option"
                 />
-              </ElFormItem>
+              </ElSelect>
+            </ElFormItem>
 
-              <ElFormItem :label="t('model.provider')">
-                <ElSelect v-model="form.provider" :disabled="isSelectedPropModel" data-testid="el-select">
-                  <ElOption
-                    v-for="p in providers"
-                    :key="p.value"
-                    :value="p.value"
-                    :label="p.label"
-                    data-testid="el-option"
-                  />
-                </ElSelect>
-              </ElFormItem>
+            <ElFormItem :label="t('model.endpoint')">
+              <ElInput
+                v-model="form.endpoint"
+                :placeholder="t('model.endpoint')"
+                :disabled="isFieldDisabled || form.provider !== 'other'"
+                data-testid="el-input"
+              />
+            </ElFormItem>
 
-              <ElFormItem :label="t('model.endpoint')">
-                <ElInput
-                  v-model="form.endpoint"
-                  :placeholder="t('model.endpoint')"
-                  :disabled="isSelectedPropModel || form.provider !== 'other'"
-                  data-testid="el-input"
+            <ElFormItem :label="t('model.apiKey')">
+              <ElInput
+                v-model="form.apiKey"
+                type="password"
+                show-password
+                :placeholder="t('model.apiKeyPlaceholder')"
+                :disabled="isFieldDisabled"
+                data-testid="el-input"
+              />
+            </ElFormItem>
+
+            <ElFormItem :label="t('model.modelName')">
+              <ElSelect
+                v-model="form.modelName"
+                :placeholder="t('model.modelName')"
+                filterable
+                allow-create
+                default-first-option
+                :loading="isLoadingModels"
+                :disabled="isFieldDisabled"
+                data-testid="el-select"
+              >
+                <ElOption
+                  v-for="name in modelList"
+                  :key="name"
+                  :value="name"
+                  :label="name"
                 />
-              </ElFormItem>
+              </ElSelect>
+            </ElFormItem>
 
-              <ElFormItem :label="t('model.apiKey')">
-                <ElInput
-                  v-model="form.apiKey"
-                  type="password"
-                  show-password
-                  :placeholder="t('model.apiKeyPlaceholder')"
-                  :disabled="isSelectedPropModel"
-                  data-testid="el-input"
-                />
-              </ElFormItem>
+            <ElFormItem :label="t('model.temperature')">
+              <ElSlider
+                v-model="form.temperature"
+                :min="0"
+                :max="2"
+                :step="0.1"
+                :disabled="isFieldDisabled"
+                data-testid="el-slider"
+              />
+            </ElFormItem>
 
-              <ElFormItem :label="t('model.modelName')">
-                <ElSelect
-                  v-model="form.modelName"
-                  :placeholder="t('model.modelName')"
-                  filterable
-                  allow-create
-                  default-first-option
-                  :loading="isLoadingModels"
-                  :disabled="isSelectedPropModel"
-                  data-testid="el-select"
-                >
-                  <ElOption
-                    v-for="name in modelList"
-                    :key="name"
-                    :value="name"
-                    :label="name"
-                  />
-                </ElSelect>
-              </ElFormItem>
+            <ElFormItem :label="t('model.maxTokens')">
+              <ElInputNumber
+                v-model="form.maxTokens"
+                :min="1"
+                :max="100000"
+                :disabled="isFieldDisabled"
+                data-testid="el-input-number"
+              />
+            </ElFormItem>
 
-              <ElFormItem :label="t('model.temperature')">
-                <ElSlider
-                  v-model="form.temperature"
-                  :min="0"
-                  :max="2"
-                  :step="0.1"
-                  :disabled="isSelectedPropModel"
-                  data-testid="el-slider"
-                />
-              </ElFormItem>
-
-              <ElFormItem :label="t('model.maxTokens')">
-                <ElInputNumber
-                  v-model="form.maxTokens"
-                  :min="1"
-                  :max="100000"
-                  :disabled="isSelectedPropModel"
-                  data-testid="el-input-number"
-                />
-              </ElFormItem>
-
-              <ElFormItem v-if="!isSelectedPropModel">
-                <ElButton type="primary" data-testid="el-button" @click="handleUpdate">
-                  {{ t('model.save') }}
-                </ElButton>
-              </ElFormItem>
-            </ElForm>
-          </template>
-
-          <!-- Create mode (new model) -->
-          <template v-else>
-            <ElForm
-              :model="form"
-              label-width="120px"
-              label-position="right"
-              data-testid="el-form"
-              class="model-manager__form"
-            >
-              <ElFormItem :label="t('model.name')">
-                <ElInput
-                  v-model="form.name"
-                  :placeholder="t('model.name')"
-                  data-testid="el-input"
-                />
-              </ElFormItem>
-
-              <ElFormItem :label="t('model.provider')">
-                <ElSelect v-model="form.provider" data-testid="el-select">
-                  <ElOption
-                    v-for="p in providers"
-                    :key="p.value"
-                    :value="p.value"
-                    :label="p.label"
-                    data-testid="el-option"
-                  />
-                </ElSelect>
-              </ElFormItem>
-
-              <ElFormItem :label="t('model.endpoint')">
-                <ElInput
-                  v-model="form.endpoint"
-                  :placeholder="t('model.endpoint')"
-                  :disabled="form.provider !== 'other'"
-                  data-testid="el-input"
-                />
-              </ElFormItem>
-
-              <ElFormItem :label="t('model.apiKey')">
-                <ElInput
-                  v-model="form.apiKey"
-                  type="password"
-                  show-password
-                  :placeholder="t('model.apiKey')"
-                  data-testid="el-input"
-                />
-              </ElFormItem>
-
-              <ElFormItem :label="t('model.modelName')">
-                <ElSelect
-                  v-model="form.modelName"
-                  :placeholder="t('model.modelName')"
-                  filterable
-                  allow-create
-                  default-first-option
-                  :loading="isLoadingModels"
-                  data-testid="el-select"
-                >
-                  <ElOption
-                    v-for="name in modelList"
-                    :key="name"
-                    :value="name"
-                    :label="name"
-                  />
-                </ElSelect>
-              </ElFormItem>
-
-              <ElFormItem :label="t('model.temperature')">
-                <ElSlider
-                  v-model="form.temperature"
-                  :min="0"
-                  :max="2"
-                  :step="0.1"
-                  data-testid="el-slider"
-                />
-              </ElFormItem>
-
-              <ElFormItem :label="t('model.maxTokens')">
-                <ElInputNumber
-                  v-model="form.maxTokens"
-                  :min="1"
-                  :max="100000"
-                  data-testid="el-input-number"
-                />
-              </ElFormItem>
-
-              <ElFormItem>
-                <ElButton type="primary" data-testid="el-button" @click="handleCreate">
-                  {{ t('model.create') }}
-                </ElButton>
-              </ElFormItem>
-            </ElForm>
-          </template>
+            <!-- Button: create in new mode, save in edit mode (hidden for prop models) -->
+            <ElFormItem v-if="isNewMode || !isSelectedPropModel">
+              <ElButton type="primary" data-testid="el-button" @click="isNewMode ? handleCreate() : handleUpdate()">
+                {{ isNewMode ? t('model.create') : t('model.save') }}
+              </ElButton>
+            </ElFormItem>
+          </ElForm>
         </ElScrollbar>
       </div>
     </div>
