@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref } from 'vue'
-import { AiChat, registerAgent } from '@ai-chat/vue'
+import { AiChat, registerAgent, DeepAgentRunner } from '@ai-chat/vue'
 import type { LocaleName } from '@ai-chat/vue'
 import { S3StorageService } from '@ai-chat/storage-s3'
 import type { S3StorageConfig } from '@ai-chat/storage-s3'
@@ -12,12 +12,14 @@ import { llmToolAgentDef } from './agents/llm-tool-agent'
 import { formSchemaAgentDef } from './agents/form-schema-agent'
 import { skillAgentDef } from './agents/skill-agent'
 import { mcpAgentDef } from './agents/mcp-agent'
+import {deepAgentDef} from './agents/deep-agent'
 
 // 在模块顶层同步注册（先于组件渲染），确保下拉框能立即列出
 registerAgent(llmToolAgentDef)
 registerAgent(formSchemaAgentDef)
 registerAgent(skillAgentDef)
 registerAgent(mcpAgentDef)
+registerAgent(deepAgentDef, new DeepAgentRunner(deepAgentDef))
 
 // ---------------------------------------------------------------------------
 // Locale state

@@ -8,8 +8,8 @@ import type { AgentDefinition } from '@ai-chat/vue/types'
 // ── Agent Definition（配置模式，无需提供 runner） ──────────────
 
 export const mcpAgentDef: AgentDefinition = {
-  id: 'demo-mcp-agent',
-  name: 'MCP Agent',
+  id: 'demo-fs-agent',
+  name: 'FS Agent',
   description: '文件操作',
   systemPrompt:
     '进行文件操作',
