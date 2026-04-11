@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onUnmounted, ref, watch } from 'vue'
+import { computed, onUnmounted, reactive, ref, watch } from 'vue'
 import { ElDialog, ElScrollbar, ElEmpty } from 'element-plus'
 import MarkdownIt from 'markdown-it'
 import hljs from 'highlight.js'
@@ -146,7 +146,22 @@ const iterationSteps = computed<IterationStep[]>(() => {
   return steps
 })
 
-const isReasoningExpanded = ref(true)
+const expandedReasoningSteps = reactive<Record<number, boolean>>({})
+
+function isReasoningExpanded(index: number): boolean {
+  if (index in expandedReasoningSteps) {
+    return expandedReasoningSteps[index]
+  }
+  // Default: expand if currently streaming
+  if (execution.value?.status === 'running') {
+    return true
+  }
+  return false
+}
+
+function toggleReasoningStep(index: number): void {
+  expandedReasoningSteps[index] = !isReasoningExpanded(index)
+}
 
 const isReasoningDone = computed(() => {
   if (!execution.value) return true
@@ -155,7 +170,9 @@ const isReasoningDone = computed(() => {
 
 watch(isReasoningDone, (done) => {
   if (done) {
-    isReasoningExpanded.value = false
+    for (const key of Object.keys(expandedReasoningSteps)) {
+      delete expandedReasoningSteps[Number(key)]
+    }
   }
 })
 
@@ -228,13 +245,13 @@ const statusLabel = computed(() => {
         <div v-for="(step, idx) in iterationSteps" :key="idx" class="sub-agent-log__step">
           <!-- Reasoning (collapsible thinking) -->
           <div v-if="step.reasoningContent" class="sub-agent-log__reasoning">
-            <div class="sub-agent-log__reasoning-header" @click="isReasoningExpanded = !isReasoningExpanded">
+            <div class="sub-agent-log__reasoning-header" @click="toggleReasoningStep(idx)">
               <span class="sub-agent-log__reasoning-icon">💭</span>
               <span class="sub-agent-log__reasoning-title">{{ t('chat.thinking') }}</span>
-              <span v-if="!isReasoningExpanded && step.reasoningContent" class="sub-agent-log__reasoning-preview">{{ getPreviewText(step.reasoningContent) }}</span>
-              <span class="sub-agent-log__reasoning-toggle">{{ isReasoningExpanded ? '▲' : '▼' }}</span>
+              <span v-if="!isReasoningExpanded(idx) && step.reasoningContent" class="sub-agent-log__reasoning-preview">{{ getPreviewText(step.reasoningContent) }}</span>
+              <span class="sub-agent-log__reasoning-toggle">{{ isReasoningExpanded(idx) ? '▲' : '▼' }}</span>
             </div>
-            <div class="sub-agent-log__reasoning-collapse" :class="{ 'sub-agent-log__reasoning-collapse--collapsed': !isReasoningExpanded }">
+            <div class="sub-agent-log__reasoning-collapse" :class="{ 'sub-agent-log__reasoning-collapse--collapsed': !isReasoningExpanded(idx) }">
               <div class="sub-agent-log__reasoning-content">
                 <!-- eslint-disable-next-line vue/no-v-html -->
                 <div v-html="renderStepMarkdown(step.reasoningContent)" />
