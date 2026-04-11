@@ -282,6 +282,8 @@ export interface SubAgentCallInfo {
 export interface ThinkingStep {
   type: 'thinking'
   content: string
+  /** 该轮迭代产生的文本结果（按顺序展示：思考 → 结果） */
+  resultContent?: string
   tokenUsage?: TokenUsage
 }
 

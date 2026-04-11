@@ -91,6 +91,9 @@ const isReasoningExpanded = ref(!!props.message.reasoningContent)
 const hasSteps = computed(() =>
   Array.isArray(props.message.steps) && props.message.steps.length > 0,
 )
+const hasDistributedResults = computed(() =>
+  Array.isArray(props.message.steps) && props.message.steps.some(s => s.type === 'thinking' && !!(s as { resultContent?: string }).resultContent),
+)
 const expandedThinkingSteps = reactive<Record<number, boolean>>({})
 
 watch(
@@ -281,20 +284,24 @@ onUpdated(() => {
       <template v-if="hasSteps">
         <div v-for="(step, index) in message.steps" :key="index">
           <!-- ThinkingStep -->
-          <div v-if="step.type === 'thinking'" class="chat-message__reasoning">
-            <div class="chat-message__reasoning-header" @click="toggleThinkingStep(index)">
-              <span class="chat-message__reasoning-icon">💭</span>
-              <span class="chat-message__reasoning-title">{{ t('chat.stepThinking') }}</span>
-              <span v-if="step.tokenUsage" class="chat-message__reasoning-tokens">{{ t('chat.stepTokens', { n: formatNumber(step.tokenUsage.reasoningTokens ?? step.tokenUsage.totalTokens) }) }}</span>
-              <span class="chat-message__reasoning-toggle">{{ isThinkingExpanded(index) ? '▲' : '▼' }}</span>
-            </div>
-            <div class="chat-message__reasoning-collapse" :class="{ 'chat-message__reasoning-collapse--collapsed': !isThinkingExpanded(index) }">
-              <div class="chat-message__reasoning-content">
-                <!-- eslint-disable-next-line vue/no-v-html -->
-                <div v-html="renderStepMarkdown(step.content)" />
+          <template v-if="step.type === 'thinking'">
+            <div class="chat-message__reasoning">
+              <div class="chat-message__reasoning-header" @click="toggleThinkingStep(index)">
+                <span class="chat-message__reasoning-icon">💭</span>
+                <span class="chat-message__reasoning-title">{{ t('chat.stepThinking') }}</span>
+                <span v-if="step.tokenUsage" class="chat-message__reasoning-tokens">{{ t('chat.stepTokens', { n: formatNumber(step.tokenUsage.reasoningTokens ?? step.tokenUsage.totalTokens) }) }}</span>
+                <span class="chat-message__reasoning-toggle">{{ isThinkingExpanded(index) ? '▲' : '▼' }}</span>
+              </div>
+              <div class="chat-message__reasoning-collapse" :class="{ 'chat-message__reasoning-collapse--collapsed': !isThinkingExpanded(index) }">
+                <div class="chat-message__reasoning-content">
+                  <!-- eslint-disable-next-line vue/no-v-html -->
+                  <div v-html="renderStepMarkdown(step.content)" />
+                </div>
               </div>
             </div>
-          </div>
+            <!-- eslint-disable-next-line vue/no-v-html -->
+            <div v-if="step.resultContent" class="chat-message__content chat-message__content--step" v-html="renderStepMarkdown(step.resultContent)" />
+          </template>
           <!-- SubAgentStep -->
           <div v-else class="chat-message__sub-agent-card" :class="`chat-message__sub-agent-card--${step.status}`" @click="openSubAgentLog(step)">
             <span class="chat-message__sub-agent-card__status-icon" :class="`--${step.status}`">
@@ -310,8 +317,11 @@ onUpdated(() => {
             </span>
           </div>
         </div>
-        <!-- eslint-disable-next-line vue/no-v-html -->
-        <div ref="contentRef" class="chat-message__content" v-html="renderedContent" />
+        <!-- Main content: only rendered when steps lack distributed results (backward compat for old messages) -->
+        <template v-if="!hasDistributedResults">
+          <!-- eslint-disable-next-line vue/no-v-html -->
+          <div ref="contentRef" class="chat-message__content" v-html="renderedContent" />
+        </template>
         <!-- Attachments -->
         <div v-if="attachments.length > 0 || legacyFiles.length > 0" class="chat-message__attachments">
           <div
@@ -569,6 +579,12 @@ onUpdated(() => {
 .chat-message__content {
   min-width: 0;
   overflow: hidden;
+}
+
+.chat-message__content--step {
+  margin-top: 2px;
+  padding-top: 6px;
+  border-top: 1px dashed var(--el-border-color-lighter, #ebeef5);
 }
 
 .chat-message__content :deep(img) {

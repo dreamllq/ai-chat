@@ -138,6 +138,7 @@ export function useChat() {
       // Steps tracking
       let iterationAware = false
       let currentThinkingStep: ThinkingStep | null = null
+      let currentIterationContent = ''
       const steps: MessageStep[] = []
 
       function finalizeCurrentThinkingStep(tokenUsageOverride?: TokenUsage): void {
@@ -145,6 +146,7 @@ export function useChat() {
           if (tokenUsageOverride) {
             currentThinkingStep.tokenUsage = tokenUsageOverride
           }
+          currentThinkingStep.resultContent = currentIterationContent || undefined
           currentThinkingStep = null
         }
       }
@@ -187,8 +189,9 @@ export function useChat() {
               }
             }
           }
-          // Finalize previous thinking step
+          // Finalize previous thinking step (saves its resultContent)
           finalizeCurrentThinkingStep(chunk.tokenUsage)
+          currentIterationContent = ''
           // Create new thinking step
           currentThinkingStep = { type: 'thinking', content: '' }
           steps.push(currentThinkingStep)
@@ -196,6 +199,7 @@ export function useChat() {
         } else if (chunk.type === 'token') {
           if (chunk.content) {
             fullContent += chunk.content
+            currentIterationContent += chunk.content
           }
           if (chunk.reasoningContent) {
             fullReasoning += chunk.reasoningContent
@@ -205,6 +209,9 @@ export function useChat() {
             }
           }
           if (iterationAware) {
+            if (currentThinkingStep && currentIterationContent) {
+              currentThinkingStep.resultContent = currentIterationContent
+            }
             // Detect reasoning→content transition
             if (hadReasoning && !reasoningDoneFired && fullContent && !chunk.reasoningContent) {
               reasoningDoneFired = true
@@ -293,6 +300,7 @@ export function useChat() {
           // Steps: finalize thinking step, push SubAgentStep
           if (iterationAware) {
             finalizeCurrentThinkingStep()
+            currentIterationContent = ''
             steps.push({
               type: 'sub_agent',
               executionId: chunk.subAgent!.executionId,
