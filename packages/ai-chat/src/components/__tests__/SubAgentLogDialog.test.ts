@@ -219,24 +219,54 @@ describe('SubAgentLogDialog', () => {
   })
 
   it('displays output section when output is present', async () => {
-    const execution = createExecution({ output: 'The answer is 42' })
+    const execution = createExecution({
+      output: 'The answer is 42',
+      logs: [
+        { timestamp: 1100, type: 'start', content: 'Starting task' },
+        { timestamp: 1200, type: 'token', content: 'The answer is 42' },
+        { timestamp: 1500, type: 'done', content: 'Task completed' },
+      ],
+    })
     await db.subAgentExecutions.add(execution)
 
     const wrapper = mountDialog({ modelValue: true, executionId: 'exec-1' })
     await flushLiveQuery()
 
-    expect(wrapper.find('.sub-agent-log__bubble').exists()).toBe(true)
+    expect(wrapper.find('.sub-agent-log__step').exists()).toBe(true)
     expect(wrapper.find('.sub-agent-log__bubble-content').text()).toContain('The answer is 42')
   })
 
-  it('does not display output section when output is null', async () => {
-    const execution = createExecution({ output: null })
+  it('does not display output section when output is null and logs are empty', async () => {
+    const execution = createExecution({ output: null, logs: [] })
     await db.subAgentExecutions.add(execution)
 
     const wrapper = mountDialog({ modelValue: true, executionId: 'exec-1' })
     await flushLiveQuery()
 
-    expect(wrapper.find('.sub-agent-log__bubble').exists()).toBe(false)
+    expect(wrapper.find('.sub-agent-log__step').exists()).toBe(false)
+  })
+
+  it('reconstructs output from logs when iteration markers are present', async () => {
+    const execution = createExecution({
+      output: 'Step1 output Step2 answer',
+      reasoningContent: null,
+      logs: [
+        { timestamp: 1000, type: 'iteration_start', content: 'Iteration 1' },
+        { timestamp: 1100, type: 'token', content: 'Step1 output ' },
+        { timestamp: 1200, type: 'iteration_start', content: 'Iteration 2' },
+        { timestamp: 1300, type: 'token', content: 'Step2 answer' },
+        { timestamp: 1400, type: 'done', content: '' },
+      ],
+    })
+    await db.subAgentExecutions.add(execution)
+
+    const wrapper = mountDialog({ modelValue: true, executionId: 'exec-1' })
+    await flushLiveQuery()
+
+    const steps = wrapper.findAll('.sub-agent-log__step')
+    expect(steps).toHaveLength(2)
+    expect(steps[0].find('.sub-agent-log__bubble-content').text()).toContain('Step1 output')
+    expect(steps[1].find('.sub-agent-log__bubble-content').text()).toContain('Step2 answer')
   })
 
   it('displays error section when error is present', async () => {
@@ -271,14 +301,14 @@ describe('SubAgentLogDialog', () => {
   })
 
   it('reactively updates when DB record changes', async () => {
-    const execution = createExecution({ status: 'running', output: null, endTime: null })
+    const execution = createExecution({ status: 'running', output: null, endTime: null, logs: [] })
     await db.subAgentExecutions.add(execution)
 
     const wrapper = mountDialog({ modelValue: true, executionId: 'exec-1' })
     await flushLiveQuery()
 
     expect(wrapper.find('.sub-agent-log__status--running').exists()).toBe(true)
-    expect(wrapper.find('.sub-agent-log__bubble').exists()).toBe(false)
+    expect(wrapper.find('.sub-agent-log__step').exists()).toBe(false)
 
     await db.subAgentExecutions.update('exec-1', {
       status: 'completed',
@@ -288,7 +318,7 @@ describe('SubAgentLogDialog', () => {
     await flushLiveQuery()
 
     expect(wrapper.find('.sub-agent-log__status--completed').exists()).toBe(true)
-    expect(wrapper.find('.sub-agent-log__bubble').exists()).toBe(true)
+    expect(wrapper.find('.sub-agent-log__step').exists()).toBe(true)
     expect(wrapper.find('.sub-agent-log__bubble-content').text()).toContain('Done!')
   })
 })

@@ -85,6 +85,7 @@ const sortedLogs = computed<SubAgentLogEntry[]>(() => {
 
 const logTypeConfig: Record<SubAgentLogEntry['type'], { icon: string; labelKey: string; className: string }> = {
   start: { icon: '🟢', labelKey: 'subAgent.logStart', className: 'sub-agent-log__entry--start' },
+  iteration_start: { icon: '🔄', labelKey: 'subAgent.logToken', className: 'sub-agent-log__entry--iteration-start' },
   token: { icon: '📝', labelKey: 'subAgent.logToken', className: 'sub-agent-log__entry--token' },
   reasoning: { icon: '💭', labelKey: 'subAgent.logReasoning', className: 'sub-agent-log__entry--reasoning' },
   tool_call: { icon: '🔧', labelKey: 'subAgent.logToolCall', className: 'sub-agent-log__entry--tool-call' },
@@ -98,17 +99,51 @@ function getLogConfig(type: SubAgentLogEntry['type']) {
 }
 
 const timelineLogs = computed<SubAgentLogEntry[]>(() => {
-  return sortedLogs.value.filter(e => e.type !== 'token' && e.type !== 'reasoning')
+  return sortedLogs.value.filter(e => e.type !== 'token' && e.type !== 'reasoning' && e.type !== 'iteration_start')
 })
 
-const renderedOutput = computed(() => {
-  if (!execution.value?.output) return ''
-  return md.render(execution.value.output)
-})
+interface IterationStep {
+  index: number
+  reasoningContent: string
+  output: string
+}
 
-const renderedReasoning = computed(() => {
-  if (!execution.value?.reasoningContent) return ''
-  return md.render(execution.value.reasoningContent)
+const iterationSteps = computed<IterationStep[]>(() => {
+  if (!execution.value) return []
+  const logs = sortedLogs.value
+
+  const steps: IterationStep[] = []
+  let currentStep: IterationStep | null = null
+
+  for (const log of logs) {
+    if (log.type === 'iteration_start' || log.type === 'start') {
+      if (currentStep) {
+        steps.push(currentStep)
+      }
+      currentStep = { index: steps.length, reasoningContent: '', output: '' }
+    } else if (currentStep) {
+      if (log.type === 'reasoning' && log.content) {
+        currentStep.reasoningContent += log.content
+      } else if (log.type === 'token' && log.content) {
+        currentStep.output += log.content
+      }
+    }
+  }
+
+  if (currentStep) {
+    steps.push(currentStep)
+  }
+
+  // Backward compat: if no iteration markers found, use top-level output/reasoningContent
+  if (steps.length === 0 && (execution.value.output || execution.value.reasoningContent)) {
+    steps.push({
+      index: 0,
+      reasoningContent: execution.value.reasoningContent ?? '',
+      output: execution.value.output ?? '',
+    })
+  }
+
+  return steps
 })
 
 const isReasoningExpanded = ref(true)
@@ -123,6 +158,15 @@ watch(isReasoningDone, (done) => {
     isReasoningExpanded.value = false
   }
 })
+
+function renderStepMarkdown(content: string): string {
+  return md.render(content)
+}
+
+function getPreviewText(content: string): string {
+  const text = content.replace(/\n/g, ' ').replace(/\s+/g, ' ').trim()
+  return text.length > 100 ? text.slice(0, 100) + '…' : text
+}
 
 function formatTime(timestamp: number): string {
   const date = new Date(timestamp)
@@ -179,31 +223,35 @@ const statusLabel = computed(() => {
         </div>
       </div>
 
-      <!-- Chat Bubble: Reasoning + Output (streaming display) -->
-      <div v-if="execution.output || execution.reasoningContent" class="sub-agent-log__bubble">
-        <div class="sub-agent-log__bubble-body">
-          <div v-if="execution.reasoningContent" class="sub-agent-log__reasoning">
+      <!-- Steps-based rendering (consistent with ChatMessage) -->
+      <template v-if="iterationSteps.length > 0">
+        <div v-for="(step, idx) in iterationSteps" :key="idx" class="sub-agent-log__step">
+          <!-- Reasoning (collapsible thinking) -->
+          <div v-if="step.reasoningContent" class="sub-agent-log__reasoning">
             <div class="sub-agent-log__reasoning-header" @click="isReasoningExpanded = !isReasoningExpanded">
               <span class="sub-agent-log__reasoning-icon">💭</span>
               <span class="sub-agent-log__reasoning-title">{{ t('chat.thinking') }}</span>
-              <span v-if="execution.tokenUsage?.reasoningTokens" class="sub-agent-log__reasoning-tokens">{{ formatNumber(execution.tokenUsage!.reasoningTokens) }} tokens</span>
+              <span v-if="!isReasoningExpanded && step.reasoningContent" class="sub-agent-log__reasoning-preview">{{ getPreviewText(step.reasoningContent) }}</span>
               <span class="sub-agent-log__reasoning-toggle">{{ isReasoningExpanded ? '▲' : '▼' }}</span>
             </div>
             <div class="sub-agent-log__reasoning-collapse" :class="{ 'sub-agent-log__reasoning-collapse--collapsed': !isReasoningExpanded }">
               <div class="sub-agent-log__reasoning-content">
                 <!-- eslint-disable-next-line vue/no-v-html -->
-                <div v-html="renderedReasoning" />
+                <div v-html="renderStepMarkdown(step.reasoningContent)" />
               </div>
             </div>
           </div>
+          <!-- Output -->
           <!-- eslint-disable-next-line vue/no-v-html -->
-          <div v-if="execution.output" class="sub-agent-log__bubble-content" v-html="renderedOutput" />
-          <div v-if="execution.tokenUsage" class="sub-agent-log__token-usage">
-            <span class="sub-agent-log__token-usage-item">{{ t('chat.promptTokens') }} {{ formatNumber(execution.tokenUsage!.promptTokens) }}</span>
-            <span class="sub-agent-log__token-usage-item">{{ t('chat.completionTokens') }} {{ formatNumber(execution.tokenUsage!.completionTokens) }}</span>
-            <span class="sub-agent-log__token-usage-item">{{ t('chat.totalTokens') }} {{ formatNumber(execution.tokenUsage!.totalTokens) }}</span>
-          </div>
+          <div v-if="step.output" class="sub-agent-log__bubble-content" v-html="renderStepMarkdown(step.output)" />
         </div>
+      </template>
+
+      <!-- Token Usage -->
+      <div v-if="execution.tokenUsage" class="sub-agent-log__token-usage">
+        <span class="sub-agent-log__token-usage-item">{{ t('chat.promptTokens') }} {{ formatNumber(execution.tokenUsage!.promptTokens) }}</span>
+        <span class="sub-agent-log__token-usage-item">{{ t('chat.completionTokens') }} {{ formatNumber(execution.tokenUsage!.completionTokens) }}</span>
+        <span class="sub-agent-log__token-usage-item">{{ t('chat.totalTokens') }} {{ formatNumber(execution.tokenUsage!.totalTokens) }}</span>
       </div>
 
       <!-- Timeline -->
@@ -407,11 +455,15 @@ const statusLabel = computed(() => {
 }
 
 /* Chat Bubble */
-.sub-agent-log__bubble {
+.sub-agent-log__step {
   padding: 10px 14px;
   background: var(--el-fill-color-light, #f5f7fa);
   border-radius: 12px;
   border-top-left-radius: 4px;
+}
+
+.sub-agent-log__step + .sub-agent-log__step {
+  margin-top: 8px;
 }
 
 .sub-agent-log__bubble-body {
@@ -528,6 +580,16 @@ const statusLabel = computed(() => {
 .sub-agent-log__reasoning-toggle {
   margin-left: auto;
   font-size: 10px;
+}
+
+.sub-agent-log__reasoning-preview {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+  color: var(--el-text-color-placeholder, #a8abb2);
 }
 
 .sub-agent-log__reasoning-collapse {
