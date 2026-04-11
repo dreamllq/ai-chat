@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, watch, nextTick } from 'vue'
+import { ref, watch, nextTick, onMounted } from 'vue'
 import { useChat } from '../composables/useChat'
 import { useSession } from '../composables/useSession'
 import ChatMessage from './ChatMessage.vue'
@@ -20,16 +20,23 @@ function scrollToBottom() {
 // Auto-scroll on message content/streaming changes
 watch(
   () => currentMessages.value.map((m) => m.id + m.content + m.isStreaming),
-  async () => {
-    await nextTick()
-    scrollToBottom()
+  () => {
+    // Use nextTick + requestAnimationFrame to wait for child component
+    // DOM updates (e.g. markdown rendering, copy buttons) to complete
+    nextTick(() => requestAnimationFrame(() => scrollToBottom()))
   },
+  { flush: 'post' },
 )
 
 // Scroll to bottom when switching conversation
-watch(currentConversationId, async () => {
-  await nextTick()
-  scrollToBottom()
+watch(currentConversationId, () => {
+  nextTick(() => requestAnimationFrame(() => scrollToBottom()))
+})
+
+// Scroll to bottom on initial mount (handles page refresh where
+// messages are loaded asynchronously via liveQuery after mount)
+onMounted(() => {
+  nextTick(() => requestAnimationFrame(() => scrollToBottom()))
 })
 </script>
 
