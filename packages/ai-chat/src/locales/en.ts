@@ -46,6 +46,8 @@ export interface AiChatLocale {
     providerOther: string
     fetchModelsFailed: string
     propModelReadOnly: string
+    createSuccess: string
+    updateSuccess: string
   }
   agent: {
     title: string
@@ -158,6 +160,8 @@ export const en: AiChatLocale = {
     providerOther: 'Other',
     fetchModelsFailed: 'Failed to fetch models',
     propModelReadOnly: 'This model is provided via props and cannot be edited.',
+    createSuccess: 'Model created successfully',
+    updateSuccess: 'Model saved successfully',
   },
   agent: {
     title: 'Agent',
