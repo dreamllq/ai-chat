@@ -1,3 +1,6 @@
+/** 组件尺寸 */
+export type AiChatSize = 'default' | 'mini'
+
 /** 聊天消息角色类型 */
 export type MessageRole = 'user' | 'assistant' | 'system'
 

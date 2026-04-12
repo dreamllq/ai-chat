@@ -12,10 +12,11 @@ import { useAgent } from '../composables/useAgent'
 import { ConversationService } from '../services/database'
 import { agentRegistry } from '../services/agent'
 import type { AiChatLocale, LocaleName } from '../locales'
-import type { FileUploadService, Conversation, MessageAttachment, ModelConfig } from '../types'
+import type { AiChatSize, FileUploadService, Conversation, MessageAttachment, ModelConfig } from '../types'
 
 const props = withDefaults(defineProps<{
   locale?: AiChatLocale | LocaleName
+  size?: AiChatSize
   fileUploadService?: FileUploadService | null
   defaultSidebarCollapsed?: boolean
   sidebarCollapsed?: boolean
@@ -26,6 +27,7 @@ const props = withDefaults(defineProps<{
   models?: ModelConfig[]
 }>(), {
   locale: 'en',
+  size: 'default',
   fileUploadService: null,
   defaultSidebarCollapsed: false,
   sidebarCollapsed: undefined,
@@ -155,7 +157,7 @@ async function handleSend(payload: { content: string; attachments?: MessageAttac
 </script>
 
 <template>
-  <AiChatProvider :locale="props.locale">
+  <AiChatProvider :locale="props.locale" :size="props.size">
     <div class="ai-chat">
       <LayoutShell :sidebar-collapsed="sidebarCollapsed" :new-chat-disabled="isNewChatDisabled" @update:sidebar-collapsed="handleSidebarCollapsedUpdate" @new-chat="handleNewChat">
         <template #sidebar>
