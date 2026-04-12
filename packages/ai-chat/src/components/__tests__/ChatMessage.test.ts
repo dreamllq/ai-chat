@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { ref, computed } from 'vue'
 import { mount } from '@vue/test-utils'
-import type { ChatMessage as ChatMessageType } from '../../types'
+import type { ChatMessage as ChatMessageType, AiChatSize } from '../../types'
 import ChatMessage from '../ChatMessage.vue'
 
 // Mock useLocale
@@ -305,5 +306,30 @@ describe('ChatMessage', () => {
     })
 
     expect(wrapper.find('.chat-message__reasoning').exists()).toBe(false)
+  })
+})
+
+describe('ChatMessage size', () => {
+  function createMessageSize(initialSize: AiChatSize = 'default') {
+    const size = ref<AiChatSize>(initialSize)
+    const messageClasses = computed(() => ({ 'chat-message--mini': size.value === 'mini' }))
+    return { size, messageClasses }
+  }
+
+  it('has no mini class by default', () => {
+    const { messageClasses } = createMessageSize()
+    expect(messageClasses.value['chat-message--mini']).toBe(false)
+  })
+
+  it('applies mini class when size is mini', () => {
+    const { messageClasses } = createMessageSize('mini')
+    expect(messageClasses.value['chat-message--mini']).toBe(true)
+  })
+
+  it('reacts to size change', () => {
+    const { size, messageClasses } = createMessageSize()
+    expect(messageClasses.value['chat-message--mini']).toBe(false)
+    size.value = 'mini'
+    expect(messageClasses.value['chat-message--mini']).toBe(true)
   })
 })

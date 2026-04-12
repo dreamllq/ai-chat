@@ -7,6 +7,7 @@ import 'highlight.js/styles/github-dark.css'
 import { liveQuery } from 'dexie'
 import { db } from '../database/db'
 import { useLocale } from '../composables/useLocale'
+import { useSize } from '../size'
 import type { SubAgentExecution, SubAgentLogEntry } from '../types'
 
 const md = new MarkdownIt({
@@ -39,11 +40,15 @@ const emit = defineEmits<{
 }>()
 
 const { t } = useLocale()
+const size = useSize()
 
 const dialogVisible = computed({
   get: () => props.modelValue,
   set: (val: boolean) => emit('update:modelValue', val),
 })
+
+const dialogWidth = computed(() => size.value === 'mini' ? '480px' : '640px')
+const dialogClasses = computed(() => ({ 'sub-agent-log-dialog--mini': size.value === 'mini' }))
 
 const execution = ref<SubAgentExecution | null>(null)
 let liveQuerySubscription: { unsubscribe(): void } | null = null
@@ -218,12 +223,12 @@ const statusLabel = computed(() => {
   <ElDialog
     v-model="dialogVisible"
     :title="t('subAgent.logTitle')"
-    width="640px"
+    :width="dialogWidth"
     destroy-on-close
-    append-to-body
+    :append-to-body="false"
     data-testid="sub-agent-log-dialog"
   >
-    <div v-if="execution" class="sub-agent-log">
+    <div v-if="execution" class="sub-agent-log" :class="dialogClasses">
       <!-- Execution Header -->
       <div class="sub-agent-log__header">
         <div class="sub-agent-log__header-row">
@@ -672,5 +677,28 @@ const statusLabel = computed(() => {
   color: var(--el-color-danger, #f56c6c);
   line-height: 1.6;
   word-break: break-word;
+}
+
+/* Mini size overrides */
+.sub-agent-log-dialog--mini .sub-agent-log__entry {
+  padding: 4px 0;
+  gap: 6px;
+}
+
+.sub-agent-log-dialog--mini .sub-agent-log__entry-content {
+  font-size: 12px;
+}
+
+.sub-agent-log-dialog--mini .sub-agent-log__step {
+  padding: 6px 10px;
+}
+
+.sub-agent-log-dialog--mini .sub-agent-log__header {
+  padding: 8px 12px;
+}
+
+.sub-agent-log-dialog--mini .sub-agent-log__reasoning-header {
+  padding: 4px 8px;
+  font-size: 11px;
 }
 </style>

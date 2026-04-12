@@ -18,6 +18,7 @@ import {
 import { Delete, Plus } from '@element-plus/icons-vue'
 import { useModel } from '../composables/useModel'
 import { useLocale } from '../composables/useLocale'
+import { useSize } from '../size'
 import type { ModelConfig } from '../types'
 
 const props = defineProps<{
@@ -31,6 +32,10 @@ const emit = defineEmits<{
 const { models, createModel, updateModel,
   deleteModel, isPropModel } = useModel()
 const { t } = useLocale()
+const size = useSize()
+
+const managerClasses = computed(() => ({ 'model-manager--mini': size.value === 'mini' }))
+const dialogWidth = computed(() => size.value === 'mini' ? '560px' : '760px')
 
 const dialogVisible = computed({
   get: () => props.visible,
@@ -222,12 +227,12 @@ async function handleDelete(id: string) {
   <ElDialog
     v-model="dialogVisible"
     :title="t('model.title')"
-    width="760px"
+    :width="dialogWidth"
     destroy-on-close
-    append-to-body
+    :append-to-body="false"
     data-testid="el-dialog"
   >
-    <div class="model-manager">
+    <div class="model-manager" :class="managerClasses">
       <!-- Left Panel: Model List -->
       <div class="model-manager__list-panel">
         <div class="model-manager__list-header">
@@ -558,5 +563,23 @@ async function handleDelete(id: string) {
   font-size: 13px;
   color: var(--el-text-color-secondary);
   line-height: 1.5;
+}
+
+/* Mini size overrides */
+.model-manager--mini .model-manager__list-panel {
+  width: 180px;
+  min-width: 180px;
+}
+
+.model-manager--mini .model-manager__form {
+  padding: 12px 16px 8px;
+}
+
+.model-manager--mini .model-manager__form :deep(.el-form-item__label) {
+  font-size: 12px;
+}
+
+.model-manager--mini .model-manager__edit-header {
+  padding: 12px 16px 6px;
 }
 </style>

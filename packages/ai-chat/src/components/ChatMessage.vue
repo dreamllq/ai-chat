@@ -7,6 +7,7 @@ import type { ChatMessage as ChatMessageType, SubAgentCallInfo, SubAgentStep } f
 import { isMessageAttachment, isLegacyFileMetadata } from '../types'
 import type { MessageAttachment } from '../types'
 import { useLocale } from '../composables/useLocale'
+import { useSize } from '../size'
 import SubAgentLogDialog from './SubAgentLogDialog.vue'
 
 const props = defineProps<{
@@ -14,6 +15,9 @@ const props = defineProps<{
 }>()
 
 const { t } = useLocale()
+const size = useSize()
+
+const messageClasses = computed(() => ({ 'chat-message--mini': size.value === 'mini' }))
 
 const md = new MarkdownIt({
   html: false,
@@ -272,11 +276,11 @@ onUpdated(() => {
 <template>
   <div
     class="chat-message"
-    :class="{
+    :class="[{
       'chat-message--user': isUser,
       'chat-message--assistant': isAssistant,
       'chat-message--system': isSystem,
-    }"
+    }, messageClasses]"
   >
     <div v-if="isAssistant" class="chat-message__avatar">
       <span class="chat-message__avatar-icon">AI</span>
@@ -1026,5 +1030,57 @@ onUpdated(() => {
 
 @keyframes chat-sub-agent-spin {
   to { transform: rotate(360deg); }
+}
+
+/* === Mini mode overrides === */
+.chat-message--mini .chat-message__avatar {
+  width: 24px;
+  height: 24px;
+}
+
+.chat-message--mini .chat-message__avatar-icon {
+  font-size: 10px;
+}
+
+.chat-message--mini .chat-message__bubble {
+  padding: 6px 12px;
+  font-size: 13px;
+}
+
+.chat-message--mini .chat-message__time {
+  font-size: 10px;
+}
+
+.chat-message--mini .chat-message__token-usage {
+  font-size: 10px;
+}
+
+.chat-message--mini .chat-message__step-usage {
+  font-size: 10px;
+}
+
+.chat-message--mini .chat-message__content :deep(pre) {
+  font-size: 12px;
+}
+
+.chat-message--mini .chat-message__content :deep(pre code) {
+  font-size: 12px;
+}
+
+.chat-message--mini .chat-message__content :deep(pre .code-block-header) {
+  font-size: 11px;
+  padding: 6px 12px;
+}
+
+.chat-message--mini .chat-message__content :deep(pre .code-block-body) {
+  padding: 8px 12px;
+}
+
+.chat-message--mini .chat-message__content :deep(code) {
+  font-size: 12px;
+}
+
+.chat-message--mini .chat-message__content :deep(:not(pre) > code) {
+  padding: 1px 4px;
 }
 </style>
