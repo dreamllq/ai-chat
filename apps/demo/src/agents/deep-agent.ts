@@ -5,5 +5,5 @@ export const deepAgentDef: AgentDefinition = {
   name: 'deep Agent',
   description: '这是一个深度agent',
   systemPrompt: '这是一个深度agent',
-  allowedAgents:['demo-fs-agent']
+  allowedAgents:['demo-code-agent','demo-fs-agent', 'demo-shell-agent']
 }

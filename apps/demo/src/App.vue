@@ -13,12 +13,16 @@ import { formSchemaAgentDef } from './agents/form-schema-agent'
 import { skillAgentDef } from './agents/skill-agent'
 import { mcpAgentDef } from './agents/mcp-agent'
 import {deepAgentDef} from './agents/deep-agent'
+import {shellAgentDef} from './agents/shell-agent'
+import {codeAgentDef} from './agents/code-agent'
 
 // 在模块顶层同步注册（先于组件渲染），确保下拉框能立即列出
 registerAgent(llmToolAgentDef)
 registerAgent(formSchemaAgentDef)
 registerAgent(skillAgentDef)
 registerAgent(mcpAgentDef)
+registerAgent(shellAgentDef)
+registerAgent(codeAgentDef)
 registerAgent(deepAgentDef, new DeepAgentRunner(deepAgentDef))
 
 // ---------------------------------------------------------------------------
