@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import { AiChat, registerAgent, DeepAgentRunner } from '@ai-chat/vue'
-import type { LocaleName } from '@ai-chat/vue'
+import type { LocaleName, AiChatSize } from '@ai-chat/vue'
 import { S3StorageService } from '@ai-chat/storage-s3'
 import type { S3StorageConfig } from '@ai-chat/storage-s3'
 
@@ -59,6 +59,17 @@ function switchLocale(name: LocaleName) {
 // ---------------------------------------------------------------------------
 // Locale state
 // ---------------------------------------------------------------------------
+
+// ---------------------------------------------------------------------------
+// Size state
+// ---------------------------------------------------------------------------
+
+const currentSize = ref<AiChatSize>('default')
+
+const sizeLabels: { key: AiChatSize; label: string }[] = [
+  { key: 'default', label: 'Default' },
+  { key: 'mini', label: 'Mini' },
+]
 
 // ---------------------------------------------------------------------------
 // S3 File Upload Service
@@ -132,6 +143,16 @@ const models = [
             {{ item.label }}
           </button>
         </div>
+        <div class="size-switcher">
+          <button
+            v-for="item in sizeLabels"
+            :key="item.key"
+            :class="['size-btn', { active: currentSize === item.key }]"
+            @click="currentSize = item.key"
+          >
+            {{ item.label }}
+          </button>
+        </div>
       </div>
     </header>
 
@@ -139,6 +160,7 @@ const models = [
     <main class="demo-main">
       <AiChat 
         :locale="currentLocale"
+        :size="currentSize"
         :file-upload-service="fileUploadService"
         :models="models"
       >
@@ -284,6 +306,51 @@ body,
 }
 
 .locale-btn.active::after {
+  display: none;
+}
+
+/* ── Size switcher ─────────────────────────────────────────────────── */
+.size-switcher {
+  display: flex;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid #e2e2e8;
+  background: #fafafa;
+}
+
+.size-btn {
+  border: none;
+  background: transparent;
+  padding: 6px 14px;
+  font-size: 13px;
+  font-weight: 500;
+  color: #666;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  position: relative;
+}
+
+.size-btn:not(:last-child)::after {
+  content: '';
+  position: absolute;
+  right: 0;
+  top: 20%;
+  height: 60%;
+  width: 1px;
+  background: #e2e2e8;
+}
+
+.size-btn:hover {
+  color: #333;
+  background: #f0f0f4;
+}
+
+.size-btn.active {
+  background: #6366f1;
+  color: #fff;
+}
+
+.size-btn.active::after {
   display: none;
 }
 
