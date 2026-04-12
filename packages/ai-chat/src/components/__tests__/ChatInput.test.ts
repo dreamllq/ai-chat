@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { mount } from '@vue/test-utils'
 import { ref, computed } from 'vue'
-import type { MessageAttachment } from '../../types'
+import type { MessageAttachment, AiChatSize } from '../../types'
 import ChatInput from '../ChatInput.vue'
 
 vi.mock('element-plus', async () => {
@@ -63,6 +63,13 @@ const mockRemoveFile = vi.fn()
 const mockRetryFile = vi.fn()
 const mockGetCompletedAttachments = vi.fn<() => MessageAttachment[]>(() => [])
 const mockClear = vi.fn()
+
+// Mock useSize
+const mockSize = ref<AiChatSize>('default')
+
+vi.mock('../../size', () => ({
+  useSize: () => mockSize,
+}))
 
 vi.mock('../../composables/useFileUpload', () => ({
   useFileUpload: () => ({
@@ -144,6 +151,7 @@ describe('ChatInput', () => {
     mockRetryFile.mockClear()
     mockGetCompletedAttachments.mockClear()
     mockClear.mockClear()
+    mockSize.value = 'default'
   })
 
   it('renders textarea with correct placeholder', () => {
@@ -413,5 +421,38 @@ describe('ChatInput', () => {
 
     // Should have called removeFile via the composable
     expect(mockRemoveFile).toHaveBeenCalledWith('state-1')
+  })
+
+  it('applies mini class when size is mini', async () => {
+    mockSize.value = 'mini'
+    const wrapper = mountChatInput()
+    await wrapper.vm.$nextTick()
+
+    expect(wrapper.find('.chat-input').classes()).toContain('chat-input--mini')
+  })
+
+  it('does not apply mini class by default', () => {
+    const wrapper = mountChatInput()
+    expect(wrapper.find('.chat-input').classes()).not.toContain('chat-input--mini')
+  })
+
+  it('uses 12px icons in mini mode', async () => {
+    mockSize.value = 'mini'
+    const wrapper = mountChatInput()
+    await wrapper.vm.$nextTick()
+
+    const icons = wrapper.findAllComponents({ name: 'ElIcon' })
+    for (const icon of icons) {
+      expect(icon.props('size')).toBe(12)
+    }
+  })
+
+  it('uses 14px icons by default', () => {
+    const wrapper = mountChatInput()
+
+    const icons = wrapper.findAllComponents({ name: 'ElIcon' })
+    for (const icon of icons) {
+      expect(icon.props('size')).toBe(14)
+    }
   })
 })

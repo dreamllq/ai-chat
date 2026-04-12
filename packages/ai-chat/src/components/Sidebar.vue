@@ -3,6 +3,7 @@ import { ref, computed } from 'vue'
 import { ElButton, ElIcon, ElInput, ElPopconfirm } from 'element-plus'
 import { useSession } from '../composables/useSession'
 import { useLocale } from '../composables/useLocale'
+import { useSize } from '../size'
 import type { Conversation } from '../types'
 
 const props = defineProps<{
@@ -12,6 +13,11 @@ const props = defineProps<{
 
 const { conversations, currentConversationId, currentMessages, createConversation, deleteConversation, clearAllConversations, renameConversation, switchConversation } = useSession()
 const { t } = useLocale()
+const size = useSize()
+
+const actionIconSize = computed(() => size.value === 'mini' ? 12 : 16)
+const deleteIconSize = computed(() => size.value === 'mini' ? 12 : 14)
+const sidebarClasses = computed(() => ({ 'ai-chat-sidebar--mini': size.value === 'mini' }))
 
 const conversationList = computed(() => conversations.value ?? [])
 
@@ -65,7 +71,7 @@ function formatTokenCount(tokens: number): string {
 </script>
 
 <template>
-  <div class="ai-chat-sidebar">
+  <div :class="['ai-chat-sidebar', sidebarClasses]">
     <div class="ai-chat-sidebar__header">
       <ElButton class="ai-chat-sidebar__new-chat" type="primary" :disabled="isNewChatDisabled" @click="handleNewChat">
         <ElIcon><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg></ElIcon>
@@ -82,7 +88,7 @@ function formatTokenCount(tokens: number): string {
             size="small"
             :disabled="conversationList.length === 0"
           >
-            <ElIcon :size="16"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6" /><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" /></svg></ElIcon>
+            <ElIcon :size="actionIconSize"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6" /><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" /></svg></ElIcon>
           </ElButton>
         </template>
       </ElPopconfirm>
@@ -131,7 +137,7 @@ function formatTokenCount(tokens: number): string {
                 size="small"
                 @click.stop
               >
-                <ElIcon :size="14"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6" /><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" /></svg></ElIcon>
+                <ElIcon :size="deleteIconSize"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6" /><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" /></svg></ElIcon>
               </ElButton>
             </template>
           </ElPopconfirm>
@@ -257,5 +263,22 @@ function formatTokenCount(tokens: number): string {
 
 .ai-chat-sidebar__item-delete {
   padding: 4px;
+}
+
+.ai-chat-sidebar--mini .ai-chat-sidebar__item {
+  padding: 6px 10px;
+}
+
+.ai-chat-sidebar--mini .ai-chat-sidebar__item-title {
+  font-size: 13px;
+}
+
+.ai-chat-sidebar--mini .ai-chat-sidebar__item-time {
+  font-size: 11px;
+}
+
+.ai-chat-sidebar--mini .ai-chat-sidebar__empty {
+  font-size: 13px;
+  padding: 16px;
 }
 </style>

@@ -1,11 +1,15 @@
 <script setup lang="ts">
-import { ref, watch, nextTick, onMounted } from 'vue'
+import { ref, computed, watch, nextTick, onMounted } from 'vue'
 import { useChat } from '../composables/useChat'
 import { useSession } from '../composables/useSession'
+import { useSize } from '../size'
 import ChatMessage from './ChatMessage.vue'
 
 const { currentMessages, isStreaming } = useChat()
 const { currentConversationId } = useSession()
+const size = useSize()
+
+const listClasses = computed(() => ({ 'chat-message-list--mini': size.value === 'mini' }))
 
 const listRef = ref<HTMLElement | null>(null)
 
@@ -41,7 +45,7 @@ onMounted(() => {
 </script>
 
 <template>
-  <div ref="listRef" class="chat-message-list">
+  <div ref="listRef" :class="['chat-message-list', listClasses]">
     <ChatMessage
       v-for="message in currentMessages"
       :key="message.id"
@@ -55,5 +59,9 @@ onMounted(() => {
   flex: 1;
   overflow-y: auto;
   padding: 16px 0;
+}
+
+.chat-message-list--mini {
+  padding: 12px 0;
 }
 </style>

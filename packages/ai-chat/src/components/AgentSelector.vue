@@ -3,6 +3,7 @@ import { computed } from 'vue'
 import { ElSelect, ElOption } from 'element-plus'
 import { agentRegistry } from '../services/agent'
 import { useLocale } from '../composables/useLocale'
+import { useSize } from '../size'
 
 const props = defineProps<{
   modelValue?: string
@@ -13,6 +14,9 @@ const emit = defineEmits<{
 }>()
 
 const { t } = useLocale()
+const size = useSize()
+
+const selectorClasses = computed(() => ({ 'agent-selector--mini': size.value === 'mini' }))
 
 const agents = computed(() => {
   // Depend on version so registry changes trigger re-computation
@@ -40,7 +44,7 @@ function handleChange(value: string) {
   <ElSelect
     :model-value="modelValue"
     :placeholder="placeholder"
-    class="agent-selector"
+    :class="['agent-selector', selectorClasses]"
     @update:model-value="handleChange"
   >
     <ElOption
@@ -94,5 +98,17 @@ function handleChange(value: string) {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.agent-selector--mini :deep(.el-input__inner) {
+  font-size: 12px;
+}
+
+.agent-selector--mini .agent-selector__option-name {
+  font-size: 13px;
+}
+
+.agent-selector--mini .agent-selector__option-desc {
+  font-size: 11px;
 }
 </style>

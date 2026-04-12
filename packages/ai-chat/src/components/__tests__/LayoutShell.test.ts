@@ -1,7 +1,9 @@
 import { describe, it, expect } from 'vitest'
 import { mount } from '@vue/test-utils'
-import { nextTick } from 'vue'
+import { nextTick, ref, computed } from 'vue'
 import LayoutShell from '../LayoutShell.vue'
+import { sizeInjectionKey } from '../../size'
+import type { AiChatSize } from '../../types'
 
 const ElButtonStub = {
   name: 'ElButton',
@@ -149,5 +151,68 @@ describe('LayoutShell', () => {
 
     await wrapper.setProps({ sidebarCollapsed: false })
     expect(sidebar.classes()).not.toContain('ai-chat-sidebar--collapsed')
+  })
+
+  it('applies mini BEM modifier when size is mini', () => {
+    const size = ref<AiChatSize>('mini')
+    const wrapper = mount(LayoutShell, {
+      props: { sidebarCollapsed: false },
+      global: {
+        provide: { [sizeInjectionKey as symbol]: size },
+        stubs: { ElButton: ElButtonStub, ElIcon: ElIconStub },
+      },
+    })
+    expect(wrapper.find('.ai-chat-layout').classes()).toContain('ai-chat-layout--mini')
+  })
+
+  it('does not apply mini BEM modifier by default', () => {
+    const size = ref<AiChatSize>('default')
+    const wrapper = mount(LayoutShell, {
+      props: { sidebarCollapsed: false },
+      global: {
+        provide: { [sizeInjectionKey as symbol]: size },
+        stubs: { ElButton: ElButtonStub, ElIcon: ElIconStub },
+      },
+    })
+    expect(wrapper.find('.ai-chat-layout').classes()).not.toContain('ai-chat-layout--mini')
+  })
+})
+
+// Pure logic tests (no DOM mounting)
+function createLayoutShellSize(initialSize: AiChatSize = 'default') {
+  const size = ref<AiChatSize>(initialSize)
+  const headerIconSize = computed(() => size.value === 'mini' ? 14 : 18)
+  const layoutClasses = computed(() => ({ 'ai-chat-layout--mini': size.value === 'mini' }))
+  return { size, headerIconSize, layoutClasses }
+}
+
+describe('LayoutShell size logic', () => {
+  it('has no mini class by default', () => {
+    const { layoutClasses } = createLayoutShellSize()
+    expect(layoutClasses.value['ai-chat-layout--mini']).toBe(false)
+  })
+
+  it('applies mini class when size is mini', () => {
+    const { layoutClasses } = createLayoutShellSize('mini')
+    expect(layoutClasses.value['ai-chat-layout--mini']).toBe(true)
+  })
+
+  it('uses 18px icons by default', () => {
+    const { headerIconSize } = createLayoutShellSize()
+    expect(headerIconSize.value).toBe(18)
+  })
+
+  it('uses 14px icons in mini mode', () => {
+    const { headerIconSize } = createLayoutShellSize('mini')
+    expect(headerIconSize.value).toBe(14)
+  })
+
+  it('reacts to size change', () => {
+    const { size, layoutClasses, headerIconSize } = createLayoutShellSize('default')
+    expect(layoutClasses.value['ai-chat-layout--mini']).toBe(false)
+    expect(headerIconSize.value).toBe(18)
+    size.value = 'mini'
+    expect(layoutClasses.value['ai-chat-layout--mini']).toBe(true)
+    expect(headerIconSize.value).toBe(14)
   })
 })

@@ -1,7 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { mount } from '@vue/test-utils'
-import { ref, nextTick } from 'vue'
+import { ref, nextTick, computed } from 'vue'
 import type { Conversation } from '../../types'
+import type { AiChatSize } from '../../types'
 import Sidebar from '../Sidebar.vue'
 
 // --- Mock useSession ---
@@ -48,6 +49,13 @@ vi.mock('../../composables/useLocale', () => ({
   }),
 }))
 
+// --- Mock useSize ---
+const mockSize = ref<AiChatSize>('default')
+
+vi.mock('../../size', () => ({
+  useSize: () => mockSize,
+}))
+
 // --- Element Plus Stubs ---
 const ElButtonStub = {
   name: 'ElButton',
@@ -71,7 +79,7 @@ const ElPopconfirmStub = {
 
 const ElIconStub = {
   name: 'ElIcon',
-  template: '<span class="el-icon"><slot /></span>',
+  template: '<span class="el-icon" :data-size="size"><slot /></span>',
   props: ['size'],
 }
 
@@ -115,6 +123,7 @@ describe('Sidebar', () => {
     mockRenameConversation.mockReset()
     mockSwitchConversation.mockReset()
     mockT.mockClear()
+    mockSize.value = 'default'
   })
 
   it('renders conversation list with titles', () => {
@@ -304,5 +313,47 @@ describe('Sidebar', () => {
     const newChatBtn = wrapper.find('.ai-chat-sidebar__new-chat')
 
     expect(newChatBtn.attributes('disabled')).toBeUndefined()
+  })
+
+  it('applies mini class when size is mini', async () => {
+    mockConversations.value = []
+    mockSize.value = 'mini'
+
+    const wrapper = mountSidebar()
+    await nextTick()
+
+    expect(wrapper.find('.ai-chat-sidebar').classes()).toContain('ai-chat-sidebar--mini')
+  })
+
+  it('does not apply mini class by default', async () => {
+    mockConversations.value = []
+
+    const wrapper = mountSidebar()
+    await nextTick()
+
+    expect(wrapper.find('.ai-chat-sidebar').classes()).not.toContain('ai-chat-sidebar--mini')
+  })
+
+  it('uses smaller action icon size in mini mode', async () => {
+    mockConversations.value = [makeConversation()]
+    mockSize.value = 'mini'
+
+    const wrapper = mountSidebar()
+    await nextTick()
+
+    const html = wrapper.html()
+    expect(html).toContain('data-size="12"')
+  })
+
+  it('uses default icon sizes when not in mini mode', async () => {
+    const conv = makeConversation()
+    mockConversations.value = [conv]
+
+    const wrapper = mountSidebar()
+    await nextTick()
+
+    const html = wrapper.html()
+    expect(html).toContain('data-size="16"')
+    expect(html).toContain('data-size="14"')
   })
 })

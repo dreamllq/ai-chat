@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { mount } from '@vue/test-utils'
-import { ref, nextTick } from 'vue'
-import type { ChatMessage } from '../../types'
+import { ref, computed, nextTick } from 'vue'
+import type { ChatMessage, AiChatSize } from '../../types'
 import ChatMessageList from '../ChatMessageList.vue'
 
 // Mock useChat
@@ -15,6 +15,13 @@ vi.mock('../../composables/useChat', () => ({
     sendMessage: vi.fn(),
     stopStreaming: vi.fn(),
   }),
+}))
+
+// Mock useSize
+const mockSize = ref<AiChatSize>('default')
+
+vi.mock('../../size', () => ({
+  useSize: () => mockSize,
 }))
 
 // Mock useLocale
@@ -55,6 +62,7 @@ describe('ChatMessageList', () => {
   beforeEach(() => {
     mockMessages.value = []
     mockIsStreaming.value = false
+    mockSize.value = 'default'
     mockT.mockClear()
 
     // requestAnimationFrame callbacks are not flushed by nextTick() in jsdom,
@@ -155,5 +163,30 @@ describe('ChatMessageList', () => {
     await nextTick()
 
     expect(wrapper.findAllComponents({ name: 'ChatMessage' })).toHaveLength(2)
+  })
+
+  it('has no mini class by default', () => {
+    const wrapper = mountChatMessageList()
+    expect(wrapper.find('.chat-message-list').classes()).not.toContain('chat-message-list--mini')
+  })
+
+  it('applies mini class when size is mini', async () => {
+    mockSize.value = 'mini'
+    const wrapper = mountChatMessageList()
+    await nextTick()
+    expect(wrapper.find('.chat-message-list').classes()).toContain('chat-message-list--mini')
+  })
+
+  it('reacts to size change', async () => {
+    const wrapper = mountChatMessageList()
+    expect(wrapper.find('.chat-message-list').classes()).not.toContain('chat-message-list--mini')
+
+    mockSize.value = 'mini'
+    await nextTick()
+    expect(wrapper.find('.chat-message-list').classes()).toContain('chat-message-list--mini')
+
+    mockSize.value = 'default'
+    await nextTick()
+    expect(wrapper.find('.chat-message-list').classes()).not.toContain('chat-message-list--mini')
   })
 })

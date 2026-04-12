@@ -5,6 +5,7 @@ import { Promotion, CircleClose, UploadFilled, Setting } from '@element-plus/ico
 import { useLocale } from '../composables/useLocale'
 import { useModel } from '../composables/useModel'
 import { useFileUpload } from '../composables/useFileUpload'
+import { useSize } from '../size'
 import { agentRegistry } from '../services/agent'
 import ModelManager from './ModelManager.vue'
 import type { FileUploadService, MessageAttachment } from '../types'
@@ -28,6 +29,9 @@ const emit = defineEmits<{
 
 const { t } = useLocale()
 const { models, currentModelId } = useModel()
+const size = useSize()
+const toolbarIconSize = computed(() => size.value === 'mini' ? 12 : 14)
+const inputClasses = computed(() => ({ 'chat-input--mini': size.value === 'mini' }))
 const { fileStates, isAllReady, addFile, removeFile, retryFile, getCompletedAttachments, clear } = useFileUpload({
   fileUploadService: props.fileUploadService
 })
@@ -131,7 +135,7 @@ function handleModelChange(id: string) {
 </script>
 
 <template>
-  <div class="chat-input">
+  <div :class="['chat-input', inputClasses]">
     <div class="chat-input__container">
       <!-- File preview area -->
       <div v-if="fileStates.length > 0" class="chat-input__files">
@@ -222,7 +226,7 @@ function handleModelChange(id: string) {
               class="chat-input__manage-option"
             >
               <div class="chat-input__manage-option-content">
-                <ElIcon :size="14"><Setting /></ElIcon>
+                <ElIcon :size="toolbarIconSize"><Setting /></ElIcon>
                 <span>{{ t('model.manage') }}</span>
               </div>
             </ElOption>
@@ -246,7 +250,7 @@ function handleModelChange(id: string) {
             class="chat-input__icon-btn"
             @click="triggerFileUpload"
           >
-            <ElIcon :size="14"><UploadFilled /></ElIcon>
+            <ElIcon :size="toolbarIconSize"><UploadFilled /></ElIcon>
           </ElButton>
           <!-- Stop button -->
           <ElButton
@@ -256,7 +260,7 @@ function handleModelChange(id: string) {
             size="small"
             @click="handleStop"
           >
-            <ElIcon :size="14"><CircleClose /></ElIcon>
+            <ElIcon :size="toolbarIconSize"><CircleClose /></ElIcon>
           </ElButton>
           <!-- Send button -->
           <ElButton
@@ -267,7 +271,7 @@ function handleModelChange(id: string) {
             :disabled="!canSend"
             @click="handleSend"
           >
-            <ElIcon :size="14"><Promotion /></ElIcon>
+            <ElIcon :size="toolbarIconSize"><Promotion /></ElIcon>
           </ElButton>
         </div>
       </div>
@@ -548,5 +552,16 @@ function handleModelChange(id: string) {
 /* Hidden file input */
 .chat-input__hidden-input {
   display: none;
+}
+
+.chat-input--mini {
+  --chat-input-radius: 10px;
+  --chat-input-toolbar-height: 30px;
+}
+
+.chat-input--mini .chat-input__textarea {
+  padding: 8px 10px 4px;
+  min-height: 36px;
+  font-size: 13px;
 }
 </style>
