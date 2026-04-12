@@ -15,7 +15,8 @@ Vue 3 AI chat component library (monorepo). Uses Element Plus for UI, Dexie/Inde
 ├── packages/ai-chat/   # Main library (@ai-chat/vue)
 │   ├── src/
 │   │   ├── components/ # 10 Vue SFCs (AiChat, Sidebar, ChatInput, ChatMessage, etc.)
-│   │   ├── composables/# 6 composables (useChat, useSession, useModel, useLocale, useAgent, useObservable)
+│   │   ├── composables/# 7 composables (useChat, useSession, useModel, useLocale, useAgent, useObservable, useSize)
+│   │   ├── size/          # Size injection key + useSize composable
 │   │   ├── agents/     # LangChainRunner + message converter + LLM init + MCP client
 │   │   ├── services/   # AgentRegistry singleton + CRUD services for IndexedDB
 │   │   ├── database/   # Dexie schema (4 tables: conversations, messages, models, agents)
@@ -42,6 +43,7 @@ Vue 3 AI chat component library (monorepo). Uses Element Plus for UI, Dexie/Inde
 | MCP server connection | `packages/ai-chat/src/agents/mcp-client.ts` | MCP integration via @langchain/mcp-adapters |
 | Message conversion | `packages/ai-chat/src/agents/message-converter.ts` | ChatMessage → LangChain BaseMessage conversion |
 | LLM initialization | `packages/ai-chat/src/agents/llm-init.ts` | ChatOpenAI creation from ModelConfig |
+| 修改组件样式/尺寸 | `packages/ai-chat/src/components/` | 所有组件支持 size prop (default/mini) |
 
 ## CONVENTIONS
 
@@ -52,6 +54,7 @@ Vue 3 AI chat component library (monorepo). Uses Element Plus for UI, Dexie/Inde
 - **Side-effect agent registration** — built-in LangChain agent is registered in `src/index.ts` (not `agents/index.ts`) to prevent tree-shaking from removing it
 - **Element Plus is peerDependency** — never bundle it; externalized in vite build
 - **Tests collocated** — `__tests__/` subdirectory next to source files, `*.test.ts` naming
+- **所有组件支持 size prop** — 通过 provide/inject 传递 `AiChatSize`（'default' | 'mini'），使用 `useSize()` composable 获取当前 size。CSS 变量在 LayoutShell 中根据 size 覆盖，各组件通过 BEM 修饰符（如 `.chat-message--mini`）应用组件级样式差异。
 
 ## ANTI-PATTERNS (THIS PROJECT)
 
@@ -63,6 +66,8 @@ Vue 3 AI chat component library (monorepo). Uses Element Plus for UI, Dexie/Inde
 - **NEVER** forget cascade delete — `ConversationService.delete()` must also delete associated messages
 - **DO NOT** use Dexie `liveQuery` closures that read Vue `ref.value` — liveQuery only tracks Dexie table mutations, not Vue reactivity. Use `watch()` for parameterized queries instead
 - **DO NOT** leave TS errors in test files — `vite-plugin-dts` scans all `.ts` files including tests; test TS errors will fail the build
+- **NEVER** 创建新的 size 选项而不更新所有组件 — size 是全局属性，必须所有组件一致支持
+- **NEVER** 使用 calc() 分数缩放生成 mini 值 — 使用显式整数 px 值避免 sub-pixel 渲染
 
 ## UNIQUE STYLES
 
@@ -72,6 +77,7 @@ Vue 3 AI chat component library (monorepo). Uses Element Plus for UI, Dexie/Inde
 - **Database service classes** — `ConversationService`, `MessageService`, `ModelService`, `AgentService` are plain classes (not composables) wrapping Dexie operations. Composables consume them
 - **Tool calling loop** — `LangChainRunner` implements max-5-iteration invoke → tool_calls → execute → ToolMessage loop internally. Users only provide `ToolDefinition[]` with execute functions.
 - **MCP integration** — `MCPClient` wraps `@langchain/mcp-adapters` MultiServerMCPClient. Lazy-loaded, graceful degradation on connection failure. Tools converted to framework-agnostic `ToolDefinition[]`.
+- **Size propagation** — AiChat.vue 接受 `size` prop，通过 AiChatProvider provide，子组件通过 `useSize()` inject。CSS 层面使用 LayoutShell 的全局变量覆盖 + 各组件 BEM `--mini` 修饰符。Element Plus 组件保持 `size="small"`（已是 EP 最小选项）。
 
 ## COMMANDS
 
