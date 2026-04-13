@@ -101,7 +101,6 @@ export interface AiChatLocale {
     agentNotFound: string
     circularCall: string
     logTitle: string
-    logTimeline: string
     logStart: string
     logToken: string
     logToolCall: string
@@ -215,7 +214,6 @@ export const en: AiChatLocale = {
     agentNotFound: 'Agent not found',
     circularCall: 'Circular agent call detected',
     logTitle: 'Agent Execution Log',
-    logTimeline: 'Timeline',
     logStart: 'Start',
     logToken: 'Token',
     logToolCall: 'Tool Call',

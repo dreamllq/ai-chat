@@ -103,7 +103,6 @@ export const zhCn: AiChatLocale = {
     agentNotFound: '未找到智能体',
     circularCall: '检测到循环调用',
     logTitle: '智能体执行日志',
-    logTimeline: '时间线',
     logStart: '开始',
     logToken: '令牌',
     logToolCall: '工具调用',
