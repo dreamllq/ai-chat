@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onUnmounted, reactive, ref, watch } from 'vue'
+import { computed, nextTick, onUpdated, onUnmounted, reactive, ref, watch } from 'vue'
 import { ElDialog, ElEmpty } from 'element-plus'
 import MarkdownIt from 'markdown-it'
 import hljs from 'highlight.js'
@@ -168,6 +168,58 @@ watch(isReasoningDone, (done) => {
   }
 })
 
+// Code copy support
+const dialogRef = ref<HTMLElement | null>(null)
+
+function addCopyButtons(): void {
+  const el = dialogRef.value
+  if (!el) return
+
+  const preBlocks = el.querySelectorAll('pre')
+  preBlocks.forEach((pre, index) => {
+    if (pre.querySelector('.code-block-copy')) return
+
+    pre.style.position = 'relative'
+
+    const btn = document.createElement('button')
+    btn.className = 'code-block-copy'
+    btn.textContent = t('chat.copyCode')
+    btn.addEventListener('click', () => copyCode(pre, index, btn))
+    pre.appendChild(btn)
+  })
+}
+
+function getPreCodeText(pre: HTMLPreElement): string {
+  const codeEl = pre.querySelector('code')
+  const el = codeEl ?? pre
+  return el.textContent ?? ''
+}
+
+async function copyCode(pre: HTMLPreElement, _index: number, btn: HTMLButtonElement): Promise<void> {
+  const raw = getPreCodeText(pre)
+  if (!raw) return
+  try {
+    await navigator.clipboard.writeText(raw)
+    btn.textContent = t('chat.copySuccess')
+    setTimeout(() => {
+      btn.textContent = t('chat.copyCode')
+    }, 2000)
+  } catch {
+    // Clipboard not available
+  }
+}
+
+onUpdated(() => {
+  nextTick(() => addCopyButtons())
+})
+
+watch(
+  () => [props.modelValue, execution.value?.logs.length],
+  () => {
+    nextTick(() => addCopyButtons())
+  },
+)
+
 function renderStepMarkdown(content: string): string {
   return md.render(content)
 }
@@ -207,7 +259,7 @@ const statusLabel = computed(() => {
     :append-to-body="false"
     data-testid="sub-agent-log-dialog"
   >
-    <div v-if="execution" class="sub-agent-log" :class="dialogClasses">
+    <div v-if="execution" ref="dialogRef" class="sub-agent-log" :class="dialogClasses">
       <!-- Execution Header -->
       <div class="sub-agent-log__header">
         <div class="sub-agent-log__header-row">
@@ -652,5 +704,28 @@ const statusLabel = computed(() => {
 .sub-agent-log-dialog--mini .sub-agent-log__reasoning-header {
   padding: 4px 8px;
   font-size: 11px;
+}
+
+/* Code copy button */
+.sub-agent-log :deep(.code-block-copy) {
+  position: absolute;
+  top: 6px;
+  right: 8px;
+  background: rgba(110, 118, 129, 0.25);
+  border: 1px solid rgba(110, 118, 129, 0.3);
+  color: #c9d1d9;
+  font-size: 12px;
+  cursor: pointer;
+  padding: 4px 10px;
+  border-radius: 4px;
+  transition: background-color 0.2s, color 0.2s;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+  z-index: 1;
+  line-height: 1;
+}
+
+.sub-agent-log :deep(.code-block-copy:hover) {
+  background: rgba(110, 118, 129, 0.45);
+  color: #f0f6fc;
 }
 </style>

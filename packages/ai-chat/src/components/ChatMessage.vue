@@ -211,28 +211,15 @@ function formatSize(bytes: number): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
 }
 
-// Store raw code indexed by block position for copy
-const codeBlockRawMap = computed<Map<number, string>>(() => {
-  const map = new Map<number, string>()
-  const regex = /```[\w]*\n([\s\S]*?)```/g
-  let match: RegExpExecArray | null = regex.exec(props.message.content)
-  let idx = 0
-  while (match !== null) {
-    map.set(idx, match[1].replace(/\n$/, ''))
-    idx++
-    match = regex.exec(props.message.content)
-  }
-  return map
-})
-
 const contentRef = ref<HTMLElement | null>(null)
+const bubbleRef = ref<HTMLElement | null>(null)
 const copiedIndex = ref<number | null>(null)
 
 function addCopyButtons(): void {
-  const el = contentRef.value
+  // Scan all <pre> blocks inside the bubble container
+  const el = bubbleRef.value
   if (!el) return
 
-  // Find all <pre> blocks — each one corresponds to a code block
   const preBlocks = el.querySelectorAll('pre')
   preBlocks.forEach((pre, index) => {
     // Skip if already has a copy button
@@ -243,14 +230,20 @@ function addCopyButtons(): void {
     const btn = document.createElement('button')
     btn.className = 'code-block-copy'
     btn.textContent = t('chat.copyCode')
-    btn.addEventListener('click', () => copyCode(index, btn))
+    btn.addEventListener('click', () => copyCode(pre, index, btn))
     pre.appendChild(btn)
   })
 }
 
-async function copyCode(index: number, btn: HTMLButtonElement): Promise<void> {
-  const raw = codeBlockRawMap.value.get(index)
-  if (raw === undefined) return
+function getPreCodeText(pre: HTMLPreElement): string {
+  const codeEl = pre.querySelector('code')
+  const el = codeEl ?? pre
+  return el.textContent ?? ''
+}
+
+async function copyCode(pre: HTMLPreElement, index: number, btn: HTMLButtonElement): Promise<void> {
+  const raw = getPreCodeText(pre)
+  if (!raw) return
   try {
     await navigator.clipboard.writeText(raw)
     copiedIndex.value = index
@@ -288,7 +281,7 @@ onUpdated(() => {
 
     <div class="chat-message__body">
       <div class="chat-message__time">{{ relativeTime }}</div>
-      <div class="chat-message__bubble">
+      <div ref="bubbleRef" class="chat-message__bubble">
       <!-- Steps-based rendering -->
       <template v-if="hasSteps">
         <div v-for="(step, index) in message.steps" :key="index">
@@ -739,7 +732,7 @@ onUpdated(() => {
   50% { opacity: 0; }
 }
 
-.chat-message__content :deep(.code-block-copy) {
+.chat-message__bubble :deep(.code-block-copy) {
   position: absolute;
   top: 6px;
   right: 8px;
@@ -756,7 +749,7 @@ onUpdated(() => {
   line-height: 1;
 }
 
-.chat-message__content :deep(.code-block-copy:hover) {
+.chat-message__bubble :deep(.code-block-copy:hover) {
   background: rgba(110, 118, 129, 0.45);
   color: #f0f6fc;
 }
