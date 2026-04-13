@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onUnmounted, reactive, ref, watch } from 'vue'
-import { ElDialog, ElScrollbar, ElEmpty } from 'element-plus'
+import { ElDialog, ElEmpty } from 'element-plus'
 import MarkdownIt from 'markdown-it'
 import hljs from 'highlight.js'
 import 'highlight.js/styles/github-dark.css'
@@ -88,24 +88,11 @@ const sortedLogs = computed<SubAgentLogEntry[]>(() => {
   return [...execution.value.logs].sort((a, b) => a.timestamp - b.timestamp)
 })
 
-const logTypeConfig: Record<SubAgentLogEntry['type'], { icon: string; labelKey: string; className: string }> = {
-  start: { icon: '🟢', labelKey: 'subAgent.logStart', className: 'sub-agent-log__entry--start' },
-  iteration_start: { icon: '🔄', labelKey: 'subAgent.logToken', className: 'sub-agent-log__entry--iteration-start' },
-  token: { icon: '📝', labelKey: 'subAgent.logToken', className: 'sub-agent-log__entry--token' },
-  reasoning: { icon: '💭', labelKey: 'subAgent.logReasoning', className: 'sub-agent-log__entry--reasoning' },
-  tool_call: { icon: '🔧', labelKey: 'subAgent.logToolCall', className: 'sub-agent-log__entry--tool-call' },
-  tool_result: { icon: '⚙️', labelKey: 'subAgent.logToolResult', className: 'sub-agent-log__entry--tool-result' },
-  done: { icon: '✅', labelKey: 'subAgent.logDone', className: 'sub-agent-log__entry--done' },
-  error: { icon: '❌', labelKey: 'subAgent.logError', className: 'sub-agent-log__entry--error' },
-}
+const isTaskExpanded = ref(false)
 
-function getLogConfig(type: SubAgentLogEntry['type']) {
-  return logTypeConfig[type]
+function toggleTask(): void {
+  isTaskExpanded.value = !isTaskExpanded.value
 }
-
-const timelineLogs = computed<SubAgentLogEntry[]>(() => {
-  return sortedLogs.value.filter(e => e.type !== 'token' && e.type !== 'reasoning' && e.type !== 'iteration_start')
-})
 
 interface IterationStep {
   index: number
@@ -190,14 +177,6 @@ function getPreviewText(content: string): string {
   return text.length > 100 ? text.slice(0, 100) + '…' : text
 }
 
-function formatTime(timestamp: number): string {
-  const date = new Date(timestamp)
-  const h = date.getHours().toString().padStart(2, '0')
-  const m = date.getMinutes().toString().padStart(2, '0')
-  const s = date.getSeconds().toString().padStart(2, '0')
-  return `${h}:${m}:${s}`
-}
-
 function formatNumber(n: number): string {
   return n.toLocaleString()
 }
@@ -237,7 +216,16 @@ const statusLabel = computed(() => {
             {{ statusLabel }}
           </span>
         </div>
-        <div class="sub-agent-log__task">{{ t('subAgent.task') }}: {{ execution.task }}</div>
+        <div class="sub-agent-log__task" @click="toggleTask">
+          <span class="sub-agent-log__task-label">{{ t('subAgent.task') }}:</span>
+          <span class="sub-agent-log__task-toggle">{{ isTaskExpanded ? '▲' : '▼' }}</span>
+        </div>
+        <div class="sub-agent-log__task-collapse" :class="{ 'sub-agent-log__task-collapse--collapsed': !isTaskExpanded }">
+          <div class="sub-agent-log__task-content">
+            <!-- eslint-disable-next-line vue/no-v-html -->
+            <div v-html="renderStepMarkdown(execution.task)" />
+          </div>
+        </div>
         <div class="sub-agent-log__meta">
           <span v-if="execution.endTime">
             {{ t('subAgent.duration', { duration: formatDuration(execution.startTime, execution.endTime) }) }}
@@ -275,36 +263,6 @@ const statusLabel = computed(() => {
         <span class="sub-agent-log__token-usage-item">{{ t('chat.completionTokens') }} {{ formatNumber(execution.tokenUsage!.completionTokens) }}</span>
         <span class="sub-agent-log__token-usage-item">{{ t('chat.totalTokens') }} {{ formatNumber(execution.tokenUsage!.totalTokens) }}</span>
       </div>
-
-      <!-- Timeline -->
-      <div class="sub-agent-log__timeline-header">
-        {{ t('subAgent.logTimeline') }}
-      </div>
-      <ElScrollbar class="sub-agent-log__scroll" max-height="300px">
-        <div v-if="timelineLogs.length === 0" class="sub-agent-log__empty">
-          {{ t('subAgent.noLogs') }}
-        </div>
-        <div v-else class="sub-agent-log__timeline">
-          <div
-            v-for="(log, index) in timelineLogs"
-            :key="index"
-            class="sub-agent-log__entry"
-            :class="getLogConfig(log.type).className"
-            data-testid="sub-agent-log-entry"
-          >
-            <div class="sub-agent-log__entry-marker">
-              <span class="sub-agent-log__entry-icon">{{ getLogConfig(log.type).icon }}</span>
-            </div>
-            <div class="sub-agent-log__entry-body">
-              <div class="sub-agent-log__entry-header">
-                <span class="sub-agent-log__entry-type">{{ t(getLogConfig(log.type).labelKey) }}</span>
-                <span class="sub-agent-log__entry-time">{{ formatTime(log.timestamp) }}</span>
-              </div>
-              <div class="sub-agent-log__entry-content">{{ log.content }}</div>
-            </div>
-          </div>
-        </div>
-      </ElScrollbar>
 
       <!-- Error -->
       <div v-if="execution.error" class="sub-agent-log__error">
@@ -363,117 +321,120 @@ const statusLabel = computed(() => {
 }
 
 .sub-agent-log__task {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 6px;
+  cursor: pointer;
+  user-select: none;
   font-size: 13px;
   color: var(--el-text-color-regular, #606266);
+}
+
+.sub-agent-log__task:hover {
+  color: var(--el-color-primary, #409eff);
+}
+
+.sub-agent-log__task-label {
+  font-weight: 500;
+}
+
+.sub-agent-log__task-toggle {
+  font-size: 10px;
+  color: var(--el-text-color-secondary, #909399);
+}
+
+.sub-agent-log__task-collapse {
+  display: grid;
+  grid-template-rows: 1fr;
+  transition: grid-template-rows 0.25s ease;
+}
+
+.sub-agent-log__task-collapse--collapsed {
+  grid-template-rows: 0fr;
+}
+
+.sub-agent-log__task-content {
+  overflow: hidden;
+  min-height: 0;
+}
+
+.sub-agent-log__task-content :deep(div) {
+  padding: 8px 12px;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--el-text-color-regular, #606266);
+  background: var(--el-fill-color-lighter, #fafafa);
+  border-radius: 6px;
   margin-top: 6px;
+}
+
+.sub-agent-log__task-content :deep(p) {
+  margin: 0 0 8px;
+}
+
+.sub-agent-log__task-content :deep(p:last-child) {
+  margin-bottom: 0;
+}
+
+.sub-agent-log__task-content :deep(pre) {
+  background: #0d1117;
+  border-radius: 8px;
+  overflow: hidden;
+  margin: 8px 0;
+  font-size: 13px;
+  line-height: 1.6;
+  position: relative;
+}
+
+.sub-agent-log__task-content :deep(pre code) {
+  display: block;
+  color: #c9d1d9;
+  background: #0d1117;
+  font-family: 'Menlo', 'Monaco', 'Courier New', monospace;
+  font-size: 13px;
+  overflow-x: auto;
+}
+
+.sub-agent-log__task-content :deep(pre .code-block-header) {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 16px;
+  background: rgba(110, 118, 129, 0.15);
+  border-bottom: 1px solid rgba(110, 118, 129, 0.2);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+  font-size: 12px;
+  color: #8b949e;
+  user-select: none;
+}
+
+.sub-agent-log__task-content :deep(pre .code-block-header__lang) {
+  text-transform: lowercase;
+}
+
+.sub-agent-log__task-content :deep(pre .code-block-body) {
+  display: block;
+  padding: 12px 16px;
+  overflow-x: auto;
+}
+
+.sub-agent-log__task-content :deep(code) {
+  font-family: 'Menlo', 'Monaco', 'Courier New', monospace;
+  font-size: 13px;
+}
+
+.sub-agent-log__task-content :deep(:not(pre) > code) {
+  background: var(--el-fill-color, #f0f2f5);
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 0.9em;
 }
 
 .sub-agent-log__meta {
   font-size: 12px;
   color: var(--el-text-color-secondary, #909399);
   margin-top: 4px;
-}
-
-.sub-agent-log__timeline-header {
-  font-size: 13px;
-  font-weight: 500;
-  color: var(--el-text-color-secondary, #909399);
-  padding: 0 4px;
-}
-
-.sub-agent-log__scroll {
-  border: 1px solid var(--el-border-color-lighter, #ebeef5);
-  border-radius: 6px;
-}
-
-.sub-agent-log__empty {
-  padding: 24px 16px;
-  text-align: center;
-  color: var(--el-text-color-placeholder, #a8abb2);
-  font-size: 13px;
-}
-
-.sub-agent-log__timeline {
-  padding: 8px 12px;
-}
-
-.sub-agent-log__entry {
-  display: flex;
-  gap: 10px;
-  padding: 8px 0;
-  position: relative;
-}
-
-.sub-agent-log__entry:not(:last-child)::after {
-  content: '';
-  position: absolute;
-  left: 11px;
-  top: 34px;
-  bottom: -8px;
-  width: 2px;
-  background: var(--el-border-color-lighter, #ebeef5);
-}
-
-.sub-agent-log__entry-marker {
-  flex-shrink: 0;
-  width: 24px;
-  display: flex;
-  align-items: flex-start;
-  justify-content: center;
-  padding-top: 1px;
-}
-
-.sub-agent-log__entry-icon {
-  font-size: 14px;
-  line-height: 1;
-}
-
-.sub-agent-log__entry-body {
-  flex: 1;
-  min-width: 0;
-}
-
-.sub-agent-log__entry-header {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.sub-agent-log__entry-type {
-  font-size: 12px;
-  font-weight: 500;
-  color: var(--el-text-color-primary, #303133);
-}
-
-.sub-agent-log__entry-time {
-  font-size: 11px;
-  color: var(--el-text-color-placeholder, #a8abb2);
-  font-family: 'Menlo', 'Monaco', 'Courier New', monospace;
-}
-
-.sub-agent-log__entry-content {
-  font-size: 13px;
-  color: var(--el-text-color-regular, #606266);
-  margin-top: 3px;
-  word-break: break-word;
-  line-height: 1.5;
-}
-
-.sub-agent-log__entry--token .sub-agent-log__entry-content {
-  font-family: 'Menlo', 'Monaco', 'Courier New', monospace;
-  font-size: 12px;
-  background: var(--el-fill-color-lighter, #fafafa);
-  padding: 4px 8px;
-  border-radius: 4px;
-  white-space: pre-wrap;
-}
-
-.sub-agent-log__entry--error .sub-agent-log__entry-content {
-  color: var(--el-color-danger, #f56c6c);
-}
-
-.sub-agent-log__entry--done .sub-agent-log__entry-content {
-  color: var(--el-color-success, #67c23a);
 }
 
 /* Chat Bubble */
@@ -680,15 +641,6 @@ const statusLabel = computed(() => {
 }
 
 /* Mini size overrides */
-.sub-agent-log-dialog--mini .sub-agent-log__entry {
-  padding: 4px 0;
-  gap: 6px;
-}
-
-.sub-agent-log-dialog--mini .sub-agent-log__entry-content {
-  font-size: 12px;
-}
-
 .sub-agent-log-dialog--mini .sub-agent-log__step {
   padding: 6px 10px;
 }

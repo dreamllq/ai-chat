@@ -8,13 +8,6 @@ import SubAgentLogDialog from '../SubAgentLogDialog.vue'
 const mockT = vi.fn((path: string, params?: Record<string, string>) => {
   const map: Record<string, string> = {
     'subAgent.logTitle': 'Agent Execution Log',
-    'subAgent.logTimeline': 'Timeline',
-    'subAgent.logStart': 'Start',
-    'subAgent.logToken': 'Token',
-    'subAgent.logReasoning': 'Thinking',
-    'subAgent.logToolCall': 'Tool Call',
-    'subAgent.logToolResult': 'Tool Result',
-    'subAgent.logDone': 'Done',
     'subAgent.logError': 'Error',
     'subAgent.running': 'Running',
     'subAgent.completed': 'Completed',
@@ -87,9 +80,6 @@ function mountDialog(props: { modelValue: boolean; executionId: string | null })
           `,
           props: ['modelValue'],
         },
-        ElScrollbar: {
-          template: '<div class="el-scrollbar"><slot /></div>',
-        },
         ElEmpty: {
           template: '<div data-testid="el-empty">{{ description }}</div>',
           props: ['description'],
@@ -121,70 +111,7 @@ describe('SubAgentLogDialog', () => {
     await flushLiveQuery()
 
     expect(wrapper.find('.sub-agent-log__agent-name').text()).toBe('Research Agent')
-    expect(wrapper.find('.sub-agent-log__task').text()).toContain('Search for information')
-  })
-
-  it('renders timeline entries sorted by timestamp', async () => {
-    const execution = createExecution({
-      reasoningContent: null,
-      logs: [
-        { timestamp: 1500, type: 'done', content: 'Last' },
-        { timestamp: 1100, type: 'start', content: 'First' },
-        { timestamp: 1300, type: 'tool_call', content: 'Middle' },
-      ],
-    })
-    await db.subAgentExecutions.add(execution)
-
-    const wrapper = mountDialog({ modelValue: true, executionId: 'exec-1' })
-    await flushLiveQuery()
-
-    const entries = wrapper.findAll('.sub-agent-log__entry')
-    expect(entries).toHaveLength(3)
-    expect(entries[0].find('.sub-agent-log__entry-content').text()).toBe('First')
-    expect(entries[1].find('.sub-agent-log__entry-content').text()).toBe('Middle')
-    expect(entries[2].find('.sub-agent-log__entry-content').text()).toBe('Last')
-  })
-
-  it('shows different icons for different log types', async () => {
-    const execution = createExecution({
-      logs: [
-        { timestamp: 1100, type: 'start', content: 's' },
-        { timestamp: 1200, type: 'error', content: 'e' },
-        { timestamp: 1300, type: 'done', content: 'd' },
-      ],
-    })
-    await db.subAgentExecutions.add(execution)
-
-    const wrapper = mountDialog({ modelValue: true, executionId: 'exec-1' })
-    await flushLiveQuery()
-
-    const entries = wrapper.findAll('.sub-agent-log__entry')
-    expect(entries[0].find('.sub-agent-log__entry-icon').text()).toBe('🟢')
-    expect(entries[1].find('.sub-agent-log__entry-icon').text()).toBe('❌')
-    expect(entries[2].find('.sub-agent-log__entry-icon').text()).toBe('✅')
-  })
-
-  it('applies different CSS classes for different log types', async () => {
-    const execution = createExecution({
-      logs: [
-        { timestamp: 1100, type: 'start', content: 's' },
-        { timestamp: 1200, type: 'tool_call', content: 'tc' },
-        { timestamp: 1400, type: 'tool_result', content: 'tr' },
-        { timestamp: 1500, type: 'done', content: 'd' },
-        { timestamp: 1600, type: 'error', content: 'e' },
-      ],
-    })
-    await db.subAgentExecutions.add(execution)
-
-    const wrapper = mountDialog({ modelValue: true, executionId: 'exec-1' })
-    await flushLiveQuery()
-
-    const entries = wrapper.findAll('.sub-agent-log__entry')
-    expect(entries[0].classes()).toContain('sub-agent-log__entry--start')
-    expect(entries[1].classes()).toContain('sub-agent-log__entry--tool-call')
-    expect(entries[2].classes()).toContain('sub-agent-log__entry--tool-result')
-    expect(entries[3].classes()).toContain('sub-agent-log__entry--done')
-    expect(entries[4].classes()).toContain('sub-agent-log__entry--error')
+    expect(wrapper.find('.sub-agent-log__task-label').text()).toBe('Task:')
   })
 
   it('emits update:modelValue with false when dialog closes', async () => {
@@ -206,16 +133,6 @@ describe('SubAgentLogDialog', () => {
 
     expect(wrapper.find('[data-testid="el-empty"]').exists()).toBe(true)
     expect(wrapper.find('[data-testid="el-empty"]').text()).toBe('No logs available')
-  })
-
-  it('shows no logs message when execution has empty logs', async () => {
-    const execution = createExecution({ logs: [] })
-    await db.subAgentExecutions.add(execution)
-
-    const wrapper = mountDialog({ modelValue: true, executionId: 'exec-1' })
-    await flushLiveQuery()
-
-    expect(wrapper.find('.sub-agent-log__empty').text()).toBe('No logs available')
   })
 
   it('displays output section when output is present', async () => {
@@ -280,19 +197,6 @@ describe('SubAgentLogDialog', () => {
     expect(wrapper.find('.sub-agent-log__error-content').text()).toBe('Something went wrong')
   })
 
-  it('formats timestamps as HH:mm:ss', async () => {
-    const ts = new Date(2025, 5, 15, 14, 30, 45).getTime()
-    const execution = createExecution({
-      logs: [{ timestamp: ts, type: 'start', content: 'started' }],
-    })
-    await db.subAgentExecutions.add(execution)
-
-    const wrapper = mountDialog({ modelValue: true, executionId: 'exec-1' })
-    await flushLiveQuery()
-
-    expect(wrapper.find('.sub-agent-log__entry-time').text()).toBe('14:30:45')
-  })
-
   it('does not render sub-agent-log when executionId is null', async () => {
     const wrapper = mountDialog({ modelValue: true, executionId: null })
     await flushLiveQuery()
@@ -320,5 +224,55 @@ describe('SubAgentLogDialog', () => {
     expect(wrapper.find('.sub-agent-log__status--completed').exists()).toBe(true)
     expect(wrapper.find('.sub-agent-log__step').exists()).toBe(true)
     expect(wrapper.find('.sub-agent-log__bubble-content').text()).toContain('Done!')
+  })
+
+  it('renders task content as markdown', async () => {
+    const execution = createExecution({ task: 'Hello **world**' })
+    await db.subAgentExecutions.add(execution)
+
+    const wrapper = mountDialog({ modelValue: true, executionId: 'exec-1' })
+    await flushLiveQuery()
+
+    const taskContent = wrapper.find('.sub-agent-log__task-content')
+    expect(taskContent.exists()).toBe(true)
+    const htmlEl = taskContent.find('div')
+    expect(htmlEl.exists()).toBe(true)
+    expect(htmlEl.html()).toContain('<strong>world</strong>')
+  })
+
+  it('collapses task content by default', async () => {
+    const execution = createExecution()
+    await db.subAgentExecutions.add(execution)
+
+    const wrapper = mountDialog({ modelValue: true, executionId: 'exec-1' })
+    await flushLiveQuery()
+
+    const collapse = wrapper.find('.sub-agent-log__task-collapse')
+    expect(collapse.exists()).toBe(true)
+    expect(collapse.classes()).toContain('sub-agent-log__task-collapse--collapsed')
+  })
+
+  it('toggles task expansion on click', async () => {
+    const execution = createExecution()
+    await db.subAgentExecutions.add(execution)
+
+    const wrapper = mountDialog({ modelValue: true, executionId: 'exec-1' })
+    await flushLiveQuery()
+
+    const task = wrapper.find('.sub-agent-log__task')
+    expect(task.exists()).toBe(true)
+
+    let collapse = wrapper.find('.sub-agent-log__task-collapse')
+    expect(collapse.classes()).toContain('sub-agent-log__task-collapse--collapsed')
+
+    await task.trigger('click')
+    await nextTick()
+    collapse = wrapper.find('.sub-agent-log__task-collapse')
+    expect(collapse.classes()).not.toContain('sub-agent-log__task-collapse--collapsed')
+
+    await task.trigger('click')
+    await nextTick()
+    collapse = wrapper.find('.sub-agent-log__task-collapse')
+    expect(collapse.classes()).toContain('sub-agent-log__task-collapse--collapsed')
   })
 })
