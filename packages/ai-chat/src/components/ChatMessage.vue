@@ -95,6 +95,18 @@ const isReasoningExpanded = ref(!!props.message.reasoningContent)
 const hasSteps = computed(() =>
   Array.isArray(props.message.steps) && props.message.steps.length > 0,
 )
+/** Steps sorted by startTime (ascending), then depth (ascending) for parallel display determinism */
+const sortedSteps = computed(() => {
+  if (!props.message.steps) return []
+  return [...props.message.steps].sort((a, b) => {
+    const timeA = a.startTime
+    const timeB = b.startTime
+    if (timeA !== timeB) return timeA - timeB
+    const depthA = a.type === 'sub_agent' ? (a as SubAgentStep).depth : 0
+    const depthB = b.type === 'sub_agent' ? (b as SubAgentStep).depth : 0
+    return depthA - depthB
+  })
+})
 const hasDistributedResults = computed(() =>
   Array.isArray(props.message.steps) && props.message.steps.some(s => s.type === 'thinking' && !!(s as { resultContent?: string }).resultContent),
 )
@@ -284,7 +296,7 @@ onUpdated(() => {
       <div ref="bubbleRef" class="chat-message__bubble">
       <!-- Steps-based rendering -->
       <template v-if="hasSteps">
-        <div v-for="(step, index) in message.steps" :key="index">
+        <div v-for="(step, index) in sortedSteps" :key="index">
           <!-- ThinkingStep -->
           <template v-if="step.type === 'thinking'">
             <div class="chat-message__reasoning">

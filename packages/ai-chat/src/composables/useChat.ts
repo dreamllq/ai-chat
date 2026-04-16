@@ -192,8 +192,7 @@ export function useChat() {
           // Finalize previous thinking step (saves its resultContent)
           finalizeCurrentThinkingStep(chunk.tokenUsage)
           currentIterationContent = ''
-          // Create new thinking step
-          currentThinkingStep = { type: 'thinking', content: '' }
+          currentThinkingStep = { type: 'thinking', content: '', startTime: Date.now() }
           steps.push(currentThinkingStep)
           await updateStepsToDB()
         } else if (chunk.type === 'token') {

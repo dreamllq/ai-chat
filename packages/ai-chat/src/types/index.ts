@@ -288,6 +288,8 @@ export interface ThinkingStep {
   /** 该轮迭代产生的文本结果（按顺序展示：思考 → 结果） */
   resultContent?: string
   tokenUsage?: TokenUsage
+  /** 创建时间戳，用于步骤排序 */
+  startTime: number
 }
 
 /** 子 Agent 步骤（一次子 Agent 调用） */
