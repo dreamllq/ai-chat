@@ -6,17 +6,17 @@ import { agentRegistry } from '../services/agent'
 import { getLocaleInstruction } from '../locales'
 import { ToolMessage, type BaseMessage } from '@langchain/core/messages'
 import { z } from 'zod'
+import { mergeAsyncGenerators } from './async-generator-merge'
 
 const DEFAULT_MAX_DEPTH = 99
 const DEFAULT_MAX_TOOL_ITERATIONS = 99
 const MAX_OUTPUT_LENGTH = 10000
+const MAX_PARALLEL_CALLS = 5
 
 export class DeepAgentRunner implements AgentRunner {
   private agentDef: AgentDefinition
   private maxDepth: number
   private maxToolIterations: number
-  private _lastSubAgentTokenUsage: TokenUsage | undefined
-
   constructor(agentDef: AgentDefinition, options?: { maxDepth?: number; maxToolIterations?: number }) {
     this.agentDef = agentDef
     this.maxDepth = options?.maxDepth ?? DEFAULT_MAX_DEPTH
@@ -36,7 +36,8 @@ export class DeepAgentRunner implements AgentRunner {
       : allAgentDefs
     const callAgentTool = this.buildCallAgentTool(allowedDefs)
 
-    const allTools: ToolDefinition[] = [...(this.agentDef.tools ?? []), callAgentTool]
+    const parallelCallTool = this.buildParallelCallTool(allowedDefs)
+    const allTools: ToolDefinition[] = [...(this.agentDef.tools ?? []), callAgentTool, parallelCallTool]
     if (this.agentDef.skills && this.agentDef.skills.length > 0) {
       allTools.push(this.buildUseSkillTool(this.agentDef.skills))
     }
@@ -111,10 +112,13 @@ export class DeepAgentRunner implements AgentRunner {
 
         currentMessages.push(accumulated!)
 
-        for (const tc of accToolCalls) {
-          let result: string
-          let subAgentTokenUsage: TokenUsage | undefined
+        // Separate parallel_call from other tool calls
+        const parallelTc = accToolCalls.find(tc => tc.name === 'parallel_call')
+        const sequentialTcs = accToolCalls.filter(tc => tc.name !== 'parallel_call')
 
+        // 1. Process sequential calls (call_agent, use_skill, regular tools)
+        for (const tc of sequentialTcs) {
+          let result: string
           if (tc.name === 'call_agent') {
             const agentId = tc.args.agentId as string
             const task = tc.args.task as string
@@ -124,7 +128,6 @@ export class DeepAgentRunner implements AgentRunner {
               result = validationError
             } else {
               result = yield* this.runSubAgent(agentId, task, callStack, currentDepth, options, model)
-              subAgentTokenUsage = this._lastSubAgentTokenUsage
             }
           } else if (tc.name === 'use_skill') {
             const skillName = tc.args.skill_name as string
@@ -150,6 +153,13 @@ export class DeepAgentRunner implements AgentRunner {
           }
 
           currentMessages.push(new ToolMessage({ content: result, tool_call_id: tc.id! }))
+        }
+
+        // 2. Process parallel_call (if present)
+        if (parallelTc) {
+          const calls = (parallelTc.args.calls as Array<{ agentId: string; task: string }>) ?? []
+          const result = yield* this.executeParallelCalls(calls, callStack, currentDepth, options, model)
+          currentMessages.push(new ToolMessage({ content: result, tool_call_id: parallelTc.id! }))
         }
       }
     } catch (err) {
@@ -287,8 +297,6 @@ export class DeepAgentRunner implements AgentRunner {
     subAgentInfo.endTime = endTime
     subAgentInfo.status = failed ? 'failed' : 'completed'
 
-    this._lastSubAgentTokenUsage = subTokenUsage
-
     yield { type: 'sub_agent_end' as const, subAgent: { ...subAgentInfo }, tokenUsage: subTokenUsage }
 
     if (output.length > MAX_OUTPUT_LENGTH) {
@@ -296,6 +304,116 @@ export class DeepAgentRunner implements AgentRunner {
     }
 
     return output
+  }
+
+  private async *executeParallelCalls(
+    calls: Array<{ agentId: string; task: string }>,
+    callStack: string[],
+    currentDepth: number,
+    parentOptions: ChatOptions | undefined,
+    model: ModelConfig,
+  ): AsyncGenerator<ChatChunk, string, unknown> {
+    if (calls.length < 2) {
+      return 'Error: parallel_call requires at least 2 sub-agent calls.'
+    }
+
+    const validCalls = calls.slice(0, MAX_PARALLEL_CALLS)
+    const excessCalls = calls.slice(MAX_PARALLEL_CALLS)
+
+    const collectors: Array<{
+      agentId: string
+      agentName: string
+      task: string
+      output: string
+      tokenUsage?: TokenUsage
+      status: 'completed' | 'failed'
+    }> = []
+
+    const generators: AsyncGenerator<ChatChunk>[] = []
+
+    for (const call of validCalls) {
+      const validationError = this.validateCallAgent(call.agentId, callStack, currentDepth)
+      const agentDef = agentRegistry.getDefinition(call.agentId)
+      const agentName = agentDef?.name ?? call.agentId
+
+      if (validationError) {
+        collectors.push({
+          agentId: call.agentId,
+          agentName,
+          task: call.task,
+          output: validationError,
+          status: 'failed',
+        })
+        continue
+      }
+
+      const runner = agentRegistry.getRunner(call.agentId)
+      if (!runner) {
+        collectors.push({
+          agentId: call.agentId,
+          agentName,
+          task: call.task,
+          output: `Error: Agent "${call.agentId}" not found.`,
+          status: 'failed',
+        })
+        continue
+      }
+
+      const collector = {
+        agentId: call.agentId,
+        agentName,
+        task: call.task,
+        output: '',
+        tokenUsage: undefined as TokenUsage | undefined,
+        status: 'completed' as 'completed' | 'failed',
+      }
+      collectors.push(collector)
+
+      const subGen = this.runSubAgent(call.agentId, call.task, callStack, currentDepth, parentOptions, model)
+      const wrappedGen = (async function* (): AsyncGenerator<ChatChunk> {
+        try {
+          for await (const chunk of subGen) {
+            if (chunk.type === 'sub_agent_log' && chunk.logEntry?.type === 'done') {
+              collector.output = chunk.logEntry.content ?? ''
+            }
+            if (chunk.type === 'sub_agent_end') {
+              collector.status = chunk.subAgent?.status === 'failed' ? 'failed' : 'completed'
+              collector.tokenUsage = chunk.tokenUsage
+            }
+            yield chunk
+          }
+        } catch (err) {
+          collector.status = 'failed'
+          collector.output = `Error: ${err instanceof Error ? err.message : String(err)}`
+        }
+      })()
+      generators.push(wrappedGen)
+    }
+
+    for (const excess of excessCalls) {
+      const agentDef = agentRegistry.getDefinition(excess.agentId)
+      collectors.push({
+        agentId: excess.agentId,
+        agentName: agentDef?.name ?? excess.agentId,
+        task: excess.task,
+        output: `Error: Exceeds maximum concurrent calls limit (${MAX_PARALLEL_CALLS}).`,
+        status: 'failed',
+      })
+    }
+
+    if (generators.length > 0) {
+      const merged = mergeAsyncGenerators(generators)
+      for await (const chunk of merged) {
+        yield chunk
+      }
+    }
+
+    const sections = collectors.map(c => {
+      const statusIcon = c.status === 'completed' ? '✅' : '❌'
+      return `### Agent: ${c.agentName} (ID: ${c.agentId}) — ${statusIcon} ${c.status}\n${c.output}`
+    })
+
+    return `## Parallel Execution Results\n\n${sections.join('\n\n')}`
   }
 
   private buildSkillsSystemPrompt(basePrompt?: string): string | undefined {
@@ -350,6 +468,31 @@ export class DeepAgentRunner implements AgentRunner {
       schema: z.object({
         agentId: z.string().describe('The ID of the agent to call'),
         task: z.string().describe('A clear description of the task for the sub-agent'),
+      }),
+      execute: async () => '',
+    }
+  }
+
+  private buildParallelCallTool(allAgentDefs: AgentDefinition[]): StructuredToolDefinition {
+    const selfId = this.agentDef.id
+    const otherAgents = allAgentDefs.filter(a => a.id !== selfId)
+
+    const agentList = otherAgents.length > 0
+      ? otherAgents.map(a => `- ${a.id}: ${a.name}${a.description ? ` — ${a.description}` : ''}`).join('\n')
+      : 'No other agents registered.'
+
+    const description = `Execute multiple sub-agent calls in parallel. Provide at least 2 agent-task pairs. All calls execute concurrently, and results are aggregated into a single response.\n\nAvailable agents:\n${agentList}\n\nMaximum concurrent calls: ${MAX_PARALLEL_CALLS}`
+
+    return {
+      name: 'parallel_call',
+      description,
+      schema: z.object({
+        calls: z.array(
+          z.object({
+            agentId: z.string().describe('The ID of the agent to call'),
+            task: z.string().describe('A clear description of the task for the sub-agent'),
+          })
+        ).min(2).describe('At least 2 sub-agent calls to execute in parallel'),
       }),
       execute: async () => '',
     }
