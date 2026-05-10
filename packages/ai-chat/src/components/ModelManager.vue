@@ -17,6 +17,7 @@ import {
 } from 'element-plus'
 import { Delete, Plus } from '@element-plus/icons-vue'
 import { useModel } from '../composables/useModel'
+import { useChatId } from '../composables/useChatId'
 import { useLocale } from '../composables/useLocale'
 import { useSize } from '../size'
 import type { ModelConfig } from '../types'
@@ -29,8 +30,9 @@ const emit = defineEmits<{
   (e: 'update:visible', value: boolean): void
 }>()
 
+const chatId = useChatId()
 const { models, createModel, updateModel,
-  deleteModel, isPropModel } = useModel()
+  deleteModel, isPropModel } = useModel(chatId)
 const { t } = useLocale()
 const size = useSize()
 

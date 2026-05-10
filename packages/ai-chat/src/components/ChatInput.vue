@@ -4,6 +4,7 @@ import { ElSelect, ElOption, ElButton, ElIcon, ElMessage } from 'element-plus'
 import { Promotion, CircleClose, UploadFilled, Setting } from '@element-plus/icons-vue'
 import { useLocale } from '../composables/useLocale'
 import { useModel } from '../composables/useModel'
+import { useChatId } from '../composables/useChatId'
 import { useFileUpload } from '../composables/useFileUpload'
 import { useSize } from '../size'
 import { agentRegistry } from '../services/agent'
@@ -28,7 +29,8 @@ const emit = defineEmits<{
 }>()
 
 const { t } = useLocale()
-const { models, currentModelId } = useModel()
+const chatId = useChatId()
+const { models, currentModelId } = useModel(chatId)
 const size = useSize()
 const toolbarIconSize = computed(() => size.value === 'mini' ? 12 : 14)
 const inputClasses = computed(() => ({ 'chat-input--mini': size.value === 'mini' }))

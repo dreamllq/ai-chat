@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import { provide, ref, watch } from 'vue'
+import { provide, ref, watch, computed } from 'vue'
 import { localeInjectionKey, type AiChatLocale, type LocaleName, locales } from '../locales'
 import { sizeInjectionKey } from '../size'
+import { chatIdKey } from '../composables/useChatId'
 import type { AiChatSize } from '../types'
 
 const STORAGE_KEY = 'ai-chat-locale'
@@ -22,12 +23,18 @@ function getInitialLocale(): AiChatLocale {
 }
 
 const props = withDefaults(defineProps<{
+  chatId?: string
   locale?: AiChatLocale | LocaleName
   size?: AiChatSize
 }>(), {
+  chatId: 'default',
   locale: 'en',
   size: 'default',
 })
+
+const normalizedChatId = computed(() => props.chatId || 'default')
+
+provide(chatIdKey, normalizedChatId.value)
 
 const localeRef = ref<AiChatLocale>(getInitialLocale())
 

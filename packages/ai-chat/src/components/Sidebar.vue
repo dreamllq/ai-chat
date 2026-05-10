@@ -2,6 +2,7 @@
 import { ref, computed } from 'vue'
 import { ElButton, ElIcon, ElInput, ElPopconfirm } from 'element-plus'
 import { useSession } from '../composables/useSession'
+import { useChatId } from '../composables/useChatId'
 import { useLocale } from '../composables/useLocale'
 import { useSize } from '../size'
 import type { Conversation } from '../types'
@@ -11,7 +12,8 @@ const props = defineProps<{
   modelId?: string
 }>()
 
-const { conversations, currentConversationId, currentMessages, createConversation, deleteConversation, clearAllConversations, renameConversation, switchConversation } = useSession()
+const chatId = useChatId()
+const { conversations, currentConversationId, currentMessages, createConversation, deleteConversation, clearAllConversations, renameConversation, switchConversation } = useSession(chatId)
 const { t } = useLocale()
 const size = useSize()
 

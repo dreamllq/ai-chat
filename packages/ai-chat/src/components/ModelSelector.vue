@@ -3,11 +3,13 @@ import { ref, computed } from 'vue'
 import { ElSelect, ElOption, ElButton, ElIcon } from 'element-plus'
 import { Setting } from '@element-plus/icons-vue'
 import { useModel } from '../composables/useModel'
+import { useChatId } from '../composables/useChatId'
 import { useLocale } from '../composables/useLocale'
 import { useSize } from '../size'
 import ModelManager from './ModelManager.vue'
 
-const { models, currentModelId, selectModel } = useModel()
+const chatId = useChatId()
+const { models, currentModelId, selectModel } = useModel(chatId)
 const { t } = useLocale()
 const size = useSize()
 

@@ -2,11 +2,13 @@
 import { ref, computed, watch, nextTick, onMounted } from 'vue'
 import { useChat } from '../composables/useChat'
 import { useSession } from '../composables/useSession'
+import { useChatId } from '../composables/useChatId'
 import { useSize } from '../size'
 import ChatMessage from './ChatMessage.vue'
 
-const { currentMessages, isStreaming } = useChat()
-const { currentConversationId } = useSession()
+const chatId = useChatId()
+const { currentMessages, isStreaming } = useChat(chatId)
+const { currentConversationId } = useSession(chatId)
 const size = useSize()
 
 const listClasses = computed(() => ({ 'chat-message-list--mini': size.value === 'mini' }))

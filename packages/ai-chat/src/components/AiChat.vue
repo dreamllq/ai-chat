@@ -15,6 +15,7 @@ import type { AiChatLocale, LocaleName } from '../locales'
 import type { AiChatSize, FileUploadService, Conversation, MessageAttachment, ModelConfig } from '../types'
 
 const props = withDefaults(defineProps<{
+  chatId?: string
   locale?: AiChatLocale | LocaleName
   size?: AiChatSize
   fileUploadService?: FileUploadService | null
@@ -26,6 +27,7 @@ const props = withDefaults(defineProps<{
   defaultModelId?: string
   models?: ModelConfig[]
 }>(), {
+  chatId: 'default',
   locale: 'en',
   size: 'default',
   fileUploadService: null,
@@ -37,6 +39,8 @@ const props = withDefaults(defineProps<{
   defaultModelId: undefined,
   models: undefined,
 })
+
+const normalizedChatId = computed(() => props.chatId || 'default')
 
 const emit = defineEmits<{
   'update:sidebarCollapsed': [value: boolean]
@@ -53,10 +57,12 @@ const sidebarCollapsed = computed(() =>
   props.sidebarCollapsed !== undefined ? props.sidebarCollapsed : internalSidebarCollapsed.value
 )
 
-const { isStreaming, sendMessage, stopStreaming } = useChat()
-const { currentConversation, currentConversationId, currentMessages, createConversation } = useSession()
-const { models, currentModelId, selectModel, initDefault } = useModel()
-const { agents, currentAgentId, selectAgent, initDefault: initDefaultAgent } = useAgent()
+const chatId = normalizedChatId.value
+
+const { isStreaming, sendMessage, stopStreaming } = useChat(chatId)
+const { currentConversation, currentConversationId, currentMessages, createConversation } = useSession(chatId)
+const { models, currentModelId, selectModel, initDefault } = useModel(chatId)
+const { agents, currentAgentId, selectAgent, initDefault: initDefaultAgent } = useAgent(chatId)
 
 const conversationService = new ConversationService()
 
@@ -157,7 +163,7 @@ async function handleSend(payload: { content: string; attachments?: MessageAttac
 </script>
 
 <template>
-  <AiChatProvider :locale="props.locale" :size="props.size">
+  <AiChatProvider :locale="props.locale" :size="props.size" :chat-id="normalizedChatId">
     <div class="ai-chat">
       <LayoutShell :sidebar-collapsed="sidebarCollapsed" :new-chat-disabled="isNewChatDisabled" @update:sidebar-collapsed="handleSidebarCollapsedUpdate" @new-chat="handleNewChat">
         <template #sidebar>
