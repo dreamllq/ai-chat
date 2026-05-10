@@ -3,122 +3,148 @@ import { liveQuery, ConversationService, MessageService } from '../services/data
 import { useObservable } from './useObservable'
 import type { Conversation, ChatMessage } from '../types'
 
-const STORAGE_KEY = 'ai-chat:selected-conversation-id'
+interface SessionState {
+  currentConversationId: Ref<string | null>
+  currentMessages: Ref<ChatMessage[]>
+  messagesUnsub: (() => void) | null
+  subscriptionInitialized: boolean
+}
 
-// Module-level singleton state — shared across all useSession() callers
-const currentConversationId = ref<string | null>(null)
-const currentMessages: Ref<ChatMessage[]> = ref<ChatMessage[]>([]) as Ref<ChatMessage[]>
+// Map<chatId, SessionState> — each chatId has independent state
+const sessionStates = new Map<string, SessionState>()
 
-// Restore persisted selection on module load
-try {
-  const saved = localStorage.getItem(STORAGE_KEY)
-  if (saved) currentConversationId.value = saved
-} catch {}
+function getStorageKey(chatId: string): string {
+  return `ai-chat:${chatId}:selected-conversation-id`
+}
 
-let messagesUnsub: (() => void) | null = null
-let subscriptionInitialized = false
+function getOrCreateState(chatId: string): SessionState {
+  const existing = sessionStates.get(chatId)
+  if (existing) return existing
 
-/** Reset singleton state (for testing) */
-export function _resetSessionState() {
-  currentConversationId.value = null
-  currentMessages.value = []
-  messagesUnsub?.()
-  messagesUnsub = null
-  subscriptionInitialized = false
+  const state: SessionState = {
+    currentConversationId: ref<string | null>(null),
+    currentMessages: ref<ChatMessage[]>([]) as Ref<ChatMessage[]>,
+    messagesUnsub: null,
+    subscriptionInitialized: false,
+  }
+
+  // Restore persisted selection
   try {
-    localStorage.removeItem(STORAGE_KEY)
+    const saved = localStorage.getItem(getStorageKey(chatId))
+    if (saved) state.currentConversationId.value = saved
+  } catch {}
+
+  sessionStates.set(chatId, state)
+  return state
+}
+
+/** Reset all session state (for testing) */
+export function _resetSessionState() {
+  for (const state of sessionStates.values()) {
+    state.messagesUnsub?.()
+  }
+  sessionStates.clear()
+  try {
+    // Clean up all ai-chat:* localStorage keys
+    const keysToRemove: string[] = []
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i)
+      if (key && key.startsWith('ai-chat:') && key.endsWith(':selected-conversation-id')) {
+        keysToRemove.push(key)
+      }
+    }
+    keysToRemove.forEach((key) => localStorage.removeItem(key))
   } catch {}
 }
 
-function ensureSubscription(messageService: MessageService) {
-  if (subscriptionInitialized) return
-  subscriptionInitialized = true
+function persistConversationId(chatId: string, id: string | null): void {
+  try {
+    if (id) localStorage.setItem(getStorageKey(chatId), id)
+    else localStorage.removeItem(getStorageKey(chatId))
+  } catch {}
+}
 
-  watch(currentConversationId, (id) => {
-    messagesUnsub?.()
+function ensureSubscription(chatId: string, state: SessionState, messageService: MessageService) {
+  if (state.subscriptionInitialized) return
+  state.subscriptionInitialized = true
+
+  watch(state.currentConversationId, (id) => {
+    state.messagesUnsub?.()
     if (!id) {
-      currentMessages.value = []
+      state.currentMessages.value = []
       return
     }
     const observable = liveQuery(() => messageService.getByConversationId(id))
     const sub = observable.subscribe({
-      next: (val) => { currentMessages.value = val }
+      next: (val) => { state.currentMessages.value = val }
     })
-    messagesUnsub = () => sub.unsubscribe()
+    state.messagesUnsub = () => sub.unsubscribe()
   }, { immediate: true })
 }
 
-export function useSession() {
+export function useSession(chatId = 'default') {
   const conversationService = new ConversationService()
   const messageService = new MessageService()
 
+  const state = getOrCreateState(chatId)
+
   const conversations = useObservable<Conversation[]>(() =>
-    conversationService.getAll()
+    conversationService.getAll(chatId)
   )
 
   const currentConversation = computed(() =>
-    conversations.value?.find((c) => c.id === currentConversationId.value)
+    conversations.value?.find((c) => c.id === state.currentConversationId.value)
   )
 
   // Validate persisted selection against loaded conversations
   watch(conversations, (loaded) => {
-    if (currentConversationId.value && loaded && loaded.length > 0) {
-      const exists = loaded.some((c) => c.id === currentConversationId.value)
+    if (state.currentConversationId.value && loaded && loaded.length > 0) {
+      const exists = loaded.some((c) => c.id === state.currentConversationId.value)
       if (!exists) {
         // Saved conversation no longer exists — fall back to first available
         const firstId = loaded[0].id
-        currentConversationId.value = firstId
-        try {
-          localStorage.setItem(STORAGE_KEY, firstId)
-        } catch {}
+        state.currentConversationId.value = firstId
+        persistConversationId(chatId, firstId)
       }
     }
   })
 
-  ensureSubscription(messageService)
+  ensureSubscription(chatId, state, messageService)
 
   async function createConversation(agentId: string, modelId: string): Promise<Conversation> {
     const list = conversations.value ?? []
     const emptyConv = list.find(c => !c.messageCount)
     if (emptyConv) {
-      currentConversationId.value = emptyConv.id
-      try {
-        localStorage.setItem(STORAGE_KEY, emptyConv.id)
-      } catch {}
+      state.currentConversationId.value = emptyConv.id
+      persistConversationId(chatId, emptyConv.id)
       return emptyConv
     }
 
     const conv = await conversationService.create({
       title: 'New Chat',
+      chatId,
       agentId,
       modelId,
     })
-    currentConversationId.value = conv.id
-    try {
-      localStorage.setItem(STORAGE_KEY, conv.id)
-    } catch {}
+    state.currentConversationId.value = conv.id
+    persistConversationId(chatId, conv.id)
     return conv
   }
 
   async function deleteConversation(id: string): Promise<void> {
     await conversationService.delete(id)
-    if (currentConversationId.value === id) {
-      const remaining = await conversationService.getAll()
+    if (state.currentConversationId.value === id) {
+      const remaining = await conversationService.getAll(chatId)
       const nextId = remaining.length > 0 ? remaining[0].id : null
-      currentConversationId.value = nextId
-      try {
-        if (nextId) localStorage.setItem(STORAGE_KEY, nextId)
-        else localStorage.removeItem(STORAGE_KEY)
-      } catch {}
+      state.currentConversationId.value = nextId
+      persistConversationId(chatId, nextId)
     }
   }
 
   async function clearAllConversations(): Promise<void> {
-    await conversationService.deleteAll()
-    currentConversationId.value = null
-    try {
-      localStorage.removeItem(STORAGE_KEY)
-    } catch {}
+    await conversationService.deleteAll(chatId)
+    state.currentConversationId.value = null
+    persistConversationId(chatId, null)
   }
 
   async function renameConversation(id: string, title: string): Promise<void> {
@@ -126,17 +152,15 @@ export function useSession() {
   }
 
   function switchConversation(id: string): void {
-    currentConversationId.value = id
-    try {
-      localStorage.setItem(STORAGE_KEY, id)
-    } catch {}
+    state.currentConversationId.value = id
+    persistConversationId(chatId, id)
   }
 
   return {
     conversations,
-    currentConversationId,
+    currentConversationId: state.currentConversationId,
     currentConversation,
-    currentMessages,
+    currentMessages: state.currentMessages,
     createConversation,
     deleteConversation,
     clearAllConversations,

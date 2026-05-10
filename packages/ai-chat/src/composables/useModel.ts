@@ -1,34 +1,44 @@
-import { ref, computed, watch } from 'vue'
+import { ref, computed, watch, type Ref } from 'vue'
 import { ModelService } from '../services/database'
 import { useObservable } from './useObservable'
 import type { ModelConfig } from '../types'
 
-const STORAGE_KEY = 'ai-chat:selected-model-id'
+function getStorageKey(chatId: string): string {
+  return `ai-chat:${chatId}:selected-model-id`
+}
 
-// Module-level singleton — shared across all useModel() callers
-const currentModelId = ref<string | null>(null)
+const currentModelIdMap = new Map<string, Ref<string | null>>()
+
 let modelConfig: { defaultModelId?: string; showModelSelector: boolean } = { showModelSelector: true }
 let propModels: ModelConfig[] = []
 
-// Restore persisted selection on module load
-try {
-  const saved = localStorage.getItem(STORAGE_KEY)
-  if (saved) currentModelId.value = saved
-} catch {}
+function getOrCreateCurrentModelId(chatId: string): Ref<string | null> {
+  let modelIdRef = currentModelIdMap.get(chatId)
+  if (modelIdRef) return modelIdRef
+
+  modelIdRef = ref<string | null>(null)
+  // Restore persisted selection for this chatId
+  try {
+    const saved = localStorage.getItem(getStorageKey(chatId))
+    if (saved) modelIdRef.value = saved
+  } catch {}
+
+  currentModelIdMap.set(chatId, modelIdRef)
+  return modelIdRef
+}
 
 /** Reset singleton state (for testing) */
 export function _resetModelState() {
-  currentModelId.value = null
+  currentModelIdMap.clear()
   modelConfig = { showModelSelector: true }
   propModels = []
-  try {
-    localStorage.removeItem(STORAGE_KEY)
-  } catch {}
 }
 
-export function useModel() {
+export function useModel(chatId = 'default') {
   const modelService = new ModelService()
   const dbModels = useObservable<ModelConfig[]>(() => modelService.getAll())
+
+  const currentModelId = getOrCreateCurrentModelId(chatId)
 
   const models = computed(() => {
     const db = dbModels.value ?? []
@@ -65,14 +75,14 @@ export function useModel() {
     // Saved model no longer exists — try defaultModelId, then fall back to first available
     if (modelConfig.defaultModelId && loaded.some(m => m.id === modelConfig.defaultModelId)) {
       currentModelId.value = modelConfig.defaultModelId
-      try { localStorage.setItem(STORAGE_KEY, modelConfig.defaultModelId!) } catch {}
+      try { localStorage.setItem(getStorageKey(chatId), modelConfig.defaultModelId!) } catch {}
       return
     }
 
     const firstId = loaded[0].id
     currentModelId.value = firstId
     try {
-      localStorage.setItem(STORAGE_KEY, firstId)
+      localStorage.setItem(getStorageKey(chatId), firstId)
     } catch {}
   }
 
@@ -97,8 +107,8 @@ export function useModel() {
       const nextId = remaining?.[0]?.id ?? null
       currentModelId.value = nextId
       try {
-        if (nextId) localStorage.setItem(STORAGE_KEY, nextId)
-        else localStorage.removeItem(STORAGE_KEY)
+        if (nextId) localStorage.setItem(getStorageKey(chatId), nextId)
+        else localStorage.removeItem(getStorageKey(chatId))
       } catch {}
     }
   }
@@ -106,7 +116,7 @@ export function useModel() {
   function selectModel(id: string): void {
     currentModelId.value = id
     try {
-      localStorage.setItem(STORAGE_KEY, id)
+      localStorage.setItem(getStorageKey(chatId), id)
     } catch {}
   }
 

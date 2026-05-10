@@ -1,30 +1,45 @@
-import { ref, computed, watch } from 'vue'
+import { ref, computed, watch, type Ref } from 'vue'
 import { useObservable } from './useObservable'
 import { AgentService } from '../services/database'
 import { agentRegistry, ensureDefaultAgent, DEFAULT_AGENT_ID } from '../services/agent'
 import type { AgentDefinition } from '../types'
 
-const STORAGE_KEY = 'ai-chat:selected-agent-id'
-
-const currentAgentId = ref<string>(DEFAULT_AGENT_ID)
-let agentConfig: { defaultAgentId?: string; showAgentSelector: boolean } = { showAgentSelector: true }
-
-try {
-  const saved = localStorage.getItem(STORAGE_KEY)
-  if (saved) currentAgentId.value = saved
-} catch {}
-
-export function _resetAgentState() {
-  currentAgentId.value = DEFAULT_AGENT_ID
-  agentConfig = { showAgentSelector: true }
-  try {
-    localStorage.removeItem(STORAGE_KEY)
-  } catch {}
+interface AgentState {
+  currentAgentId: Ref<string>
+  agentConfig: { defaultAgentId?: string; showAgentSelector: boolean }
 }
 
-export function useAgent() {
+const agentStates = new Map<string, AgentState>()
+
+function getStorageKey(chatId: string): string {
+  return `ai-chat:${chatId}:selected-agent-id`
+}
+
+function getOrCreateState(chatId: string): AgentState {
+  let state = agentStates.get(chatId)
+  if (state) return state
+
+  const currentAgentId = ref<string>(DEFAULT_AGENT_ID)
+  const agentConfig = { showAgentSelector: true }
+
+  try {
+    const saved = localStorage.getItem(getStorageKey(chatId))
+    if (saved) currentAgentId.value = saved
+  } catch {}
+
+  state = { currentAgentId, agentConfig }
+  agentStates.set(chatId, state)
+  return state
+}
+
+export function _resetAgentState(): void {
+  agentStates.clear()
+}
+
+export function useAgent(chatId = 'default') {
+  const state = getOrCreateState(chatId)
   const agentService = new AgentService()
-  const agents = useObservable<AgentDefinition[]>(() => agentService.getAll())
+  const agents = useObservable<AgentDefinition[]>(() => agentService.getAll(chatId))
 
   // Merge registry definitions (includes runtime-registered agents not in DB)
   const allAgents = computed(() => {
@@ -45,33 +60,33 @@ export function useAgent() {
   })
 
   const currentAgent = computed(() =>
-    allAgents.value.find((a) => a.id === currentAgentId.value),
+    allAgents.value.find((a) => a.id === state.currentAgentId.value),
   )
 
   function resolveDefaultAgent(loaded: AgentDefinition[]): void {
     if (loaded.length === 0) return
 
-    if (!agentConfig.showAgentSelector) {
-      const targetId = agentConfig.defaultAgentId && loaded.some(a => a.id === agentConfig.defaultAgentId)
-        ? agentConfig.defaultAgentId
+    if (!state.agentConfig.showAgentSelector) {
+      const targetId = state.agentConfig.defaultAgentId && loaded.some(a => a.id === state.agentConfig.defaultAgentId)
+        ? state.agentConfig.defaultAgentId
         : loaded[0].id
-      currentAgentId.value = targetId
-      try { localStorage.setItem(STORAGE_KEY, targetId) } catch {}
+      state.currentAgentId.value = targetId
+      try { localStorage.setItem(getStorageKey(chatId), targetId) } catch {}
       return
     }
 
-    const exists = loaded.some(a => a.id === currentAgentId.value)
+    const exists = loaded.some(a => a.id === state.currentAgentId.value)
     if (exists) return
 
-    if (agentConfig.defaultAgentId && loaded.some(a => a.id === agentConfig.defaultAgentId)) {
-      currentAgentId.value = agentConfig.defaultAgentId
-      try { localStorage.setItem(STORAGE_KEY, agentConfig.defaultAgentId) } catch {}
+    if (state.agentConfig.defaultAgentId && loaded.some(a => a.id === state.agentConfig.defaultAgentId)) {
+      state.currentAgentId.value = state.agentConfig.defaultAgentId
+      try { localStorage.setItem(getStorageKey(chatId), state.agentConfig.defaultAgentId) } catch {}
       return
     }
 
     const firstId = loaded[0].id
-    currentAgentId.value = firstId
-    try { localStorage.setItem(STORAGE_KEY, firstId) } catch {}
+    state.currentAgentId.value = firstId
+    try { localStorage.setItem(getStorageKey(chatId), firstId) } catch {}
   }
 
   watch(allAgents, (loaded) => {
@@ -79,9 +94,9 @@ export function useAgent() {
   })
 
   function selectAgent(id: string): void {
-    currentAgentId.value = id
+    state.currentAgentId.value = id
     try {
-      localStorage.setItem(STORAGE_KEY, id)
+      localStorage.setItem(getStorageKey(chatId), id)
     } catch {}
   }
 
@@ -90,7 +105,7 @@ export function useAgent() {
     showAgentSelector?: boolean
   }): Promise<void> {
     if (options) {
-      agentConfig = {
+      state.agentConfig = {
         defaultAgentId: options.defaultAgentId,
         showAgentSelector: options.showAgentSelector ?? true,
       }
@@ -100,7 +115,7 @@ export function useAgent() {
 
   return {
     agents: allAgents,
-    currentAgentId,
+    currentAgentId: state.currentAgentId,
     currentAgent,
     selectAgent,
     initDefault,
