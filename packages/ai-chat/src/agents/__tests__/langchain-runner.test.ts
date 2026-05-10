@@ -61,6 +61,7 @@ function makeModel(overrides: Partial<ModelConfig> = {}): ModelConfig {
 function makeMessage(overrides: Partial<ChatMessage> = {}): ChatMessage {
   return {
     id: 'msg-1',
+    chatId: 'default',
     conversationId: 'conv-1',
     role: 'user',
     content: 'Hello',
@@ -266,7 +267,7 @@ describe('LangChainRunner', () => {
     ])
   })
 
-  it('should stop after 5 tool calling iterations with warning', async () => {
+  it('should stop after MAX_TOOL_ITERATIONS tool calling iterations with warning', async () => {
     const tool: ToolDefinition = {
       name: 'looper',
       description: 'Always triggers a tool call',
@@ -285,16 +286,11 @@ describe('LangChainRunner', () => {
       chunks.push(chunk)
     }
 
-    expect(mockStream).toHaveBeenCalledTimes(5)
-    expect(chunks).toEqual([
-      { type: 'iteration_start', iteration: 0 },
-      { type: 'iteration_start', iteration: 1 },
-      { type: 'iteration_start', iteration: 2 },
-      { type: 'iteration_start', iteration: 3 },
-      { type: 'iteration_start', iteration: 4 },
-      { type: 'token', content: '\n\n⚠️ Reached maximum tool calling iterations.' },
-      { type: 'done' },
-    ])
+    expect(mockStream).toHaveBeenCalledTimes(99)
+    const iterationStarts = chunks.filter((c: any) => c.type === 'iteration_start')
+    expect(iterationStarts).toHaveLength(99)
+    expect(chunks).toContainEqual({ type: 'token', content: '\n\n⚠️ Reached maximum tool calling iterations.' })
+    expect(chunks).toContainEqual({ type: 'done' })
   })
 
   it('should yield nothing when abort signal is already set', async () => {

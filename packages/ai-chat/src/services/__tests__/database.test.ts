@@ -7,6 +7,8 @@ const messageService = new MessageService()
 const modelService = new ModelService()
 const agentService = new AgentService()
 
+const CHAT_ID = 'default'
+
 beforeEach(async () => {
   await db.conversations.clear()
   await db.messages.clear()
@@ -18,6 +20,7 @@ beforeEach(async () => {
 describe('ConversationService', () => {
   it('should create a conversation with auto-generated id and timestamps', async () => {
     const conv = await conversationService.create({
+      chatId: CHAT_ID,
       title: 'Test Chat',
       agentId: 'agent-1',
       modelId: 'model-1',
@@ -33,16 +36,16 @@ describe('ConversationService', () => {
   })
 
   it('should get all conversations', async () => {
-    await conversationService.create({ title: 'A', agentId: 'a1', modelId: 'm1' })
-    await conversationService.create({ title: 'B', agentId: 'a2', modelId: 'm2' })
+    await conversationService.create({ chatId: CHAT_ID, title: 'A', agentId: 'a1', modelId: 'm1' })
+    await conversationService.create({ chatId: CHAT_ID, title: 'B', agentId: 'a2', modelId: 'm2' })
 
-    const all = await conversationService.getAll()
+    const all = await conversationService.getAll(CHAT_ID)
     expect(all).toHaveLength(2)
     expect(all.map((c) => c.title)).toEqual(expect.arrayContaining(['A', 'B']))
   })
 
   it('should get conversation by id', async () => {
-    const created = await conversationService.create({ title: 'Find Me', agentId: 'a1', modelId: 'm1' })
+    const created = await conversationService.create({ chatId: CHAT_ID, title: 'Find Me', agentId: 'a1', modelId: 'm1' })
     const found = await conversationService.getById(created.id)
 
     expect(found).toBeDefined()
@@ -55,7 +58,7 @@ describe('ConversationService', () => {
   })
 
   it('should update a conversation and bump updatedAt', async () => {
-    const created = await conversationService.create({ title: 'Old', agentId: 'a1', modelId: 'm1' })
+    const created = await conversationService.create({ chatId: CHAT_ID, title: 'Old', agentId: 'a1', modelId: 'm1' })
 
     // Small delay to ensure updatedAt differs
     await new Promise((r) => setTimeout(r, 5))
@@ -68,7 +71,7 @@ describe('ConversationService', () => {
   })
 
   it('should delete a conversation', async () => {
-    const created = await conversationService.create({ title: 'ToDelete', agentId: 'a1', modelId: 'm1' })
+    const created = await conversationService.create({ chatId: CHAT_ID, title: 'ToDelete', agentId: 'a1', modelId: 'm1' })
     await conversationService.delete(created.id)
 
     const found = await conversationService.getById(created.id)
@@ -76,10 +79,10 @@ describe('ConversationService', () => {
   })
 
   it('should cascade delete messages when conversation is deleted', async () => {
-    const conv = await conversationService.create({ title: 'With Messages', agentId: 'a1', modelId: 'm1' })
+    const conv = await conversationService.create({ chatId: CHAT_ID, title: 'With Messages', agentId: 'a1', modelId: 'm1' })
 
-    await messageService.create({ conversationId: conv.id, role: 'user', content: 'Hello' })
-    await messageService.create({ conversationId: conv.id, role: 'assistant', content: 'Hi there' })
+    await messageService.create({ chatId: CHAT_ID, conversationId: conv.id, role: 'user', content: 'Hello' })
+    await messageService.create({ chatId: CHAT_ID, conversationId: conv.id, role: 'assistant', content: 'Hi there' })
 
     await conversationService.delete(conv.id)
 
@@ -88,7 +91,7 @@ describe('ConversationService', () => {
   })
 
   it('should return empty array when no conversations exist', async () => {
-    const all = await conversationService.getAll()
+    const all = await conversationService.getAll(CHAT_ID)
     expect(all).toEqual([])
   })
 })
@@ -97,6 +100,7 @@ describe('ConversationService', () => {
 describe('MessageService', () => {
   it('should create a message with auto-generated id and timestamp', async () => {
     const msg = await messageService.create({
+      chatId: CHAT_ID,
       conversationId: 'conv-1',
       role: 'user',
       content: 'Hello',
@@ -111,9 +115,9 @@ describe('MessageService', () => {
 
   it('should get messages by conversationId sorted by timestamp', async () => {
     // Create messages with slight delay to ensure ordering
-    const msg1 = await messageService.create({ conversationId: 'conv-1', role: 'user', content: 'First' })
+    const msg1 = await messageService.create({ chatId: CHAT_ID, conversationId: 'conv-1', role: 'user', content: 'First' })
     await new Promise((r) => setTimeout(r, 2))
-    const msg2 = await messageService.create({ conversationId: 'conv-1', role: 'assistant', content: 'Second' })
+    const msg2 = await messageService.create({ chatId: CHAT_ID, conversationId: 'conv-1', role: 'assistant', content: 'Second' })
 
     const messages = await messageService.getByConversationId('conv-1')
 
@@ -123,9 +127,9 @@ describe('MessageService', () => {
   })
 
   it('should isolate messages between conversations', async () => {
-    await messageService.create({ conversationId: 'conv-1', role: 'user', content: 'For Conv 1' })
-    await messageService.create({ conversationId: 'conv-2', role: 'user', content: 'For Conv 2' })
-    await messageService.create({ conversationId: 'conv-1', role: 'assistant', content: 'Reply Conv 1' })
+    await messageService.create({ chatId: CHAT_ID, conversationId: 'conv-1', role: 'user', content: 'For Conv 1' })
+    await messageService.create({ chatId: CHAT_ID, conversationId: 'conv-2', role: 'user', content: 'For Conv 2' })
+    await messageService.create({ chatId: CHAT_ID, conversationId: 'conv-1', role: 'assistant', content: 'Reply Conv 1' })
 
     const conv1Messages = await messageService.getByConversationId('conv-1')
     const conv2Messages = await messageService.getByConversationId('conv-2')
@@ -136,7 +140,7 @@ describe('MessageService', () => {
   })
 
   it('should update a message', async () => {
-    const msg = await messageService.create({ conversationId: 'conv-1', role: 'assistant', content: 'Draft' })
+    const msg = await messageService.create({ chatId: CHAT_ID, conversationId: 'conv-1', role: 'assistant', content: 'Draft' })
     await messageService.update(msg.id, { content: 'Final', isStreaming: false })
 
     const messages = await messageService.getByConversationId('conv-1')
@@ -145,9 +149,9 @@ describe('MessageService', () => {
   })
 
   it('should delete messages by conversationId', async () => {
-    await messageService.create({ conversationId: 'conv-1', role: 'user', content: 'A' })
-    await messageService.create({ conversationId: 'conv-1', role: 'assistant', content: 'B' })
-    await messageService.create({ conversationId: 'conv-2', role: 'user', content: 'C' })
+    await messageService.create({ chatId: CHAT_ID, conversationId: 'conv-1', role: 'user', content: 'A' })
+    await messageService.create({ chatId: CHAT_ID, conversationId: 'conv-1', role: 'assistant', content: 'B' })
+    await messageService.create({ chatId: CHAT_ID, conversationId: 'conv-2', role: 'user', content: 'C' })
 
     await messageService.deleteByConversationId('conv-1')
 
@@ -159,11 +163,11 @@ describe('MessageService', () => {
   })
 
   it('should get latest messages with limit', async () => {
-    await messageService.create({ conversationId: 'conv-1', role: 'user', content: 'M1' })
+    await messageService.create({ chatId: CHAT_ID, conversationId: 'conv-1', role: 'user', content: 'M1' })
     await new Promise((r) => setTimeout(r, 2))
-    await messageService.create({ conversationId: 'conv-1', role: 'assistant', content: 'M2' })
+    await messageService.create({ chatId: CHAT_ID, conversationId: 'conv-1', role: 'assistant', content: 'M2' })
     await new Promise((r) => setTimeout(r, 2))
-    const msg3 = await messageService.create({ conversationId: 'conv-1', role: 'user', content: 'M3' })
+    const msg3 = await messageService.create({ chatId: CHAT_ID, conversationId: 'conv-1', role: 'user', content: 'M3' })
 
     const latest = await messageService.getLatest('conv-1', 2)
 
@@ -262,6 +266,7 @@ describe('ModelService', () => {
 describe('AgentService', () => {
   it('should create an agent with auto-generated id', async () => {
     const agent = await agentService.create({
+      chatId: CHAT_ID,
       name: 'ChatBot',
       description: 'A helpful assistant',
       systemPrompt: 'You are helpful.',
@@ -274,15 +279,15 @@ describe('AgentService', () => {
   })
 
   it('should get all agents', async () => {
-    await agentService.create({ name: 'Agent A' })
-    await agentService.create({ name: 'Agent B' })
+    await agentService.create({ chatId: CHAT_ID, name: 'Agent A' })
+    await agentService.create({ chatId: CHAT_ID, name: 'Agent B' })
 
-    const all = await agentService.getAll()
+    const all = await agentService.getAll(CHAT_ID)
     expect(all).toHaveLength(2)
   })
 
   it('should get agent by id', async () => {
-    const created = await agentService.create({ name: 'FindMe' })
+    const created = await agentService.create({ chatId: CHAT_ID, name: 'FindMe' })
     const found = await agentService.getById(created.id)
 
     expect(found).toBeDefined()
@@ -295,7 +300,7 @@ describe('AgentService', () => {
   })
 
   it('should update an agent', async () => {
-    const created = await agentService.create({ name: 'Original' })
+    const created = await agentService.create({ chatId: CHAT_ID, name: 'Original' })
     await agentService.update(created.id, { name: 'Updated', description: 'New desc' })
 
     const updated = await agentService.getById(created.id)
@@ -304,7 +309,7 @@ describe('AgentService', () => {
   })
 
   it('should delete a non-builtin agent', async () => {
-    const created = await agentService.create({ name: 'Deletable' })
+    const created = await agentService.create({ chatId: CHAT_ID, name: 'Deletable' })
     await agentService.delete(created.id)
 
     const found = await agentService.getById(created.id)
@@ -312,7 +317,7 @@ describe('AgentService', () => {
   })
 
   it('should return empty array when no agents exist', async () => {
-    const all = await agentService.getAll()
+    const all = await agentService.getAll(CHAT_ID)
     expect(all).toEqual([])
   })
 })

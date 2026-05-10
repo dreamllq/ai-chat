@@ -219,6 +219,7 @@ describe('reasoningContent', () => {
   it('should accept ChatMessage with optional reasoningContent', () => {
     const msg: ChatMessage = {
       id: 'msg-1',
+      chatId: 'default',
       conversationId: 'conv-1',
       role: 'assistant',
       content: 'The answer is 42',
@@ -231,6 +232,7 @@ describe('reasoningContent', () => {
   it('should accept ChatMessage without reasoningContent', () => {
     const msg: ChatMessage = {
       id: 'msg-2',
+      chatId: 'default',
       conversationId: 'conv-1',
       role: 'assistant',
       content: 'Hello',

@@ -22,6 +22,7 @@ describe('Core Types', () => {
   test('ChatMessage has required fields', () => {
     const msg: ChatMessage = {
       id: 'msg-1',
+      chatId: 'default',
       conversationId: 'conv-1',
       role: 'user',
       content: 'Hello',
@@ -38,6 +39,7 @@ describe('Core Types', () => {
   test('ChatMessage supports optional fields', () => {
     const msg: ChatMessage = {
       id: 'msg-1',
+      chatId: 'default',
       conversationId: 'conv-1',
       role: 'assistant',
       content: 'Hi',
@@ -52,6 +54,7 @@ describe('Core Types', () => {
   test('Conversation has all required fields', () => {
     const conv: Conversation = {
       id: 'conv-1',
+      chatId: 'default',
       title: 'Test',
       agentId: 'agent-1',
       modelId: 'model-1',

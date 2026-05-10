@@ -47,6 +47,7 @@ function createSubAgentCall(overrides: Partial<SubAgentCallInfo> = {}): SubAgent
 function createMessage(overrides: Partial<ChatMessageType> = {}): ChatMessageType {
   return {
     id: 'msg-1',
+    chatId: 'default',
     conversationId: 'conv-1',
     role: 'assistant',
     content: 'Here is the answer.',
@@ -123,9 +124,9 @@ describe('ChatMessage - Sub-Agent Cards', () => {
     const card = wrapper.find('.chat-message__sub-agent-card')
     expect(card.classes()).toContain('chat-message__sub-agent-card--completed')
 
-    const statusBadge = card.find('.chat-message__sub-agent-card__status')
-    expect(statusBadge.classes()).toContain('--completed')
-    expect(statusBadge.text()).toBe('Completed')
+    const statusIcon = card.find('.chat-message__sub-agent-card__status-icon')
+    expect(statusIcon.classes()).toContain('--completed')
+    expect(statusIcon.text()).toBe('✓')
   })
 
   it('displays running status badge with spinner and no duration', () => {
@@ -139,9 +140,8 @@ describe('ChatMessage - Sub-Agent Cards', () => {
     const card = wrapper.find('.chat-message__sub-agent-card')
     expect(card.classes()).toContain('chat-message__sub-agent-card--running')
 
-    const statusBadge = card.find('.chat-message__sub-agent-card__status')
-    expect(statusBadge.classes()).toContain('--running')
-    expect(statusBadge.text()).toBe('Running')
+    const statusIcon = card.find('.chat-message__sub-agent-card__status-icon')
+    expect(statusIcon.classes()).toContain('--running')
 
     expect(card.find('.chat-message__sub-agent-card__spinner').exists()).toBe(true)
     expect(card.find('.chat-message__sub-agent-card__duration').exists()).toBe(false)
@@ -158,9 +158,9 @@ describe('ChatMessage - Sub-Agent Cards', () => {
     const card = wrapper.find('.chat-message__sub-agent-card')
     expect(card.classes()).toContain('chat-message__sub-agent-card--failed')
 
-    const statusBadge = card.find('.chat-message__sub-agent-card__status')
-    expect(statusBadge.classes()).toContain('--failed')
-    expect(statusBadge.text()).toBe('Failed')
+    const statusIcon = card.find('.chat-message__sub-agent-card__status-icon')
+    expect(statusIcon.classes()).toContain('--failed')
+    expect(statusIcon.text()).toBe('✕')
   })
 
   it('shows task description in card', () => {

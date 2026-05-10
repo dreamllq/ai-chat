@@ -68,6 +68,7 @@ describe('SubAgent Types', () => {
   it('SubAgentExecution has all required fields', () => {
     const execution: SubAgentExecution = {
       id: 'exec-1',
+      chatId: 'default',
       parentExecutionId: null,
       conversationId: 'conv-1',
       parentMessageId: 'msg-1',
@@ -78,6 +79,7 @@ describe('SubAgent Types', () => {
       startTime: Date.now(),
       endTime: null,
       output: null,
+      reasoningContent: null,
       error: null,
       depth: 1,
       logs: [],

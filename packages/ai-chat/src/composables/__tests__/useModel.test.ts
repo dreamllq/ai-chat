@@ -43,6 +43,8 @@ describe('useModel', () => {
     await db.models.clear()
     // Reset module-level singleton state
     _resetModelState()
+    // Clear localStorage to prevent state leaking between tests
+    localStorage.clear()
   })
 
   it('createModel adds a model and it appears in models list', async () => {
@@ -113,14 +115,14 @@ describe('useModel', () => {
     await result.createModel(createModelData({ name: 'Second' }))
     await flushLiveQuery()
 
-    expect(result.currentModelId.value).toBeNull()
-
-    await result.initDefault()
-
-    // Should select some model from the list
+    // The watch auto-selects first model when models appear and none is selected
     expect(result.currentModelId.value).not.toBeNull()
-    const ids = result.models.value!.map((m) => m.id)
-    expect(ids).toContain(result.currentModelId.value)
+    const firstId = result.models.value![0].id
+    expect(result.currentModelId.value).toBe(firstId)
+
+    // initDefault should not change the selection since one is already set
+    await result.initDefault()
+    expect(result.currentModelId.value).toBe(firstId)
   })
 
   it('initDefault does nothing when already selected', async () => {
@@ -158,7 +160,8 @@ describe('useModel', () => {
     await result.createModel(createModelData({ name: 'SomeModel' }))
     await flushLiveQuery()
 
-    expect(result.currentModelId.value).toBeNull()
+    // The watch auto-selects first model; explicitly clear to test undefined state
+    result.selectModel('non-existent-id')
     expect(result.currentModel.value).toBeUndefined()
   })
 })

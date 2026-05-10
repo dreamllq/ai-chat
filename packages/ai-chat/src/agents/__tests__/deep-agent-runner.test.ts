@@ -76,6 +76,7 @@ function makeModel(overrides: Partial<ModelConfig> = {}): ModelConfig {
 function makeMessage(overrides: Partial<ChatMessage> = {}): ChatMessage {
   return {
     id: 'msg-1',
+    chatId: 'default',
     conversationId: 'conv-1',
     role: 'user',
     content: 'Hello',

@@ -72,7 +72,7 @@ describe('useSession', () => {
   it('switchConversation changes currentConversationId', async () => {
     const conv1 = await session.createConversation('agent-1', 'model-1')
     await flushLiveQuery()
-    await messageService.create({ conversationId: conv1.id, role: 'user', content: 'hi' })
+    await messageService.create({ chatId: 'default', conversationId: conv1.id, role: 'user', content: 'hi' })
     await flushLiveQuery()
     const conv2 = await session.createConversation('agent-2', 'model-2')
     await flushLiveQuery()
@@ -100,6 +100,7 @@ describe('useSession', () => {
     const conv1 = await session.createConversation('agent-1', 'model-1')
     await flushLiveQuery()
     await messageService.create({
+      chatId: 'default',
       conversationId: conv1.id,
       role: 'user',
       content: 'Hello from conv1',
@@ -109,11 +110,13 @@ describe('useSession', () => {
     const conv2 = await session.createConversation('agent-2', 'model-2')
     await flushLiveQuery()
     await messageService.create({
+      chatId: 'default',
       conversationId: conv2.id,
       role: 'user',
       content: 'Hello from conv2',
     })
     await messageService.create({
+      chatId: 'default',
       conversationId: conv2.id,
       role: 'assistant',
       content: 'Response from conv2',
@@ -142,6 +145,7 @@ describe('useSession', () => {
     const conv1 = await session.createConversation('agent-1', 'model-1')
     await flushLiveQuery()
     await messageService.create({
+      chatId: 'default',
       conversationId: conv1.id,
       role: 'user',
       content: 'Msg in conv1',
@@ -151,6 +155,7 @@ describe('useSession', () => {
     const conv2 = await session.createConversation('agent-2', 'model-2')
     await flushLiveQuery()
     await messageService.create({
+      chatId: 'default',
       conversationId: conv2.id,
       role: 'assistant',
       content: 'Msg in conv2',
@@ -173,6 +178,7 @@ describe('useSession', () => {
     const conv1 = await session.createConversation('agent-1', 'model-1')
     await flushLiveQuery()
     await messageService.create({
+      chatId: 'default',
       conversationId: conv1.id,
       role: 'user',
       content: 'Conv1 message',
@@ -182,6 +188,7 @@ describe('useSession', () => {
     await flushLiveQuery()
     // Add messages to conv2
     await messageService.create({
+      chatId: 'default',
       conversationId: conv2.id,
       role: 'user',
       content: 'Will be deleted',
@@ -224,13 +231,13 @@ describe('useSession', () => {
     await flushLiveQuery()
     expect(conv.messageCount).toBeUndefined()
 
-    await messageService.create({ conversationId: conv.id, role: 'user', content: 'hello' })
+    await messageService.create({ chatId: 'default', conversationId: conv.id, role: 'user', content: 'hello' })
     await flushLiveQuery()
 
     const updated = session.conversations.value!.find(c => c.id === conv.id)
     expect(updated?.messageCount).toBe(1)
 
-    await messageService.create({ conversationId: conv.id, role: 'assistant', content: 'hi' })
+    await messageService.create({ chatId: 'default', conversationId: conv.id, role: 'assistant', content: 'hi' })
     await flushLiveQuery()
 
     const updated2 = session.conversations.value!.find(c => c.id === conv.id)
@@ -240,7 +247,7 @@ describe('useSession', () => {
   it('createConversation reuses existing empty conversation instead of creating new', async () => {
     const conv1 = await session.createConversation('agent-1', 'model-1')
     await flushLiveQuery()
-    await messageService.create({ conversationId: conv1.id, role: 'user', content: 'hi' })
+    await messageService.create({ chatId: 'default', conversationId: conv1.id, role: 'user', content: 'hi' })
     await flushLiveQuery()
 
     const conv2 = await session.createConversation('agent-2', 'model-2')
@@ -257,7 +264,7 @@ describe('useSession', () => {
   it('createConversation creates new when all conversations have messages', async () => {
     const conv1 = await session.createConversation('agent-1', 'model-1')
     await flushLiveQuery()
-    await messageService.create({ conversationId: conv1.id, role: 'user', content: 'hi' })
+    await messageService.create({ chatId: 'default', conversationId: conv1.id, role: 'user', content: 'hi' })
     await flushLiveQuery()
 
     const conv2 = await session.createConversation('agent-2', 'model-2')

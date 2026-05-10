@@ -76,6 +76,7 @@ describe('useChat', () => {
     currentConversationId = ref<string | null>('conv-1')
     currentConversation = ref<Conversation | undefined>({
       id: 'conv-1',
+      chatId: 'default',
       title: 'Test Chat',
       agentId: 'agent-1',
       modelId: 'model-1',
@@ -292,11 +293,13 @@ describe('useChat', () => {
   it('passes conversation history to agent runner', async () => {
     // Pre-create messages in DB for history
     await messageService.create({
+      chatId: 'default',
       conversationId: 'conv-1',
       role: 'user',
       content: 'Previous Q',
     })
     await messageService.create({
+      chatId: 'default',
       conversationId: 'conv-1',
       role: 'assistant',
       content: 'Previous A',

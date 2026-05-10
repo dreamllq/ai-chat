@@ -37,6 +37,7 @@ vi.mock('../../composables/useLocale', () => ({
 function createExecution(overrides: Partial<SubAgentExecution> = {}): SubAgentExecution {
   return {
     id: 'exec-1',
+    chatId: 'default',
     parentExecutionId: null,
     conversationId: 'conv-1',
     parentMessageId: 'msg-1',

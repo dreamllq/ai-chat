@@ -248,9 +248,11 @@ function addCopyButtons(): void {
 }
 
 function getPreCodeText(pre: HTMLPreElement): string {
+  const codeBody = pre.querySelector('.code-block-body')
+  if (codeBody) return (codeBody.textContent ?? '').trimEnd()
   const codeEl = pre.querySelector('code')
   const el = codeEl ?? pre
-  return el.textContent ?? ''
+  return (el.textContent ?? '').trimEnd()
 }
 
 async function copyCode(pre: HTMLPreElement, index: number, btn: HTMLButtonElement): Promise<void> {

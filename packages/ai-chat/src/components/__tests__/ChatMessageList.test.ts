@@ -44,6 +44,7 @@ vi.mock('../../composables/useLocale', () => ({
 function createMessage(overrides: Partial<ChatMessage> = {}): ChatMessage {
   return {
     id: `msg-${Math.random().toString(36).slice(2, 8)}`,
+    chatId: 'default',
     conversationId: 'conv-1',
     role: 'user',
     content: 'Hello',

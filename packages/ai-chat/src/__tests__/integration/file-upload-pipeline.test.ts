@@ -156,6 +156,7 @@ describe('File upload pipeline — integration', () => {
     currentConversationId = ref<string | null>('conv-1')
     currentConversation = ref<Conversation | undefined>({
       id: 'conv-1',
+      chatId: 'default',
       title: 'Test Chat',
       agentId: 'agent-1',
       modelId: 'model-1',
@@ -382,6 +383,7 @@ describe('File upload pipeline — integration', () => {
   it('Backward compatibility: old-format metadata does not crash agent or ChatMessage component', async () => {
     // Manually create a message with old format metadata {name, size, type}
     const msg = await messageService.create({
+      chatId: 'default',
       conversationId: 'conv-1',
       role: 'user',
       content: 'Legacy data',

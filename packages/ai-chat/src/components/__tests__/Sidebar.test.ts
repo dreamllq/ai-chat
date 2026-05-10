@@ -87,6 +87,7 @@ const ElIconStub = {
 function makeConversation(overrides: Partial<Conversation> = {}): Conversation {
   return {
     id: `conv-${Math.random().toString(36).slice(2, 8)}`,
+    chatId: 'default',
     title: 'Test Chat',
     agentId: 'default',
     modelId: 'default',

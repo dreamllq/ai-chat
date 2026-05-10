@@ -229,6 +229,7 @@ export class DeepAgentRunner implements AgentRunner {
     try {
       const subMessages: ChatMessage[] = [{
         id: `sub-${executionId}`,
+        chatId: 'default',
         conversationId: '',
         role: 'user',
         content: task,

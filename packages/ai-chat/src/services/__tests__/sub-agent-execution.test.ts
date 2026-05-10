@@ -13,6 +13,7 @@ function makeExecution(
   overrides: Partial<Omit<SubAgentExecution, 'id'>> = {}
 ): Omit<SubAgentExecution, 'id'> {
   return {
+    chatId: 'default',
     parentExecutionId: null,
     conversationId: 'conv-1',
     parentMessageId: 'msg-1',
@@ -23,6 +24,7 @@ function makeExecution(
     startTime: Date.now(),
     endTime: null,
     output: null,
+    reasoningContent: null,
     error: null,
     depth: 0,
     logs: [],

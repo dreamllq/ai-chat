@@ -92,6 +92,7 @@ describe('useChat — file attachment pipeline', () => {
     currentConversationId = ref<string | null>('conv-1')
     currentConversation = ref<Conversation | undefined>({
       id: 'conv-1',
+      chatId: 'default',
       title: 'Test Chat',
       agentId: 'agent-1',
       modelId: 'model-1',

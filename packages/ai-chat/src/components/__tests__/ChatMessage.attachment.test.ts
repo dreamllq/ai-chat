@@ -37,6 +37,7 @@ Object.defineProperty(navigator, 'clipboard', {
 function createMessage(overrides: Partial<ChatMessageType> = {}): ChatMessageType {
   return {
     id: 'msg-1',
+    chatId: 'default',
     conversationId: 'conv-1',
     role: 'user',
     content: 'Hello',
