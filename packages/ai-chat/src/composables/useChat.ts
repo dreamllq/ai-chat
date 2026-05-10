@@ -1,4 +1,4 @@
-import { ref, onUnmounted } from 'vue'
+import { ref, onUnmounted, type Ref } from 'vue'
 import { useSession } from './useSession'
 import { useModel } from './useModel'
 import { agentRegistry } from '../services/agent'
@@ -7,9 +7,26 @@ import { TitleGenerator } from '../agents/title-generator'
 import type { MessageAttachment, SubAgentCallInfo, SubAgentLogEntry, TokenUsage, MessageStep, ThinkingStep } from '../types'
 import type { AiChatLocale, LocaleName } from '../locales'
 
-// Module-level singleton state — shared across all useChat() callers
-const isStreaming = ref(false)
-let abortController: AbortController | null = null
+// Per-chatId streaming state
+interface ChatState {
+  isStreaming: Ref<boolean>
+  abortController: AbortController | null
+}
+
+const chatStates = new Map<string, ChatState>()
+
+function getOrCreateChatState(chatId: string): ChatState {
+  let state = chatStates.get(chatId)
+  if (!state) {
+    state = { isStreaming: ref(false), abortController: null }
+    chatStates.set(chatId, state)
+  }
+  return state
+}
+
+export function _resetChatState(): void {
+  chatStates.clear()
+}
 
 const INITIAL_TITLE_MAX_LENGTH = 30
 
@@ -17,10 +34,11 @@ function resolveLocaleName(locale: AiChatLocale | LocaleName): string {
   return typeof locale === 'string' ? locale : 'en'
 }
 
-export function useChat() {
+export function useChat(chatId = 'default') {
+  const chatState = getOrCreateChatState(chatId)
   const { currentConversation, currentConversationId, currentMessages } =
-    useSession()
-  const { models } = useModel()
+    useSession(chatId)
+  const { models } = useModel(chatId)
   const messageService = new MessageService()
   const conversationService = new ConversationService()
   const subAgentExecutionService = new SubAgentExecutionService()
@@ -70,6 +88,7 @@ export function useChat() {
 
     // Save user message to IndexDB
     await messageService.create({
+      chatId,
       conversationId,
       role: 'user',
       content,
@@ -91,6 +110,7 @@ export function useChat() {
     // Agent not found — create assistant error message
     if (!runner) {
       await messageService.create({
+        chatId,
         conversationId,
         role: 'assistant',
         content: 'Error: Agent not found',
@@ -101,6 +121,7 @@ export function useChat() {
 
     // Create placeholder assistant message (streaming)
     const assistantMsg = await messageService.create({
+      chatId,
       conversationId,
       role: 'assistant',
       content: '',
@@ -108,8 +129,8 @@ export function useChat() {
     })
     console.log('[useChat] assistant placeholder created')
 
-    isStreaming.value = true
-    abortController = new AbortController()
+    chatState.isStreaming.value = true
+    chatState.abortController = new AbortController()
 
     let tokenUsage: TokenUsage | undefined
     let streamingFinalized = false
@@ -120,7 +141,7 @@ export function useChat() {
       console.log('[useChat] calling runner.chat() with', messagesForAgent.length, 'messages')
 
       const generator = runner.chat(messagesForAgent, model, {
-        signal: abortController.signal,
+        signal: chatState.abortController!.signal,
         locale: options?.locale ? resolveLocaleName(options.locale) : undefined,
       })
 
@@ -253,7 +274,7 @@ export function useChat() {
             ...(hadReasoning && !reasoningDoneFired ? { metadata: { ...assistantMsg.metadata, reasoningDone: true } } : {}),
           })
           streamingFinalized = true
-          isStreaming.value = false
+          chatState.isStreaming.value = false
           break
         } else if (chunk.type === 'done') {
           // Finalize last thinking step with tokenUsage
@@ -321,6 +342,7 @@ export function useChat() {
             subAgentLogBuffer[chunk.subAgent.executionId] = []
             try {
               await subAgentExecutionService.create({
+                chatId,
                 parentExecutionId: null,
                 conversationId,
                 parentMessageId: assistantMsg.id,
@@ -424,8 +446,8 @@ export function useChat() {
         })
       }
     } finally {
-      isStreaming.value = false
-      abortController = null
+      chatState.isStreaming.value = false
+      chatState.abortController = null
       if (!streamingFinalized) {
         try {
           await messageService.update(assistantMsg.id, { isStreaming: false })
@@ -468,17 +490,17 @@ export function useChat() {
 
   function stopStreaming(): void {
     console.log('[useChat] stopStreaming called')
-    abortController?.abort()
+    chatState.abortController?.abort()
   }
 
   onUnmounted(() => {
-    if (abortController) {
-      abortController.abort()
+    if (chatState.abortController) {
+      chatState.abortController.abort()
     }
   })
 
   return {
-    isStreaming,
+    isStreaming: chatState.isStreaming,
     currentMessages,
     sendMessage,
     stopStreaming,
