@@ -47,6 +47,7 @@ export { useModel } from './composables/useModel'
 export { useLocale } from './composables/useLocale'
 export { useAgent } from './composables/useAgent'
 export { useObservable } from './composables/useObservable'
+export { chatIdKey, useChatId } from './composables/useChatId'
 
 // === Size ===
 export { useSize } from './size'

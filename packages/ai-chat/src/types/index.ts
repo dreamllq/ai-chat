@@ -20,6 +20,8 @@ export interface TokenUsage {
 export interface ChatMessage {
   /** 消息唯一标识 */
   id: string
+  /** 聊天 ID，用于数据隔离 */
+  chatId: string
   /** 所属会话 ID */
   conversationId: string
   /** 消息角色 */
@@ -46,6 +48,8 @@ export interface ChatMessage {
 export interface Conversation {
   /** 会话唯一标识 */
   id: string
+  /** 聊天 ID，用于数据隔离 */
+  chatId: string
   /** 会话标题 */
   title: string
   /** 关联的智能体 ID */
@@ -179,6 +183,8 @@ export interface SkillDefinition {
 export interface AgentDefinition {
   /** 智能体唯一标识 */
   id: string
+  /** 聊天 ID，用于数据隔离（运行时注册的智能体无此字段，仅 DB 持久化的智能体需要） */
+  chatId?: string
   /** 智能体名称 */
   name: string
   /** 智能体描述 */
@@ -244,6 +250,8 @@ export interface SubAgentLogEntry {
 /** 子 Agent 执行记录（数据库存储） */
 export interface SubAgentExecution {
   id: string
+  /** 聊天 ID，用于数据隔离 */
+  chatId: string
   parentExecutionId: string | null
   conversationId: string
   parentMessageId: string
