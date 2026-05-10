@@ -12,8 +12,8 @@ export class ConversationService {
     return conversation
   }
 
-  async getAll(): Promise<Conversation[]> {
-    return db.conversations.reverse().sortBy('createdAt')
+  async getAll(chatId: string): Promise<Conversation[]> {
+    return db.conversations.where('chatId').equals(chatId).reverse().sortBy('createdAt')
   }
 
   async getById(id: string): Promise<Conversation | undefined> {
@@ -31,11 +31,16 @@ export class ConversationService {
     await db.conversations.delete(id)
   }
 
-  async deleteAll(): Promise<void> {
-    // Cascade delete all messages and sub-agent executions first
-    await db.messages.clear()
-    await db.subAgentExecutions.clear()
-    await db.conversations.clear()
+  async deleteAll(chatId: string): Promise<void> {
+    const conversations = await db.conversations.where('chatId').equals(chatId).toArray()
+    const conversationIds = conversations.map(c => c.id)
+
+    for (const conversationId of conversationIds) {
+      await db.messages.where('conversationId').equals(conversationId).delete()
+      await db.subAgentExecutions.where('conversationId').equals(conversationId).delete()
+    }
+
+    await db.conversations.where('chatId').equals(chatId).delete()
   }
 }
 
@@ -110,8 +115,8 @@ export class AgentService {
     return agent
   }
 
-  async getAll(): Promise<AgentDefinition[]> {
-    return db.agents.toArray()
+  async getAll(chatId: string): Promise<AgentDefinition[]> {
+    return db.agents.where('chatId').equals(chatId).toArray()
   }
 
   async getById(id: string): Promise<AgentDefinition | undefined> {
