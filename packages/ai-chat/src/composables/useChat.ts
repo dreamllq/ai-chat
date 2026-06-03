@@ -168,6 +168,10 @@ export function useChat(chatId = 'default') {
             currentThinkingStep.tokenUsage = tokenUsageOverride
           }
           currentThinkingStep.resultContent = currentIterationContent || undefined
+          if (!currentThinkingStep.content) {
+            const idx = steps.indexOf(currentThinkingStep)
+            if (idx !== -1) steps.splice(idx, 1)
+          }
           currentThinkingStep = null
         }
       }
@@ -214,8 +218,6 @@ export function useChat(chatId = 'default') {
           finalizeCurrentThinkingStep(chunk.tokenUsage)
           currentIterationContent = ''
           currentThinkingStep = { type: 'thinking', content: '', startTime: Date.now() }
-          steps.push(currentThinkingStep)
-          await updateStepsToDB()
         } else if (chunk.type === 'token') {
           if (chunk.content) {
             fullContent += chunk.content
@@ -225,6 +227,9 @@ export function useChat(chatId = 'default') {
             fullReasoning += chunk.reasoningContent
             hadReasoning = true
             if (iterationAware && currentThinkingStep) {
+              if (!steps.includes(currentThinkingStep)) {
+                steps.push(currentThinkingStep)
+              }
               currentThinkingStep.content += chunk.reasoningContent
             }
           }

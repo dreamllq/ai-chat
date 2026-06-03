@@ -300,7 +300,7 @@ onUpdated(() => {
       <template v-if="hasSteps">
         <div v-for="(step, index) in sortedSteps" :key="index">
           <!-- ThinkingStep -->
-          <template v-if="step.type === 'thinking'">
+          <template v-if="step.type === 'thinking' && step.content">
             <div class="chat-message__reasoning">
               <div class="chat-message__reasoning-header" @click="toggleThinkingStep(index)">
                 <span class="chat-message__reasoning-icon">💭</span>
@@ -324,7 +324,7 @@ onUpdated(() => {
             </div>
           </template>
           <!-- SubAgentStep -->
-          <div v-else class="chat-message__sub-agent-card" :class="`chat-message__sub-agent-card--${step.status}`" @click="openSubAgentLog(step)">
+          <div v-else-if="step.type === 'sub_agent'" class="chat-message__sub-agent-card" :class="`chat-message__sub-agent-card--${step.status}`" @click="openSubAgentLog(step)">
             <span class="chat-message__sub-agent-card__status-icon" :class="`--${step.status}`">
               <span v-if="step.status === 'running'" class="chat-message__sub-agent-card__spinner"></span>
               <span v-else-if="step.status === 'completed'">✓</span>
